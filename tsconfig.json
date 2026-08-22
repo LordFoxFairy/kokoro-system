@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2023", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true,
+    "noEmit": true, "verbatimModuleSyntax": true, "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true, "noImplicitOverride": true, "skipLibCheck": true,
+    "allowUnreachableCode": false, "allowUnusedLabels": false
+  },
+  "include": ["src", "test"]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@kokoro/system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "dev": "tsx src/main.ts",
+    "start": "node dist/main.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --no-file-parallelism",
+    "lint": "eslint src test",
+    "db:apply": "tsx scripts/apply-schema.ts"
+  },
+  "dependencies": {
+    "mysql2": "^3.14.1",
+    "redis": "^5.8.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.15.21",
+    "eslint": "^9.39.1",
+    "tsx": "^4.19.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^4.1.10"
+  }
+}
