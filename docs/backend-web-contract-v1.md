@@ -90,4 +90,3 @@ config_version > id
 3. Tenant A/B 使用相同 product/locale 时 cache 和 response 完全隔离。
 4. 验证 tenant、locale、surface、release 的覆盖优先级和 digest 稳定性。
 5. 验证 Redis miss、Redis failure、IAM mismatch、MySQL failure 的 fail-closed 行为。
-6. 当前 System commit：`e20f8ba`。
