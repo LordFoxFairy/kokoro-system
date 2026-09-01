@@ -1,0 +1,37 @@
+# kokoro-system
+
+System configuration control plane for Site, Workspace, site policy, release and Runtime Manifest.
+
+Start with [`docs/README.md`](docs/README.md). The source of truth for cross-repository wire schemas remains
+the parent repository `contract/`; this repository owns its application implementation and consumer-facing
+integration notes.
+
+```bash
+pnpm install
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm build
+pnpm start
+```
+
+System accepts only IAM/BFF server-side tenant context. It does not store credentials or authorization facts,
+and it does not call Model Provider services.
+
+PostgreSQL is the durable system fact store and Redis is the manifest cache/coordination dependency. The service
+fails readiness when either boundary is unavailable; this repository does not add another database runtime.
+
+## Production image
+
+The image builds the TypeScript sources and starts the compiled production entry `node dist/main.js`.
+Provide `DATABASE_URL`, `REDIS_URL`, `KOKORO_IAM_BASE_URL`, and `KOKORO_IAM_BACKEND_TOKEN` at runtime:
+
+```bash
+docker build -t kokoro-system:local .
+docker run --rm -p 4240:4240 \
+  -e DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB \
+  -e REDIS_URL=redis://HOST:6379 \
+  -e KOKORO_IAM_BASE_URL=http://HOST:7202 \
+  -e KOKORO_IAM_BACKEND_TOKEN=TOKEN \
+  kokoro-system:local
+```

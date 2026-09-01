@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { MysqlSystemRepository } from "../src/modules/runtime-manifest/mysql-repository.js";
-import type { SqlPool } from "../src/infrastructure/mysql/client.js";
+import { PostgresSystemRepository } from "../src/modules/runtime-manifest/postgres-repository.js";
+import type { SqlPool } from "../src/infrastructure/postgres/client.js";
 
-describe("MysqlSystemRepository", () => {
+describe("PostgresSystemRepository", () => {
   it("resolves surface, tenant, product, locale and release precedence deterministically", async () => {
     let released = false;
     const client = {
@@ -19,7 +19,7 @@ describe("MysqlSystemRepository", () => {
       release: () => undefined,
     };
     const pool = { connect: async () => client, ping: async () => undefined, close: async () => undefined } satisfies SqlPool;
-    const result = await new MysqlSystemRepository(pool).getManifest({
+    const result = await new PostgresSystemRepository(pool).getManifest({
       context: { tenantId: "tenant-a", actorId: null, organizationId: null, surfaceId: "surface-a", permissions: [], correlationId: "request-a" },
       productId: "product-a",
       locale: "en-US",

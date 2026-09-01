@@ -1,11 +1,11 @@
-import type { SqlPool } from "../../infrastructure/mysql/client.js";
+import type { SqlPool } from "../../infrastructure/postgres/client.js";
 import type { RuntimeManifest, TenantRequestContext } from "./model.js";
 import type { SystemRepository } from "./ports.js";
 import { manifestDigest } from "./service.js";
 
 type Row = Record<string, unknown>;
 type Value = Readonly<{ id: string; moduleKey: string; configKey: string; scopeType: string; locale: string | null; value: unknown; configVersion: string; releaseId: string | null; digest: string }>;
-export class MysqlSystemRepository implements SystemRepository {
+export class PostgresSystemRepository implements SystemRepository {
   public constructor(private readonly pool: SqlPool) {}
   public async getManifest(input: Readonly<{ context: TenantRequestContext; productId: string; locale: string }>): Promise<RuntimeManifest> {
     const client = await this.pool.connect();

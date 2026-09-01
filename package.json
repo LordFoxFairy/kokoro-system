@@ -6,22 +6,30 @@
   "engines": {
     "node": ">=22 <25"
   },
+  "packageManager": "pnpm@11.2.2",
   "scripts": {
     "dev": "tsx src/main.ts",
     "start": "node dist/main.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --no-file-parallelism",
-    "lint": "eslint src test",
-    "db:apply": "tsx scripts/apply-schema.ts"
+    "sdk:build": "pnpm --dir sdk/typescript build",
+    "sdk:typecheck": "pnpm --dir sdk/typescript typecheck",
+    "sdk:test": "pnpm --dir sdk/typescript test",
+    "lint": "eslint src test scripts sdk/typescript/src sdk/typescript/test",
+    "db:apply": "tsx scripts/apply-schema.ts",
+    "test:runtime-smoke": "tsx scripts/test/runtime-smoke.ts",
+    "test:runtime-real-iam": "tsx scripts/test/runtime-real-iam-smoke.ts"
   },
   "dependencies": {
-    "mysql2": "^3.14.1",
-    "redis": "^5.8.2"
+    "pg": "^8.16.3",
+    "redis": "^5.8.2",
+    "@bufbuild/protobuf": "2.14.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@types/node": "^22.15.21",
+    "@types/pg": "^8.15.5",
     "eslint": "^9.39.1",
     "tsx": "^4.19.4",
     "typescript": "^5.9.3",

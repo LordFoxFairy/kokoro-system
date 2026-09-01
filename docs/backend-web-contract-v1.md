@@ -6,7 +6,7 @@
 
 `kokoro-system` 拥有 Product/Application、Navigation、Localization、Theme、Feature Flag、通用配置、Assignment reference 和 Runtime Manifest。
 
-它不拥有 IAM 身份/权限、Payment、Credit、Model、Hub 或 Session 事实；Web 不直连 System MySQL/Redis。
+它不拥有 IAM 身份/权限、Payment、Credit、Model、Hub 或 Session 事实；Web 不直连 System PostgreSQL/Redis。
 
 ## 2. Runtime Manifest API
 
@@ -27,7 +27,7 @@ GET IAM_BASE_URL/internal/iam/tenant-binding?host=TENANT_HOST
 Authorization: Bearer BACKEND_WORKLOAD_TOKEN
 ```
 
-IAM 返回的 tenant 必须等于请求 context 的 tenant；不一致、未知或禁用 Host 直接失败，且不得读取 MySQL/Redis 业务数据。
+IAM 返回的 tenant 必须等于请求 context 的 tenant；不一致、未知或禁用 Host 直接失败，且不得读取 PostgreSQL/Redis 业务数据。
 
 ## 3. Response
 
@@ -66,27 +66,46 @@ config_version > id
 
 ## 5. Storage/runtime contract
 
-- MySQL 是 release/config 最终事实。
+- PostgreSQL 是 release/config 最终事实。
 - Redis 只缓存完整 Runtime Manifest。
-- Redis key：`<namespace>:manifest:TENANT_ID:PRODUCT_ID:LOCALE`。
+- Redis key：`<namespace>:manifest:TENANT_ID:PRODUCT_ID:LOCALE:SURFACE_OR_DEFAULT`；其中
+  `SURFACE_OR_DEFAULT` 为 `surface_id`，缺省请求使用固定值 `default`。这条扩展是为了保证
+  同一租户、产品和 locale 下的 surface 覆盖不会复用错误的完整 Manifest。
 - Redis failure、cache identity mismatch 或 IAM binding failure：fail closed。
 - 不使用进程内缓存或跨 tenant cache key。
-- SQL 使用 InnoDB、UTC、软删除、应用层冲突处理、显式 scope 过滤。
+- SQL 使用 PostgreSQL、UTC、软删除、应用层冲突处理、显式 scope 过滤。
 
 ## 6. HTTP error contract
 
 ```text
 400  product_id/header/query 缺失或格式错误
 404 未知路径
-503 IAM、MySQL、Redis 或 manifest 读取不可用
+503 IAM、PostgreSQL、Redis 或 manifest 读取不可用
 ```
 
 响应不得泄露 SQL、Redis key、workload token、内部堆栈或其他服务私有事实。
 
 ## 7. Web agent acceptance
 
-1. 只调用 BFF/API，不直连 System MySQL/Redis。
+1. 只调用 BFF/API，不直连 System PostgreSQL/Redis。
 2. 不在浏览器保存或提交 `tenant_id`、workload token 或 IAM backend token。
 3. Tenant A/B 使用相同 product/locale 时 cache 和 response 完全隔离。
 4. 验证 tenant、locale、surface、release 的覆盖优先级和 digest 稳定性。
-5. 验证 Redis miss、Redis failure、IAM mismatch、MySQL failure 的 fail-closed 行为。
+5. 验证 Redis miss、Redis failure、IAM mismatch、PostgreSQL failure 的 fail-closed 行为。
+
+## 8. Control-plane BFF surface
+
+Admin BFF may expose the following server-side actions without exposing System storage:
+
+```text
+GET/POST /system/sites
+GET/POST /system/workspaces
+GET/PUT  /system/sites/SITE_ID/policy
+GET/POST /system/config
+POST     /system/releases
+POST     /system/releases/RELEASE_ID/{validate,publish,retire}
+```
+
+List endpoints use `{data:{items,nextCursor}}`; mutations require `Idempotency-Key`. BFF supplies the IAM
+derived tenant context and permission set, performs CSRF/session checks at its own boundary, and forwards the
+System `x-kokoro-request-id` for tracing. User Web does not use these administrative mutations.

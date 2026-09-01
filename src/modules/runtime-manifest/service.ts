@@ -3,7 +3,7 @@ import type { ManifestCache, TenantBindingVerifier, SystemRepository } from "./p
 import type { RuntimeManifest, TenantRequestContext } from "./model.js";
 
 function cacheKey(context: TenantRequestContext, productId: string, locale: string): string {
-  return `manifest:${context.tenantId}:${productId}:${locale}`;
+  return `manifest:${context.tenantId}:${productId}:${locale}:${context.surfaceId ?? "default"}`;
 }
 export class RuntimeManifestService {
   public constructor(private readonly repository: SystemRepository, private readonly cache: ManifestCache, private readonly binding: TenantBindingVerifier) {}

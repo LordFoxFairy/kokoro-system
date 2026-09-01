@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+test-results
+.git
+.env*
+!.env.example
+docs
+test
+scripts
+sdk

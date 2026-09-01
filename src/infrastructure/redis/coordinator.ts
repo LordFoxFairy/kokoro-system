@@ -4,7 +4,7 @@ import type { RuntimeManifest } from "../../modules/runtime-manifest/model.js";
 export class RedisCoordinator implements ManifestCache {
   private readonly client: RedisClientType;
   private open = false;
-  public constructor(private readonly url: string, private readonly namespace = "kokoro:system") { this.client = createClient({ url }); this.client.on("error", () => undefined); }
+  public constructor(private readonly url: string, private readonly namespace = "kokoro:system") { this.client = createClient({ url, socket: { reconnectStrategy: (retries) => retries >= 3 ? new Error("Redis unavailable") : Math.min(100 * (retries + 1), 500) } }); this.client.on("error", () => undefined); }
   public async connect(): Promise<void> { if (!this.open) { await this.client.connect(); this.open = true; } }
   public async assertReady(): Promise<void> { await this.connect(); if (await this.client.ping() !== "PONG") throw new Error("Redis is not ready"); }
   private key(key: string): string { return `${this.namespace}:${key}`; }
