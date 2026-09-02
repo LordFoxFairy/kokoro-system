@@ -12,7 +12,10 @@ describe("system SQL contract", () => {
     expect(sql).toContain("system_config_lookup_idx ON system_config_record (tenant_id");
     expect(sql).toContain("system_site_host");
     expect(sql).toContain("system_site_host_active_hostname_uidx");
-    expect(sql).toContain("FOREIGN KEY (tenant_id, site_id) REFERENCES system_site (tenant_id, id)");
+    expect(sql).not.toMatch(/FOREIGN KEY|\bREFERENCES\b/iu);
+    expect(sql).not.toContain("system_site_tenant_id_uidx");
+    expect(sql).toContain("system_site_host_active_hostname_uidx");
+    expect(sql).toContain("system_workspace_tenant_site_key_active_uidx");
     expect(sql).toContain("system_site_policy_active_uidx");
   });
 });

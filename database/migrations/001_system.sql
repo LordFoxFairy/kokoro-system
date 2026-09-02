@@ -53,13 +53,11 @@ CREATE TABLE IF NOT EXISTS system_site (
 CREATE INDEX IF NOT EXISTS system_site_tenant_idx ON system_site (tenant_id, status, id);
 CREATE UNIQUE INDEX IF NOT EXISTS system_site_tenant_key_active_uidx
   ON system_site (tenant_id, site_key) WHERE status <> 'archived';
-CREATE UNIQUE INDEX IF NOT EXISTS system_site_tenant_id_uidx ON system_site (tenant_id, id);
 
 CREATE TABLE IF NOT EXISTS system_site_host (
   id UUID PRIMARY KEY, tenant_id TEXT NOT NULL, site_id UUID NOT NULL,
   hostname VARCHAR(255) NOT NULL, status VARCHAR(32) NOT NULL DEFAULT 'active',
-  created_at TIMESTAMPTZ(6) NOT NULL, updated_at TIMESTAMPTZ(6) NOT NULL,
-  CONSTRAINT system_site_host_site_fk FOREIGN KEY (tenant_id, site_id) REFERENCES system_site (tenant_id, id),
+  created_at TIMESTAMPTZ(6) NOT NULL,
   CONSTRAINT system_site_host_hostname_ck CHECK (hostname = lower(hostname) AND hostname <> '')
 );
 CREATE UNIQUE INDEX IF NOT EXISTS system_site_host_active_hostname_uidx
@@ -71,8 +69,7 @@ CREATE INDEX IF NOT EXISTS system_site_host_tenant_idx ON system_site_host (tena
 CREATE TABLE IF NOT EXISTS system_workspace (
   id UUID PRIMARY KEY, tenant_id TEXT NOT NULL, site_id UUID NOT NULL, workspace_key VARCHAR(128) NOT NULL,
   name VARCHAR(160) NOT NULL, status VARCHAR(32) NOT NULL, version BIGINT NOT NULL DEFAULT 1,
-  created_at TIMESTAMPTZ(6) NOT NULL, updated_at TIMESTAMPTZ(6) NOT NULL, deleted_at TIMESTAMPTZ(6), deleted_by UUID,
-  CONSTRAINT system_workspace_site_fk FOREIGN KEY (tenant_id, site_id) REFERENCES system_site (tenant_id, id)
+  created_at TIMESTAMPTZ(6) NOT NULL, updated_at TIMESTAMPTZ(6) NOT NULL, deleted_at TIMESTAMPTZ(6), deleted_by UUID
 );
 CREATE INDEX IF NOT EXISTS system_workspace_tenant_idx ON system_workspace (tenant_id, site_id, status, id);
 CREATE UNIQUE INDEX IF NOT EXISTS system_workspace_tenant_site_key_active_uidx
@@ -81,8 +78,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS system_workspace_tenant_site_key_active_uidx
 CREATE TABLE IF NOT EXISTS system_site_policy (
   id UUID PRIMARY KEY, tenant_id TEXT NOT NULL, site_id UUID NOT NULL, version BIGINT NOT NULL DEFAULT 1,
   status VARCHAR(32) NOT NULL, default_locale VARCHAR(32) NOT NULL, allowed_locales_json JSONB NOT NULL,
-  allowed_products_json JSONB NOT NULL, public_manifest BOOLEAN NOT NULL DEFAULT false, updated_at TIMESTAMPTZ(6) NOT NULL,
-  CONSTRAINT system_site_policy_site_fk FOREIGN KEY (tenant_id, site_id) REFERENCES system_site (tenant_id, id)
+  allowed_products_json JSONB NOT NULL, public_manifest BOOLEAN NOT NULL DEFAULT false, updated_at TIMESTAMPTZ(6) NOT NULL
 );
 CREATE INDEX IF NOT EXISTS system_site_policy_tenant_idx ON system_site_policy (tenant_id, site_id, status, id);
 CREATE UNIQUE INDEX IF NOT EXISTS system_site_policy_active_uidx
