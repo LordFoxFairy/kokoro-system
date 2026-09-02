@@ -1,4 +1,4 @@
-// GENERATED — DO NOT EDIT. Source Root commit: fff24d72d586e19e9cbe36d4b680411f6dd8edfd
+// GENERATED — DO NOT EDIT. Source Root commit: 24d6c5dd7d679e0facadbe4fed2a7e87a1cfccec
 // Manifest SHA-256: 6d7a093e07f92573a4320dec9590f0ea42461e70291c367322f4f29fb97f697a
 // GENERATED SOURCE — authority: contract/slice-a-contract-manifest.yaml
 
