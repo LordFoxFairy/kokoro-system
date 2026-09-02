@@ -2,7 +2,8 @@
 
 | Path | Responsibility |
 |---|---|
-| `src/interfaces/http/server.ts` | health/readiness, HTTP and JSON RPC transport |
+| `src/interfaces/http/server.ts` | health/readiness, optional BFF service-auth, HTTP and JSON RPC transport |
+| `src/interfaces/http/service-auth.ts` | `web-bff` service identity and internal secret/Bearer guard |
 | `src/modules/runtime-manifest/` | manifest assembly, IAM binding and cache port |
 | `src/modules/system/` | Site, Workspace, Policy, Config, Release domain/application |
 | `src/infrastructure/postgres/` | PostgreSQL pool and control-plane persistence adapter |
@@ -14,3 +15,7 @@
 The public application exports are in `src/index.ts`. New System features belong under `src/modules/system/`
 and should expose a repository port before adding a transport route. Do not import IAM persistence, Agent runtime,
 Session projection, Model Provider, or browser code into this repository.
+
+Runtime manifest callers use the v1 product key at the HTTP boundary. `PostgresSystemRepository` resolves it to an
+active `system_product.id` before applying UUID-backed release/config predicates; an unknown key returns an empty
+manifest without sending the key to PostgreSQL UUID columns.

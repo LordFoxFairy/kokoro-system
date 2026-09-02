@@ -20,6 +20,20 @@ x-kokoro-request-id: REQUEST_ID
 
 `surface_id` 可选，只是配置覆盖选择器，不是身份或授权边界。`x-kokoro-tenant-id` 只允许由受信 BFF/server-side context 传入；浏览器不能提交或决定它。
 
+System 的部署可配置 `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 启用 BFF service-auth。启用后，runtime manifest、RPC
+manifest 和全部 `/system/*` 业务接口必须同时满足：
+
+```http
+x-kokoro-service: web-bff
+x-kokoro-internal-secret: BFF_SERVICE_TOKEN
+Authorization: Bearer BFF_SERVICE_TOKEN   # 与上一行二选一；BFF 可同时发送两者
+x-kokoro-tenant-id: TENANT_ID
+```
+
+`x-kokoro-service-token` 不属于本契约；服务凭据不是用户 Bearer。缺失或错误 service-auth 返回
+`403 service_auth_failed`，缺 tenant context 返回 `400`。`/healthz` 和 `/readyz` 不受 service-auth 保护。
+未配置 `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 时，既有本地 fixture 兼容模式保持有效。
+
 System 必须调用 IAM：
 
 ```http
@@ -30,6 +44,10 @@ Authorization: Bearer BACKEND_WORKLOAD_TOKEN
 IAM 返回的 tenant 必须等于请求 context 的 tenant；不一致、未知或禁用 Host 直接失败，且不得读取 PostgreSQL/Redis 业务数据。
 
 ## 3. Response
+
+`product_id` 使用 v1 product key（例如 `kokoro`）。System 在 owner 内通过 active `system_product.product_key`
+解析 PostgreSQL UUID，再读取 UUID-backed release/config 记录；解析不到的 product key 返回该 key 对应的空
+manifest，不把外部 key 直接绑定到 UUID 列。响应始终回显请求的 v1 product key。
 
 ```json
 {
@@ -79,6 +97,7 @@ config_version > id
 
 ```text
 400  product_id/header/query 缺失或格式错误
+403  service_auth_failed：配置 service token 后缺失或错误的 BFF service 身份/凭据
 404 未知路径
 503 IAM、PostgreSQL、Redis 或 manifest 读取不可用
 ```
@@ -107,5 +126,6 @@ POST     /system/releases/RELEASE_ID/{validate,publish,retire}
 ```
 
 List endpoints use `{data:{items,nextCursor}}`; mutations require `Idempotency-Key`. BFF supplies the IAM
-derived tenant context and permission set, performs CSRF/session checks at its own boundary, and forwards the
-System `x-kokoro-request-id` for tracing. User Web does not use these administrative mutations.
+derived tenant context and permission set, performs CSRF/session checks at its own boundary, sends
+`x-kokoro-service: web-bff` plus the configured internal secret or service Bearer, and forwards the System
+`x-kokoro-request-id` for tracing. User Web does not use these administrative mutations.

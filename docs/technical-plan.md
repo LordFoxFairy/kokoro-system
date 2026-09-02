@@ -16,6 +16,10 @@ release 状态和 assembled Runtime Manifest。IAM 负责登录、主体、租�
 System 不写入这些事实。Workspace 不是 Agent 的 `RuntimeNamespace`，也不选择 graph/checkpoint。System
 不调用 Model Provider，不拥有模型、支付、积分、Capability 或 Session 事实。
 
+v1 HTTP/RPC 的 `product_id` 是稳定 product key。System 先通过 active `system_product.product_key` 解析
+内部 UUID，再查询 UUID-backed release/config 记录；未知 product key 返回空 manifest，不把外部 key 直接
+绑定到 PostgreSQL UUID 列。
+
 ## 2. 资源模型
 
 | 资源 | 隔离键 | 状态 | 说明 |
@@ -50,6 +54,8 @@ namespace、tenant、product、locale、surface/default；cache identity mismatc
 - HTTP：`GET /healthz`、`GET /readyz`、`/system/*`。
 - RPC：`POST /rpc/kokoro.system.v1.SystemService/GetRuntimeManifest`，仅作为同一 application service
   的 JSON transport fixture，不生成第二份业务实现。
+- 当 `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 非空时，runtime manifest、RPC manifest 和 `/system/*` 业务接口要求
+  `x-kokoro-service: web-bff` 及匹配的 internal secret 或 service Bearer；`/healthz`、`/readyz` 保持公开。
 - 读资源需要 IAM context permission `system:read`；写资源需要 `system:write`；release 状态变更需要
   `system:publish`。权限数组只在请求内存中消费，不落库。
 - 所有 mutation 要求 `Idempotency-Key`；同 tenant + key + request hash 重放原响应，hash 不同返回

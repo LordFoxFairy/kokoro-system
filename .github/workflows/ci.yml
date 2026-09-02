@@ -10,6 +10,34 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: kokoro_system
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: kokoro_ci
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d kokoro_system"
+          --health-interval=2s
+          --health-timeout=3s
+          --health-retries=30
+      redis:
+        image: redis:7
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=2s
+          --health-timeout=2s
+          --health-retries=15
+    env:
+      DATABASE_URL: postgresql://postgres:kokoro_ci@127.0.0.1:55432/kokoro_system
+      REDIS_URL: redis://127.0.0.1:56379
+      TEST_DATABASE_URL: postgresql://postgres:kokoro_ci@127.0.0.1:55432/kokoro_system
+      TEST_REDIS_URL: redis://127.0.0.1:56379
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -20,8 +48,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm lint
-      - run: pnpm test
-      - run: pnpm build
+      - run: pnpm db:apply
+      - run: pnpm contract:check
+      - run: pnpm check
+      - run: pnpm test:unit
+      - run: pnpm test:integration
       - run: docker build --tag kokoro-system:ci .

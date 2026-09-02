@@ -26,6 +26,7 @@ export type SystemClientOptions = Readonly<{
   baseUrl: string;
   tenantId: string;
   tenantHost: string;
+  serviceToken?: string;
   workloadToken?: string;
   actorId?: string;
   requestId?: () => string;
@@ -69,6 +70,7 @@ export function createSystemClient(options: SystemClientOptions): SystemClient {
   const tenantId = requireValue("tenantId", options.tenantId);
   const tenantHost = normalizeHost(options.tenantHost);
   const workloadToken = optionalValue("workloadToken", options.workloadToken);
+  const serviceToken = optionalValue("serviceToken", options.serviceToken ?? workloadToken);
   const actorId = optionalValue("actorId", options.actorId);
   const requestId = options.requestId ?? randomUUID;
   const timeoutMs = options.timeoutMs ?? 15_000;
@@ -87,7 +89,7 @@ export function createSystemClient(options: SystemClientOptions): SystemClient {
         baseUrl,
         tenantId,
         tenantHost,
-        workloadToken,
+        serviceToken,
         actorId,
         requestId,
         timeoutMs,
@@ -102,7 +104,7 @@ async function getRuntimeManifest(
     baseUrl: string;
     tenantId: string;
     tenantHost: string;
-    workloadToken: string | undefined;
+    serviceToken: string | undefined;
     actorId: string | undefined;
     requestId: () => string;
     timeoutMs: number;
@@ -130,8 +132,12 @@ async function getRuntimeManifest(
     "x-kokoro-request-id": requestId,
     "x-kokoro-tenant-id": options.tenantId,
   };
-  if (options.workloadToken !== undefined)
-    headers.authorization = `Bearer ${options.workloadToken}`;
+  if (options.serviceToken !== undefined)
+    Object.assign(headers, {
+      authorization: `Bearer ${options.serviceToken}`,
+      "x-kokoro-internal-secret": options.serviceToken,
+      "x-kokoro-service": "web-bff",
+    });
   if (options.actorId !== undefined)
     headers["x-kokoro-actor-id"] = options.actorId;
 

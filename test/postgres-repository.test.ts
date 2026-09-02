@@ -5,8 +5,11 @@ import type { SqlPool } from "../src/infrastructure/postgres/client.js";
 describe("PostgresSystemRepository", () => {
   it("resolves surface, tenant, product, locale and release precedence deterministically", async () => {
     let released = false;
+    const queries: Array<{ sql: string; values: readonly unknown[] }> = [];
     const client = {
-      query: async <Row>(sql: string): Promise<{ rows: readonly Row[]; affectedRows: number }> => {
+      query: async <Row>(sql: string, values: readonly unknown[] = []): Promise<{ rows: readonly Row[]; affectedRows: number }> => {
+        queries.push({ sql, values });
+        if (sql.includes("FROM system_product")) return { rows: [{ id: "product-uuid", product_key: "product-a" }] as Row[], affectedRows: 1 };
         if (sql.includes("FROM system_release_binding")) return { rows: [{ release_id: "release-a" }] as Row[], affectedRows: 1 };
         released = true;
         return { rows: [
@@ -28,5 +31,23 @@ describe("PostgresSystemRepository", () => {
     expect(result.theme).toEqual({ source: "surface" });
     expect(result.tenantId).toBe("tenant-a");
     expect(result.releaseId).toBe("release-a");
+    expect(queries.find(({ sql }) => sql.includes("FROM system_release_binding"))?.values).toEqual(["tenant-a", "product-uuid"]);
+    expect(queries.find(({ sql }) => sql.includes("FROM system_config_record"))?.values).toContain("product-uuid");
+  });
+
+  it("accepts a v1 product key without sending it to UUID columns", async () => {
+    const client = {
+      query: async <Row>(sql: string): Promise<{ rows: readonly Row[]; affectedRows: number }> => {
+        if (sql.includes("FROM system_product")) return { rows: [] as Row[], affectedRows: 0 };
+        throw new Error(`unexpected product-dependent query: ${sql}`);
+      },
+      release: () => undefined,
+    };
+    const pool = { connect: async () => client, ping: async () => undefined, close: async () => undefined } satisfies SqlPool;
+    await expect(new PostgresSystemRepository(pool).getManifest({
+      context: { tenantId: "tenant-a", actorId: null, organizationId: null, surfaceId: "surface-a", permissions: [], correlationId: "request-a" },
+      productId: "kokoro",
+      locale: "en-US",
+    })).resolves.toMatchObject({ tenantId: "tenant-a", productId: "kokoro", locale: "en-US", navigation: [], localeNamespaces: [], theme: {}, featureFlags: [], references: [], configVersion: "0", releaseId: null });
   });
 });

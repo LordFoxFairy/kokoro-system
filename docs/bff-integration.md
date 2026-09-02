@@ -13,11 +13,19 @@ x-kokoro-tenant-id: TENANT_ID
 x-kokoro-actor-id: ACTOR_ID
 x-kokoro-iam-permissions: system:read,system:write
 x-kokoro-request-id: REQUEST_ID
+x-kokoro-service: web-bff
+x-kokoro-internal-secret: BFF_SERVICE_TOKEN
+Authorization: Bearer BFF_SERVICE_TOKEN
 ```
 
 这些是内部 server-to-server headers；浏览器提交的同名 header 不得直接透传。System 仍使用 IAM 的
 `GET /internal/iam/tenant-binding?host=TENANT_HOST` 做 Host/tenant 校验。BFF 应透传响应的
 `x-kokoro-request-id` 到日志关联字段，但不要向浏览器暴露 workload token 或租户选择器。
+
+`KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 非空时，`x-kokoro-service: web-bff` 和 `x-kokoro-internal-secret` 或
+`Authorization: Bearer` 必须匹配同一个 BFF service token；BFF 可以同时发送两种凭据。`x-kokoro-service-token`
+不是 System 的兼容别名。`/healthz` 与 `/readyz` 不需要 service-auth，业务请求缺失或错误认证返回
+`403 service_auth_failed`。未配置 token 时仅为本地 fixture 兼容模式，不应作为生产部署配置。
 
 ## 调用约定
 

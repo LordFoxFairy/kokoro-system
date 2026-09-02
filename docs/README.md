@@ -19,6 +19,10 @@ runtime manifest fail closed，不使用进程内降级缓存。
 System 不存储登录凭据、IAM 权限事实或 Model Provider 配置，不调用 Model Provider；它只接收 IAM/BFF
 服务端构造的 `TenantRequestContext`，并在实际 manifest/control 请求前校验 Host 与 tenant binding。
 
+可选配置 `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 后，runtime manifest、RPC manifest 和全部 `/system/*` 业务路径
+还必须携带 `x-kokoro-service: web-bff` 以及匹配的 `x-kokoro-internal-secret` 或
+`Authorization: Bearer`；`/healthz`、`/readyz` 仍保持公开。未配置时保留既有本地 fixture 兼容模式。
+
 运行时必须配置 `DATABASE_URL`、`REDIS_URL`、`KOKORO_IAM_BASE_URL` 和
 `KOKORO_IAM_BACKEND_TOKEN`。system 在读取或缓存 manifest 前调用 IAM 的内部
 Tenant/domain binding 契约，Redis 不可用时不使用进程内降级缓存。

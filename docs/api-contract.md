@@ -12,7 +12,26 @@ x-kokoro-actor-id: ACTOR_ID     # optional for public configuration reads
 x-kokoro-request-id: REQUEST_ID
 ```
 
+When `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` is configured, the request must additionally carry the exact service
+identity and one matching internal credential:
+
+```text
+x-kokoro-service: web-bff
+x-kokoro-internal-secret: BFF_SERVICE_TOKEN
+Authorization: Bearer BFF_SERVICE_TOKEN   # either this or x-kokoro-internal-secret is sufficient
+```
+
+The token is a server-side BFF credential, not a user bearer. Missing or invalid service auth returns HTTP 403
+with `service_auth_failed`; `x-kokoro-service-token` and user credentials are not accepted. `/healthz` and
+`/readyz` remain available without service auth. If the token is unset, the existing local fixture mode remains
+available for compatibility.
+
 `surface_id` is optional and only selects a configuration override; it is not an identity or authorization boundary.
+
+`product_id` is the stable v1 product key used by BFF callers (for example `kokoro`), not necessarily the
+PostgreSQL UUID. System resolves that key through the active `system_product` row before querying UUID-backed
+release/config records. An unknown or not-yet-seeded product key returns an empty manifest with the requested
+product key and does not send the key to a UUID predicate.
 
 The system resolves the request host through IAM's server-to-server
 `GET /internal/iam/tenant-binding?host=HOST` contract using the
@@ -48,7 +67,8 @@ fallback. The system service never becomes an owner of payment, credit, model or
 
 ## Control-plane resources
 
-All resource routes are server-to-server and require the IAM-derived context. Collection responses use the
+All resource routes are server-to-server and require the IAM-derived context. With service auth enabled, they
+also require the same `web-bff` identity and internal credential described above. Collection responses use the
 same cursor page shape:
 
 ```json
@@ -85,7 +105,8 @@ state machine is strictly `draft → validated → published → retired`.
 Every response carries `x-kokoro-request-id`; if the caller does not supply a UUID request id, System creates
 one. Current stable statuses are `400 INVALID_ARGUMENT`, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 CONFLICT` or
 `IDEMPOTENCY_KEY_REUSED`, `501 NOT_IMPLEMENTED`, and `503` for IAM/PostgreSQL/Redis/runtime dependency failure.
-Error bodies never include credentials, connection strings, SQL, cache keys or stack traces.
+With service auth enabled, missing or invalid BFF credentials return `403 service_auth_failed`. Error bodies never
+include credentials, connection strings, SQL, cache keys or stack traces.
 
 `system:read` is required for resource reads, `system:write` for Site/Workspace/Config/Policy and draft Release
 writes, and `system:publish` for release transitions. Permissions are consumed from IAM context for the

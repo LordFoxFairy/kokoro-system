@@ -24,7 +24,8 @@ fails readiness when either boundary is unavailable; this repository does not ad
 ## Production image
 
 The image builds the TypeScript sources and starts the compiled production entry `node dist/main.js`.
-Provide `DATABASE_URL`, `REDIS_URL`, `KOKORO_IAM_BASE_URL`, and `KOKORO_IAM_BACKEND_TOKEN` at runtime:
+Provide `DATABASE_URL`, `REDIS_URL`, `KOKORO_IAM_BASE_URL`, and `KOKORO_IAM_BACKEND_TOKEN` at runtime. Set
+`KOKORO_SYSTEM_BFF_SERVICE_TOKEN` when the System business boundary should enforce BFF service-auth:
 
 ```bash
 docker build -t kokoro-system:local .
@@ -33,5 +34,11 @@ docker run --rm -p 4240:4240 \
   -e REDIS_URL=redis://HOST:6379 \
   -e KOKORO_IAM_BASE_URL=http://HOST:7202 \
   -e KOKORO_IAM_BACKEND_TOKEN=TOKEN \
+  -e KOKORO_SYSTEM_BFF_SERVICE_TOKEN=TOKEN \
   kokoro-system:local
 ```
+
+`KOKORO_SYSTEM_BFF_SERVICE_TOKEN` is optional for existing local fixtures. When configured, System keeps
+`/healthz` and `/readyz` public, but requires `x-kokoro-service: web-bff` plus either the matching
+`x-kokoro-internal-secret` or `Authorization: Bearer` credential on runtime manifest and control-plane routes.
+The BFF service token must match the value used by the BFF's upstream secret configuration.

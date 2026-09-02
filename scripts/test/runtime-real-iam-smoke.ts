@@ -13,6 +13,7 @@ const tenantHost = process.env.SMOKE_TENANT_HOST ?? "admin.example.test";
 const productId = "00000000-0000-4000-8000-0000000000c1";
 const releaseId = "00000000-0000-4000-8000-0000000000d1";
 const workloadToken = process.env.IAM_WORKLOAD_TOKEN;
+const bffServiceToken = process.env.KOKORO_SYSTEM_BFF_SERVICE_TOKEN ?? process.env.SYSTEM_BFF_SERVICE_TOKEN;
 const redisNamespace = `kokoro:system:iam-smoke:${process.pid}:${Date.now()}`;
 
 function connectionOptions(value: string, database: string): ConnectionOptions {
@@ -103,11 +104,11 @@ async function main(): Promise<void> {
       await system?.pool.ping();
       await system?.redis.assertReady();
       return true;
-    });
+    }, bffServiceToken === undefined ? {} : { bffServiceToken });
     await new Promise<void>((resolve) => systemServer?.listen(0, "127.0.0.1", resolve));
     const address = systemServer.address();
     if (!address || typeof address === "string") throw new Error("System test server did not bind");
-    const client = createSystemClient({ baseUrl: `http://127.0.0.1:${String(address.port)}`, tenantId, tenantHost, workloadToken, requestId: randomUUID });
+    const client = createSystemClient({ baseUrl: `http://127.0.0.1:${String(address.port)}`, tenantId, tenantHost, ...(bffServiceToken === undefined ? {} : { serviceToken: bffServiceToken }), requestId: randomUUID });
     const manifest = await client.getRuntimeManifest({ productId, locale: "en-US" });
     if (manifest.tenantId !== tenantId || manifest.productId !== productId || manifest.theme.source !== "iam-contract") throw new Error("System did not accept the IAM tenant binding contract");
     console.log(JSON.stringify({ status: "PASS", iamBaseUrl, systemListener: true, tenantBinding: true, manifest: true }));

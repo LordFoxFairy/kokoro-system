@@ -35,4 +35,27 @@ describe("System control HTTP contract", () => {
     const result = await request(server, "/rpc/kokoro.system.v1.SystemService/GetRuntimeManifest", { method: "POST", headers: { "x-kokoro-tenant-id": "tenant-a", "content-type": "application/json" }, body: JSON.stringify({ product_id: "p", locale: "en-US" }) });
     expect(result.status).toBe(200); expect(result.body).toMatchObject({ data: { tenantId: "tenant-a", productId: "p" } });
   });
+
+  it("requires configured BFF auth and IAM tenant binding for control-plane routes", async () => {
+    let bindingCalls = 0;
+    const server = createHttpServer(manifestService, async () => true, {
+      control: new SystemControlService(new InMemorySystemControlRepository()),
+      bffServiceToken: "service-token",
+      binding: { verify: async ({ context }) => { bindingCalls += 1; if (context.tenantId !== "tenant-a") throw new Error("tenant binding mismatch"); } },
+    });
+    const baseHeaders = { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-iam-permissions": "system:read" };
+    const missingAuth = await request(server, "/system/sites", { headers: baseHeaders });
+    expect(missingAuth.status).toBe(403);
+    expect(bindingCalls).toBe(0);
+    const valid = await request(server, "/system/sites", { headers: { ...baseHeaders, "x-kokoro-service": "web-bff", authorization: "Bearer service-token" } });
+    expect(valid.status).toBe(200);
+    expect(bindingCalls).toBe(1);
+  });
+
+  it("fails closed when configured control auth has no tenant binding verifier", async () => {
+    const server = createHttpServer(manifestService, async () => true, { control: new SystemControlService(new InMemorySystemControlRepository()), bffServiceToken: "service-token" });
+    const result = await request(server, "/system/sites", { headers: { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "service-token", "x-kokoro-iam-permissions": "system:read" } });
+    expect(result.status).toBe(503);
+    expect(result.body).toMatchObject({ error: "SERVICE_AUTH_NOT_CONFIGURED" });
+  });
 });

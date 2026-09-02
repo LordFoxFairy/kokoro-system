@@ -11,9 +11,11 @@ import { createSystemClient, SystemSdkError, type RuntimeManifest } from "../../
 const tenantA = "00000000-0000-4000-8000-0000000000a1";
 const tenantB = "00000000-0000-4000-8000-0000000000b1";
 const productId = "00000000-0000-4000-8000-0000000000c1";
+const productKey = "kokoro";
 const releaseId = "00000000-0000-4000-8000-0000000000d1";
 const surfaceA = "00000000-0000-4000-8000-0000000000e1";
 const workloadToken = "system-runtime-smoke-workload";
+const bffServiceToken = "system-runtime-smoke-bff-service";
 const redisNamespace = `kokoro:system:smoke:${process.pid}:${Date.now()}`;
 
 type ConnectionOptions = { connectionString: string; options: string };
@@ -42,7 +44,7 @@ async function requestStatus(url: string, init?: RequestInit): Promise<{ status:
 }
 
 function client(baseUrl: string, tenantId: string, tenantHost: string) {
-  return createSystemClient({ baseUrl, tenantId, tenantHost, workloadToken, requestId: randomUUID });
+  return createSystemClient({ baseUrl, tenantId, tenantHost, serviceToken: bffServiceToken, requestId: randomUUID });
 }
 
 async function seed(databaseUrl: string): Promise<void> {
@@ -57,7 +59,7 @@ async function seed(databaseUrl: string): Promise<void> {
         [input.id, input.tenantId, input.moduleKey, input.scopeType, input.scopeId, input.productId, input.locale, input.configKey, JSON.stringify(input.value), input.version, input.releaseId, "0".repeat(64), now, now],
       );
     };
-    await execute(connection, `INSERT INTO system_product (id, product_key, name, status, created_at, updated_at) VALUES (?, ?, ?, 'active', ?, ?)`, [productId, "admin", "Admin", now, now]);
+    await execute(connection, `INSERT INTO system_product (id, product_key, name, status, created_at, updated_at) VALUES (?, ?, ?, 'active', ?, ?)`, [productId, productKey, "Kokoro", now, now]);
     await execute(connection, `INSERT INTO system_config_release (id, release_key, status, digest, published_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?)`, [releaseId, "smoke-release", "1".repeat(64), now, now, now]);
     await execute(connection, `INSERT INTO system_release_binding (id, scope_type, scope_id, product_id, release_id, status, created_at, updated_at) VALUES (?, 'tenant', ?, ?, ?, 'active', ?, ?)`, [randomUUID(), tenantA, productId, releaseId, now, now]);
     await execute(connection, `INSERT INTO system_release_binding (id, scope_type, scope_id, product_id, release_id, status, created_at, updated_at) VALUES (?, 'tenant', ?, ?, ?, 'active', ?, ?)`, [randomUUID(), tenantB, productId, releaseId, now, now]);
@@ -109,44 +111,47 @@ async function main(): Promise<void> {
     const host = url.searchParams.get("host");
     const tenantId = host === "tenant-a.example.test" ? tenantA : host === "tenant-b.example.test" ? tenantB : undefined;
     if (!tenantId) { response.statusCode = 404; response.end(JSON.stringify({ error: "unknown host" })); return; }
-    response.setHeader("content-type", "application/json"); response.end(JSON.stringify({ data: { tenantId } }));
+    response.setHeader("content-type", "application/json"); response.end(JSON.stringify({ data: { tenant_id: tenantId, status: "active" } }));
   });
   const iam = await listen(iamServer);
   const runtime = await createSystemRuntime({ databaseUrl: database.databaseUrl, redisUrl: testRedisUrl, redisNamespace, binding: new IamTenantBindingClient(iam.url, workloadToken) });
-  const systemServer = createHttpServer(runtime.service, async () => { await runtime.pool.ping(); await runtime.redis.assertReady(); return true; });
+  const systemServer = createHttpServer(runtime.service, async () => { await runtime.pool.ping(); await runtime.redis.assertReady(); return true; }, { bffServiceToken });
   const system = await listen(systemServer);
   try {
     await seed(database.databaseUrl);
     const a = client(system.url, tenantA, "tenant-a.example.test");
     const b = client(system.url, tenantB, "tenant-b.example.test");
-    const surface = await a.getRuntimeManifest({ productId, locale: "en-US", surfaceId: surfaceA });
-    const cached = await a.getRuntimeManifest({ productId, locale: "en-US", surfaceId: surfaceA });
-    const tenantOnly = await a.getRuntimeManifest({ productId, locale: "en-US" });
-    const otherTenant = await b.getRuntimeManifest({ productId, locale: "en-US" });
+    const surface = await a.getRuntimeManifest({ productId: productKey, locale: "en-US", surfaceId: surfaceA });
+    const cached = await a.getRuntimeManifest({ productId: productKey, locale: "en-US", surfaceId: surfaceA });
+    const tenantOnly = await a.getRuntimeManifest({ productId: productKey, locale: "en-US" });
+    const otherTenant = await b.getRuntimeManifest({ productId: productKey, locale: "en-US" });
     assert((surface.theme as { source?: string }).source === "surface-a", "surface precedence failed");
+    assert(surface.productId === productKey, "product key response identity failed");
     assert(cached.digest === surface.digest, "cached digest changed");
     assert((tenantOnly.theme as { source?: string }).source === "tenant-a", "tenant precedence failed");
     assert((otherTenant.theme as { source?: string }).source === "tenant-b", "tenant cache isolation failed");
     assert(tenantOnly.tenantId === tenantA && otherTenant.tenantId === tenantB, "tenant response identity failed");
 
-    const missingTenant = await requestStatus(`${system.url}/system/runtime-manifest?product_id=${productId}`);
+    const missingServiceAuth = await requestStatus(`${system.url}/system/runtime-manifest?product_id=${productKey}`, { headers: { "x-kokoro-tenant-id": tenantA } });
+    assert(missingServiceAuth.status === 403, "missing service auth did not return 403");
+    const missingTenant = await requestStatus(`${system.url}/system/runtime-manifest?product_id=${productKey}`, { headers: { "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": bffServiceToken } });
     assert(missingTenant.status === 400, "missing tenant header did not return 400");
-    const missingProduct = await requestStatus(`${system.url}/system/runtime-manifest`, { headers: { "x-kokoro-tenant-id": tenantA } });
+    const missingProduct = await requestStatus(`${system.url}/system/runtime-manifest`, { headers: { "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": bffServiceToken, "x-kokoro-tenant-id": tenantA } });
     assert(missingProduct.status === 400, "missing product did not return 400");
     const unknownPath = await requestStatus(`${system.url}/not-found`);
     assert(unknownPath.status === 404, "unknown path did not return 404");
 
     const mismatch = client(system.url, tenantB, "tenant-a.example.test");
-    await expectSdkStatus(() => mismatch.getRuntimeManifest({ productId, locale: "en-US" }), 503, "IAM binding mismatch");
-    await runtime.redis.set(`manifest:${tenantA}:${productId}:en-US:default`, { ...tenantOnly, tenantId: tenantB }, 30);
-    await expectSdkStatus(() => a.getRuntimeManifest({ productId, locale: "en-US" }), 503, "cache identity mismatch");
+    await expectSdkStatus(() => mismatch.getRuntimeManifest({ productId: productKey, locale: "en-US" }), 503, "IAM binding mismatch");
+    await runtime.redis.set(`manifest:${tenantA}:${productKey}:en-US:default`, { ...tenantOnly, tenantId: tenantB }, 30);
+    await expectSdkStatus(() => a.getRuntimeManifest({ productId: productKey, locale: "en-US" }), 503, "cache identity mismatch");
     console.log(JSON.stringify({ status: "PASS", listener: true, sdk: true, tenantIsolation: true, precedence: true, cacheIdentity: true, httpErrors: true }));
   } finally {
     await system.close();
     await runtime.pool.close();
     await runtime.redis.close();
     await iam.close();
-    await redis.del(`${redisNamespace}:manifest:${tenantA}:${productId}:en-US:surface-a`, `${redisNamespace}:manifest:${tenantA}:${productId}:en-US:default`);
+    await redis.del(`${redisNamespace}:manifest:${tenantA}:${productKey}:en-US:surface-a`, `${redisNamespace}:manifest:${tenantA}:${productKey}:en-US:default`);
     await redis.quit();
     await database.drop();
   }

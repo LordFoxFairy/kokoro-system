@@ -31,7 +31,7 @@ describe("System SDK client", () => {
       baseUrl: "http://system.example.test/api/",
       tenantId: "tenant-1",
       tenantHost: "tenant.example.test",
-      workloadToken: "workload-token",
+      serviceToken: "workload-token",
       actorId: "user-1",
       requestId: () => "00000000-0000-4000-8000-000000000001",
       fetch: fetcher,
@@ -52,8 +52,10 @@ describe("System SDK client", () => {
     expect(calls[0]?.init?.headers).toEqual({
       authorization: "Bearer workload-token",
       host: "tenant.example.test",
+      "x-kokoro-internal-secret": "workload-token",
       "x-kokoro-actor-id": "user-1",
       "x-kokoro-request-id": "00000000-0000-4000-8000-000000000001",
+      "x-kokoro-service": "web-bff",
       "x-kokoro-tenant-id": "tenant-1",
     });
   });

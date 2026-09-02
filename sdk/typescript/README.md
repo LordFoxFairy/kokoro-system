@@ -13,7 +13,7 @@ const system = createSystemClient({
   baseUrl: process.env.KOKORO_SYSTEM_BASE_URL!,
   tenantId: process.env.KOKORO_TENANT_ID!,
   tenantHost: process.env.KOKORO_TENANT_HOST!,
-  workloadToken: process.env.KOKORO_SYSTEM_WORKLOAD_TOKEN, // optional service SK
+  serviceToken: process.env.KOKORO_SYSTEM_BFF_SERVICE_TOKEN, // optional; enables web-bff service auth
 });
 
 const manifest = await system.getRuntimeManifest({
@@ -24,6 +24,8 @@ const manifest = await system.getRuntimeManifest({
 ```
 
 Keep this package in server-only modules. Browser code must call the Admin
-same-origin BFF, never this SDK directly, and must never receive workload
-tokens or tenant context controls. A deployment normally only needs the System
-URL, service SK when the System gateway requires it, tenant host, and tenant ID.
+same-origin BFF, never this SDK directly, and must never receive service
+tokens or tenant context controls. When `serviceToken` is present, the SDK
+sends `x-kokoro-service: web-bff`, `x-kokoro-internal-secret` and the matching
+`Authorization: Bearer` credential. `workloadToken` remains a compatibility
+alias for `serviceToken`.
