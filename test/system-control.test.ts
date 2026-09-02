@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { InMemorySystemControlRepository } from "../src/modules/system/in-memory-repository.js";
-import { SystemControlService } from "../src/modules/system/service.js";
+import { InMemorySystemControlRepository } from "../src/infrastructure/persistence/in-memory-system-control-repository.js";
+import { SystemControlService } from "../src/modules/system/application/service.js";
 import type { TenantRequestContext } from "../src/modules/runtime-manifest/model.js";
 
 const context = (tenantId: string, permissions: readonly string[] = ["system:read", "system:write", "system:publish"]): TenantRequestContext => ({

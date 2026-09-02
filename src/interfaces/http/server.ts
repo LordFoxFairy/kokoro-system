@@ -3,8 +3,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { RuntimeManifestService } from "../../modules/runtime-manifest/service.js";
 import type { TenantRequestContext } from "../../modules/runtime-manifest/model.js";
 import { SystemDomainError } from "../../modules/system/errors.js";
-import type { ConfigInput, PageRequest, ReleaseInput, SiteInput, WorkspaceInput } from "../../modules/system/model.js";
-import type { SystemControlService } from "../../modules/system/service.js";
+import type { ConfigInput, PageRequest, ReleaseInput, SiteInput, WorkspaceInput } from "../../modules/system/application/dto.js";
+import type { SystemControlService } from "../../modules/system/application/service.js";
 import { requireBffServiceAuth, ServiceAuthError, ServiceAuthNotConfiguredError } from "./service-auth.js";
 
 class RequestValidationError extends Error {}

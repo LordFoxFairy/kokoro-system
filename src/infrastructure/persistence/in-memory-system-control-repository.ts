@@ -1,7 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { TenantRequestContext } from "../runtime-manifest/model.js";
-import { SystemDomainError } from "./errors.js";
-import type { ConfigInput, ConfigRelease, Page, PageRequest, ReleaseInput, Site, SiteInput, SitePolicy, SystemConfig, SystemControlRepository, Workspace, WorkspaceInput } from "./model.js";
+import type { TenantRequestContext } from "../../modules/runtime-manifest/model.js";
+import { SystemDomainError } from "../../modules/system/errors.js";
+import type { ConfigInput, Page, PageRequest, ReleaseInput, SiteInput, WorkspaceInput } from "../../modules/system/application/dto.js";
+import type { SystemControlRepository } from "../../modules/system/application/ports.js";
+import type { ConfigRelease, Site, SitePolicy, SystemConfig, Workspace } from "../../modules/system/domain/models.js";
 
 function now(): string { return new Date().toISOString(); }
 function page<T extends { id: string }>(values: readonly T[], request: PageRequest): Page<T> {

@@ -1,8 +1,8 @@
 import { request as httpRequest, type Server } from "node:http";
 import { describe, expect, it } from "vitest";
 import { createHttpServer } from "../src/interfaces/http/server.js";
-import { InMemorySystemControlRepository } from "../src/modules/system/in-memory-repository.js";
-import { SystemControlService } from "../src/modules/system/service.js";
+import { InMemorySystemControlRepository } from "../src/infrastructure/persistence/in-memory-system-control-repository.js";
+import { SystemControlService } from "../src/modules/system/application/service.js";
 import type { RuntimeManifestService } from "../src/modules/runtime-manifest/service.js";
 
 const manifestService = { get: async () => ({ tenantId: "tenant-a", productId: "p", locale: "en-US", navigation: [], localeNamespaces: [], theme: {}, featureFlags: [], references: [], configVersion: "1", releaseId: null, digest: "d" }) } as unknown as RuntimeManifestService;

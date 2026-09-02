@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
-import type { TenantRequestContext } from "../runtime-manifest/model.js";
-import { SystemDomainError } from "./errors.js";
-import type { ConfigInput, ConfigRelease, Page, PageRequest, ReleaseInput, Site, SiteInput, SitePolicy, SystemControlRepository, SystemConfig, Workspace, WorkspaceInput } from "./model.js";
+import type { TenantRequestContext } from "../../runtime-manifest/model.js";
+import { SystemDomainError } from "../errors.js";
+import type { ConfigRelease, Site, SitePolicy, SystemConfig, Workspace } from "../domain/models.js";
+import type { ConfigInput, Page, PageRequest, ReleaseInput, SiteInput, WorkspaceInput } from "./dto.js";
+import type { SystemControlRepository } from "./ports.js";
 
 function hash(value: unknown): string { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 function requirePermission(context: TenantRequestContext, permission: string): void { if (!context.permissions.includes(permission)) throw new SystemDomainError("FORBIDDEN", "permission denied", 403); }
@@ -9,8 +11,10 @@ function requireKey(key: string): string { if (!key.trim() || key.length > 128) 
 function validPage(page: PageRequest): void { if (page.limit !== undefined && (!Number.isInteger(page.limit) || page.limit < 1 || page.limit > 100)) throw new SystemDomainError("INVALID_ARGUMENT", "limit must be between 1 and 100"); }
 function validateText(name: string, value: string): void { if (!value.trim() || value.length > 160) throw new SystemDomainError("INVALID_ARGUMENT", `${name} is invalid`); }
 
+/** Application orchestration for System control-plane commands and queries. */
 export class SystemControlService {
   public constructor(private readonly repository: SystemControlRepository) {}
+
   public async listSites(context: TenantRequestContext, page: PageRequest): Promise<Page<Site>> { requirePermission(context, "system:read"); validPage(page); return this.repository.listSites(context, page); }
   public async createSite(context: TenantRequestContext, input: SiteInput, key: string): Promise<Site> { requirePermission(context, "system:write"); validateText("site_key", input.siteKey); validateText("hostname", input.hostname); validateText("display_name", input.displayName); return this.mutate(context, key, input, () => this.repository.createSite(context, input)); }
   public async listWorkspaces(context: TenantRequestContext, page: PageRequest): Promise<Page<Workspace>> { requirePermission(context, "system:read"); validPage(page); return this.repository.listWorkspaces(context, page); }
@@ -28,15 +32,28 @@ export class SystemControlService {
     const command = { id, next };
     const replay = await this.replay<ConfigRelease>(context, key, command);
     if (replay !== null) return replay;
-    const current = await this.repository.getRelease(context, id); if (!current) throw new SystemDomainError("NOT_FOUND", "release not found", 404);
+    const current = await this.repository.getRelease(context, id);
+    if (!current) throw new SystemDomainError("NOT_FOUND", "release not found", 404);
     const valid = (current.status === "draft" && next === "validated") || (current.status === "validated" && next === "published") || (current.status === "published" && next === "retired");
     if (!valid) throw new SystemDomainError("INVALID_STATE", `release cannot transition from ${current.status} to ${next}`);
     return this.mutate(context, key, command, () => this.repository.updateRelease(context, id, next));
   }
-  private async replay<T>(context: TenantRequestContext, key: string, input: unknown): Promise<T | null> { const idempotencyKey = requireKey(key); const receipt = await this.repository.getReceipt(context.tenantId, idempotencyKey); if (!receipt) return null; if (receipt.requestHash !== hash(input)) throw new SystemDomainError("IDEMPOTENCY_KEY_REUSED", "idempotency key was used with a different request", 409); return receipt.response as T; }
+
+  private async replay<T>(context: TenantRequestContext, key: string, input: unknown): Promise<T | null> {
+    const idempotencyKey = requireKey(key);
+    const receipt = await this.repository.getReceipt(context.tenantId, idempotencyKey);
+    if (!receipt) return null;
+    if (receipt.requestHash !== hash(input)) throw new SystemDomainError("IDEMPOTENCY_KEY_REUSED", "idempotency key was used with a different request", 409);
+    return receipt.response as T;
+  }
+
   private async mutate<T>(context: TenantRequestContext, key: string, input: unknown, operation: () => Promise<T>): Promise<T> {
-    const idempotencyKey = requireKey(key); const requestHash = hash(input); const receipt = await this.repository.getReceipt(context.tenantId, idempotencyKey);
+    const idempotencyKey = requireKey(key);
+    const requestHash = hash(input);
+    const receipt = await this.repository.getReceipt(context.tenantId, idempotencyKey);
     if (receipt) { if (receipt.requestHash !== requestHash) throw new SystemDomainError("IDEMPOTENCY_KEY_REUSED", "idempotency key was used with a different request", 409); return receipt.response as T; }
-    const value = await operation(); await this.repository.saveReceipt(context.tenantId, idempotencyKey, requestHash, value); return value;
+    const value = await operation();
+    await this.repository.saveReceipt(context.tenantId, idempotencyKey, requestHash, value);
+    return value;
   }
 }
