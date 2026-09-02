@@ -24,16 +24,13 @@ fails readiness when either boundary is unavailable; this repository does not ad
 ## Production image
 
 The image builds the TypeScript sources and starts the compiled production entry `node dist/main.js`.
-Provide `DATABASE_URL`, `REDIS_URL`, `KOKORO_IAM_BASE_URL`, `KOKORO_IAM_BACKEND_TOKEN`, and
-`KOKORO_SYSTEM_BFF_SERVICE_TOKEN` at runtime. The last variable configures the required BFF service-auth boundary:
+Provide `DATABASE_URL`, `REDIS_URL`, and `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` at runtime. System resolves Host against its own Site records; it has no IAM Host lookup dependency. The last variable configures the required BFF service-auth boundary:
 
 ```bash
 docker build -t kokoro-system:local .
 docker run --rm -p 4240:4240 \
   -e DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB \
   -e REDIS_URL=redis://HOST:6379 \
-  -e KOKORO_IAM_BASE_URL=http://HOST:7202 \
-  -e KOKORO_IAM_BACKEND_TOKEN=TOKEN \
   -e KOKORO_SYSTEM_BFF_SERVICE_TOKEN=TOKEN \
   kokoro-system:local
 ```
