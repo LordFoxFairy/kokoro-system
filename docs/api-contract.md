@@ -98,7 +98,7 @@ state machine is strictly `draft → validated → published → retired`.
 
 `POST /rpc/kokoro.system.v1.SystemService/GetRuntimeManifest` accepts the same `product_id`, `locale` and
 `surface_id` fields as the HTTP manifest query. It calls the same application service and returns the same
-`{"data": ...}` envelope; it is a transport fixture, not a second contract authority.
+`{"data": ..., "meta": {"request_id": "REQ_ID"}}` v1 envelope; it is a transport fixture, not a second contract authority.
 
 ## Errors and permissions
 
@@ -106,7 +106,8 @@ Every response carries `x-kokoro-request-id`; if the caller does not supply a UU
 one. Current stable statuses are `400 INVALID_ARGUMENT`, `403 FORBIDDEN`, `404 NOT_FOUND`, `409 CONFLICT` or
 `IDEMPOTENCY_KEY_REUSED`, `501 NOT_IMPLEMENTED`, and `503` for IAM/PostgreSQL/Redis/runtime dependency failure.
 With service auth enabled, missing or invalid BFF credentials return `403 service_auth_failed`. Error bodies never
-include credentials, connection strings, SQL, cache keys or stack traces.
+include credentials, connection strings, SQL, cache keys or stack traces. The wire error shape is
+`{"error": {"code": "ERROR_CODE", "message": "..."}, "meta": {"request_id": "REQ_ID"}}`.
 
 `system:read` is required for resource reads, `system:write` for Site/Workspace/Config/Policy and draft Release
 writes, and `system:publish` for release transitions. Permissions are consumed from IAM context for the

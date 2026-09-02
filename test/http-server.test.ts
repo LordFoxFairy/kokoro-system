@@ -46,41 +46,60 @@ describe("System HTTP contract", () => {
     const server = createHttpServer(serviceStub(), async () => true);
     await expect(getJson(server, "/system/runtime-manifest?product_id=product-a")).resolves.toEqual({
       status: 400,
-      body: { error: "x-kokoro-tenant-id is required" },
+      body: {
+        error: { code: "INVALID_ARGUMENT", message: "x-kokoro-tenant-id is required" },
+        meta: { request_id: expect.any(String) },
+      },
     });
   });
 
   it("returns 503 when readiness dependencies fail and preserves request id", async () => {
     const server = createHttpServer(serviceStub(), async () => { throw new Error("dependency fixture down"); });
-    await expect(getJson(server, "/readyz")).resolves.toMatchObject({ status: 503, body: { error: "system unavailable" } });
+    await expect(getJson(server, "/readyz")).resolves.toMatchObject({
+      status: 503,
+      body: { error: { code: "SYSTEM_UNAVAILABLE", message: "system unavailable" }, meta: { request_id: expect.any(String) } },
+    });
   });
 
   it("keeps health and readiness public when BFF service auth is enabled", async () => {
     const server = createHttpServer(serviceStub(), async () => true, { bffServiceToken: "service-token" });
-    await expect(getJson(server, "/healthz")).resolves.toMatchObject({ status: 200, body: { status: "ok" } });
-    await expect(getJson(server, "/readyz")).resolves.toMatchObject({ status: 200, body: { status: "ready" } });
+    await expect(getJson(server, "/healthz")).resolves.toMatchObject({
+      status: 200,
+      body: { data: { status: "ok", service: "kokoro-system" }, meta: { request_id: expect.any(String) } },
+    });
+    await expect(getJson(server, "/readyz")).resolves.toMatchObject({
+      status: 200,
+      body: { data: { status: "ready", service: "kokoro-system" }, meta: { request_id: expect.any(String) } },
+    });
   });
 
   it("requires web-bff service auth before runtime manifest access", async () => {
     const server = createHttpServer(serviceStub(), async () => true, { bffServiceToken: "service-token" });
     const tenant = { "x-kokoro-tenant-id": "tenant-a" };
-    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", tenant)).resolves.toEqual({ status: 403, body: { error: "service_auth_failed" } });
-    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...tenant, "x-kokoro-service": "not-web-bff", "x-kokoro-internal-secret": "service-token" })).resolves.toEqual({ status: 403, body: { error: "service_auth_failed" } });
-    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...tenant, "x-kokoro-service": "web-bff" })).resolves.toEqual({ status: 403, body: { error: "service_auth_failed" } });
-    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...tenant, "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "wrong-token" })).resolves.toEqual({ status: 403, body: { error: "service_auth_failed" } });
-    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...tenant, "x-kokoro-service": "web-bff", "x-kokoro-service-token": "service-token" })).resolves.toEqual({ status: 403, body: { error: "service_auth_failed" } });
+    const expected = { error: { code: "service_auth_failed", message: "service authentication failed" }, meta: { request_id: expect.any(String) } };
+    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", tenant)).resolves.toEqual({ status: 403, body: expected });
+    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...tenant, "x-kokoro-service": "not-web-bff", "x-kokoro-internal-secret": "service-token" })).resolves.toEqual({ status: 403, body: expected });
+    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...tenant, "x-kokoro-service": "web-bff" })).resolves.toEqual({ status: 403, body: expected });
+    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...tenant, "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "wrong-token" })).resolves.toEqual({ status: 403, body: expected });
+    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...tenant, "x-kokoro-service": "web-bff", "x-kokoro-service-token": "service-token" })).resolves.toEqual({ status: 403, body: expected });
   });
 
   it("accepts the BFF internal secret or service bearer and still requires tenant context", async () => {
     const server = createHttpServer(serviceStub(), async () => true, { bffServiceToken: "service-token" });
     const common = { "x-kokoro-service": "web-bff", "x-kokoro-tenant-id": "tenant-a" };
-    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...common, "x-kokoro-internal-secret": "service-token" })).resolves.toMatchObject({ status: 200 });
-    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...common, authorization: "Bearer service-token" })).resolves.toMatchObject({ status: 200 });
-    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "service-token" })).resolves.toEqual({ status: 400, body: { error: "x-kokoro-tenant-id is required" } });
+    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...common, "x-kokoro-internal-secret": "service-token" })).resolves.toMatchObject({ status: 200, body: { data: expect.any(Object), meta: { request_id: expect.any(String) } } });
+    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { ...common, authorization: "Bearer service-token" })).resolves.toMatchObject({ status: 200, body: { data: expect.any(Object), meta: { request_id: expect.any(String) } } });
+    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "service-token" })).resolves.toEqual({
+      status: 400,
+      body: { error: { code: "INVALID_ARGUMENT", message: "x-kokoro-tenant-id is required" }, meta: { request_id: expect.any(String) } },
+    });
   });
 
   it("does not expose an unauthenticated System path when service auth is enabled", async () => {
     const server = createHttpServer(serviceStub(), async () => true, { bffServiceToken: "service-token" });
-    await expect(getJson(server, "/system/not-a-route")).resolves.toEqual({ status: 403, body: { error: "service_auth_failed" } });
+    await expect(getJson(server, "/system/not-a-route")).resolves.toEqual({
+      status: 403,
+      body: { error: { code: "service_auth_failed", message: "service authentication failed" }, meta: { request_id: expect.any(String) } },
+    });
   });
 });
