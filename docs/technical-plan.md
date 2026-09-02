@@ -36,14 +36,15 @@ HTTP 只负责协议转换。`model.ts`、全能 `service.ts` 和全能 `postgre
 
 | 资源 | 隔离键 | 状态 |
 |---|---|---|
-| Site / Site Host | `tenant_id`，内部关联 `site_id` | `active → suspended → archived` |
+| Site / Site Host | `tenant_id`，`system_site_host(tenant_id, site_id, hostname)` | `active → suspended → archived` |
 | Workspace | `tenant_id + site_id` | `active → archived` |
 | SitePolicy | `tenant_id + site_id` | `active → archived` |
 | SystemConfig | tenant scope 或 global + scope | `active → deleted` |
 | ConfigRelease | `tenant_id` | `draft → validated → published → retired` |
 
 PostgreSQL 保存事实；Redis 只缓存完整 manifest。所有租户字段使用 opaque text `tenant_id`，跨服务不建外键；同一
-System 数据库内的 Site/Workspace/Policy 关系由本仓约束和事务维护。所有 mutation 使用幂等 receipt，时间为 UTC。
+System 数据库内使用 `(tenant_id, site_id)` 复合外键维护 Site/Workspace/Policy lineage，Host 使用独立规范化表和
+全局 active hostname 唯一索引。所有 mutation 使用幂等 receipt，时间为 UTC。
 
 ## 4. Manifest 组装
 

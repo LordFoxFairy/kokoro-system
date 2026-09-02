@@ -13,7 +13,7 @@ x-kokoro-actor-id: ACTOR_ID       # optional
 x-kokoro-request-id: REQUEST_ID
 ```
 
-System 使用自己的 `system_site` Host 绑定校验 `TENANT_ID + TENANT_HOST`。`site_id` 只在 System 内部资源路径和
+System 使用自己的 `system_site_host` Host 绑定校验 `TENANT_ID + TENANT_HOST`。`site_id` 只在 System 内部资源路径和
 持久化中使用，不作为跨仓隔离键；不存在 `iam_site` 或 IAM Host lookup。
 
 启用 service auth 时还需要：

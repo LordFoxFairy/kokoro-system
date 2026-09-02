@@ -12,12 +12,10 @@ export class PostgresSiteHostResolver implements SiteHostResolver {
     const client = await this.pool.connect();
     try {
       const result = await client.query<{ id: string }>(
-        `SELECT id FROM system_site
-         WHERE tenant_id = ? AND status = 'active' AND deleted_at IS NULL
-           AND EXISTS (
-             SELECT 1 FROM jsonb_array_elements_text(hostnames_json) AS hostname(value)
-             WHERE lower(regexp_replace(value, ':\\d+$', '')) = ?
-           )
+        `SELECT s.id FROM system_site s
+         INNER JOIN system_site_host h ON h.tenant_id = s.tenant_id AND h.site_id = s.id
+         WHERE s.tenant_id = ? AND s.status = 'active' AND s.deleted_at IS NULL
+           AND h.status = 'active' AND h.hostname = ?
          LIMIT 1`,
         [input.context.tenantId, host],
       );
