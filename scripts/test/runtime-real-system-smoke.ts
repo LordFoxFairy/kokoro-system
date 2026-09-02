@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     throw new Error("TEST_DATABASE_URL and TEST_REDIS_URL are required");
   }
 
-  const systemSchema = await readFile(new URL("../../database/migrations/001_system.sql", import.meta.url), "utf8");
+  const systemSchema = await readFile(new URL("../../database/schema.sql", import.meta.url), "utf8");
   const systemDatabase = await createDatabase(baseDatabaseUrl, "kokoro_system_real", systemSchema);
   let system: Awaited<ReturnType<typeof createSystemRuntime>> | undefined;
   let systemServer: ReturnType<typeof createHttpServer> | undefined;

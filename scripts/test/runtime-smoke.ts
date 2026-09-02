@@ -84,7 +84,7 @@ async function createDatabase(baseUrl: string): Promise<{ databaseUrl: string; d
   databaseUrl.pathname = `/${database}`;
   databaseUrl.searchParams.set("schema", "public");
   databaseUrl.searchParams.set("options", "-c search_path=public");
-  const schema = await readFile(new URL("../../database/migrations/001_system.sql", import.meta.url), "utf8");
+  const schema = await readFile(new URL("../../database/schema.sql", import.meta.url), "utf8");
   const schemaConnection = new Client(connectionOptions(databaseUrl.toString(), database));
   try { await schemaConnection.connect(); await schemaConnection.query(schema); } finally { await schemaConnection.end(); }
   return {

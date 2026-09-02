@@ -8,7 +8,7 @@
 ## 启动和探针
 
 ```bash
-pnpm db:apply
+pnpm db:apply-schema
 pnpm verify
 pnpm start
 curl -fsS http://127.0.0.1:4240/healthz

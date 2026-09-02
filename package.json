@@ -23,7 +23,8 @@
     "sdk:typecheck": "pnpm --dir sdk/typescript typecheck",
     "sdk:test": "pnpm --dir sdk/typescript test",
     "lint": "eslint src test scripts sdk/typescript/src sdk/typescript/test",
-    "db:apply": "tsx scripts/apply-schema.ts",
+    "db:apply-schema": "tsx scripts/apply-schema.ts",
+    "db:apply": "pnpm db:apply-schema",
     "test:runtime-smoke": "tsx scripts/test/runtime-smoke.ts",
     "test:runtime-real-system": "tsx scripts/test/runtime-real-system-smoke.ts"
   },

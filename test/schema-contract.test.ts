@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const sql = readFileSync(new URL("../database/migrations/001_system.sql", import.meta.url), "utf8");
+const sql = readFileSync(new URL("../database/schema.sql", import.meta.url), "utf8");
 
 describe("system SQL contract", () => {
   it("uses PostgreSQL tenant scope and the repository database policy", () => {
