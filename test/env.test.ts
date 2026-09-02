@@ -10,7 +10,7 @@ const baseEnv = {
 };
 
 describe("System environment", () => {
-  it("normalizes the optional BFF service token and keeps the compatibility default disabled", () => {
+  it("normalizes the required BFF service token", () => {
     expect(loadEnv({ ...baseEnv, KOKORO_SYSTEM_BFF_SERVICE_TOKEN: "  bff-token  " }).bffServiceToken).toBe("bff-token");
     expect(loadEnv(baseEnv).bffServiceToken).toBeNull();
   });

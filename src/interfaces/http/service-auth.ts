@@ -11,6 +11,16 @@ export class ServiceAuthError extends Error {
   }
 }
 
+export class ServiceAuthNotConfiguredError extends Error {
+  public readonly code = "service_auth_not_configured";
+  public readonly status = 503;
+
+  public constructor() {
+    super("system service authentication is not configured");
+    this.name = "ServiceAuthNotConfiguredError";
+  }
+}
+
 function headerValue(request: IncomingMessage, name: string): string | null {
   const value = request.headers[name];
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
@@ -30,14 +40,10 @@ function sameSecret(actual: string | null, expected: string): boolean {
   return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
 }
 
-/**
- * Enforces the optional System-to-BFF boundary. An unset token deliberately
- * preserves the existing local fixture mode; once configured, health probes
- * are still public but every System business route must call this guard.
- */
+/** Enforces the System-to-BFF boundary. Health probes bypass this guard. */
 export function requireBffServiceAuth(request: IncomingMessage, configuredToken: string | null | undefined): void {
   const expectedToken = configuredToken?.trim() || null;
-  if (expectedToken === null) return;
+  if (expectedToken === null) throw new ServiceAuthNotConfiguredError();
   if (headerValue(request, "x-kokoro-service") !== "web-bff") throw new ServiceAuthError();
   if (!sameSecret(headerValue(request, "x-kokoro-internal-secret"), expectedToken) && !sameSecret(bearerToken(request), expectedToken)) throw new ServiceAuthError();
 }

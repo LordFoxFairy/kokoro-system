@@ -6,7 +6,7 @@ import type { TenantBindingVerifier } from "../../modules/runtime-manifest/ports
 import { SystemDomainError } from "../../modules/system/errors.js";
 import type { ConfigInput, PageRequest, ReleaseInput, SiteInput, WorkspaceInput } from "../../modules/system/model.js";
 import type { SystemControlService } from "../../modules/system/service.js";
-import { requireBffServiceAuth, ServiceAuthError } from "./service-auth.js";
+import { requireBffServiceAuth, ServiceAuthError, ServiceAuthNotConfiguredError } from "./service-auth.js";
 
 class RequestValidationError extends Error {}
 type JsonRecord = Readonly<Record<string, unknown>>;
@@ -54,4 +54,4 @@ export function createHttpServer(service: RuntimeManifestService, readiness: () 
     const release = /^\/system\/releases\/([^/]+)\/(validate|publish|retire)$/u.exec(url.pathname);
     if (release && request.method === "POST") { const id = release[1] ?? ""; const key = idempotencyKey(request); const target = release[2]; const value = target === "validate" ? await controlRequired(control).validateRelease(context(request, requestId), id, key) : target === "publish" ? await controlRequired(control).publishRelease(context(request, requestId), id, key) : await controlRequired(control).retireRelease(context(request, requestId), id, key); return sendSuccess(response, 200, value, requestId); }
     return sendError(response, 404, "not_found", "not found", requestId);
-  } catch (error) { if (error instanceof RequestValidationError) return sendError(response, 400, "INVALID_ARGUMENT", error.message, requestId); if (error instanceof ServiceAuthError) return sendError(response, error.status, error.code, error.message, requestId); if (error instanceof SystemDomainError) return sendError(response, error.status, error.code, error.message, requestId); return sendError(response, 503, "SYSTEM_UNAVAILABLE", "system unavailable", requestId); } }); }
+  } catch (error) { if (error instanceof RequestValidationError) return sendError(response, 400, "INVALID_ARGUMENT", error.message, requestId); if (error instanceof ServiceAuthNotConfiguredError) return sendError(response, error.status, error.code, error.message, requestId); if (error instanceof ServiceAuthError) return sendError(response, error.status, error.code, error.message, requestId); if (error instanceof SystemDomainError) return sendError(response, error.status, error.code, error.message, requestId); return sendError(response, 503, "SYSTEM_UNAVAILABLE", "system unavailable", requestId); } }); }

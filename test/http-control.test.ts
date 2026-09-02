@@ -14,27 +14,27 @@ async function request(server: Server, path: string, init: Readonly<{ method?: s
 
 describe("System control HTTP contract", () => {
   it("exposes request_id, permission, pagination and idempotency semantics", async () => {
-    const server = createHttpServer(manifestService, async () => true, { control: new SystemControlService(new InMemorySystemControlRepository()) });
-    const headers = { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-iam-permissions": "system:write,system:read", "x-kokoro-request-id": "00000000-0000-4000-8000-000000000010", "idempotency-key": "site-command" };
+    const server = createHttpServer(manifestService, async () => true, { control: new SystemControlService(new InMemorySystemControlRepository()), bffServiceToken: "service-token", binding: { verify: async () => undefined } });
+    const headers = { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "service-token", "x-kokoro-iam-permissions": "system:write,system:read", "x-kokoro-request-id": "00000000-0000-4000-8000-000000000010", "idempotency-key": "site-command" };
     const first = await request(server, "/system/sites", { method: "POST", headers, body: JSON.stringify({ site_key: "main", hostname: "a.example.test", display_name: "A" }) });
     expect(first.status).toBe(201); expect(first.requestId).toBe(headers["x-kokoro-request-id"]);
     expect(first.body).toMatchObject({ data: { siteKey: "main" }, meta: { request_id: headers["x-kokoro-request-id"] } });
     expect(first.body).not.toHaveProperty("requestId");
     const replay = await request(server, "/system/sites", { method: "POST", headers, body: JSON.stringify({ site_key: "main", hostname: "a.example.test", display_name: "A" }) });
     expect(replay.body).toEqual(first.body);
-    const listed = await request(server, "/system/sites?limit=1", { headers: { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-iam-permissions": "system:read" } });
+    const listed = await request(server, "/system/sites?limit=1", { headers: { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "service-token", "x-kokoro-iam-permissions": "system:read" } });
     expect(listed.status).toBe(200); expect(listed.body).toMatchObject({ data: { items: [{ siteKey: "main" }] }, meta: { request_id: expect.any(String) } });
   });
 
   it("does not let a tenant without the IAM permission write a site", async () => {
-    const server = createHttpServer(manifestService, async () => true, { control: new SystemControlService(new InMemorySystemControlRepository()) });
-    const result = await request(server, "/system/sites", { method: "POST", headers: { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-iam-permissions": "system:read", "idempotency-key": "denied" }, body: JSON.stringify({ site_key: "main", hostname: "a.example.test", display_name: "A" }) });
+    const server = createHttpServer(manifestService, async () => true, { control: new SystemControlService(new InMemorySystemControlRepository()), bffServiceToken: "service-token", binding: { verify: async () => undefined } });
+    const result = await request(server, "/system/sites", { method: "POST", headers: { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "service-token", "x-kokoro-iam-permissions": "system:read", "idempotency-key": "denied" }, body: JSON.stringify({ site_key: "main", hostname: "a.example.test", display_name: "A" }) });
     expect(result.status).toBe(403); expect(result.body).toEqual({ error: { code: "FORBIDDEN", message: "permission denied" }, meta: { request_id: expect.any(String) } });
   });
 
   it("routes the RPC manifest fixture to the same manifest service", async () => {
-    const server = createHttpServer(manifestService, async () => true);
-    const result = await request(server, "/rpc/kokoro.system.v1.SystemService/GetRuntimeManifest", { method: "POST", headers: { "x-kokoro-tenant-id": "tenant-a", "content-type": "application/json" }, body: JSON.stringify({ product_id: "p", locale: "en-US" }) });
+    const server = createHttpServer(manifestService, async () => true, { bffServiceToken: "service-token" });
+    const result = await request(server, "/rpc/kokoro.system.v1.SystemService/GetRuntimeManifest", { method: "POST", headers: { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "service-token", "content-type": "application/json" }, body: JSON.stringify({ product_id: "p", locale: "en-US" }) });
     expect(result.status).toBe(200); expect(result.body).toMatchObject({ data: { tenantId: "tenant-a", productId: "p" }, meta: { request_id: expect.any(String) } });
   });
 

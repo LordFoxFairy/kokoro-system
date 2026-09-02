@@ -43,8 +43,8 @@ async function getJson(server: Server, path: string, headers: Record<string, str
 
 describe("System HTTP contract", () => {
   it("returns 400 when the tenant context header is missing", async () => {
-    const server = createHttpServer(serviceStub(), async () => true);
-    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a")).resolves.toEqual({
+    const server = createHttpServer(serviceStub(), async () => true, { bffServiceToken: "service-token" });
+    await expect(getJson(server, "/system/runtime-manifest?product_id=product-a", { "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "service-token" })).resolves.toEqual({
       status: 400,
       body: {
         error: { code: "INVALID_ARGUMENT", message: "x-kokoro-tenant-id is required" },
@@ -54,7 +54,7 @@ describe("System HTTP contract", () => {
   });
 
   it("returns 503 when readiness dependencies fail and preserves request id", async () => {
-    const server = createHttpServer(serviceStub(), async () => { throw new Error("dependency fixture down"); });
+    const server = createHttpServer(serviceStub(), async () => { throw new Error("dependency fixture down"); }, { bffServiceToken: "service-token" });
     await expect(getJson(server, "/readyz")).resolves.toMatchObject({
       status: 503,
       body: { error: { code: "SYSTEM_UNAVAILABLE", message: "system unavailable" }, meta: { request_id: expect.any(String) } },

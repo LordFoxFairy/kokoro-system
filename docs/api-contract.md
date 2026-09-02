@@ -12,7 +12,7 @@ x-kokoro-actor-id: ACTOR_ID     # optional for public configuration reads
 x-kokoro-request-id: REQUEST_ID
 ```
 
-When `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` is configured, the request must additionally carry the exact service
+Every business request must carry the exact service
 identity and one matching internal credential:
 
 ```text
@@ -21,10 +21,11 @@ x-kokoro-internal-secret: BFF_SERVICE_TOKEN
 Authorization: Bearer BFF_SERVICE_TOKEN   # either this or x-kokoro-internal-secret is sufficient
 ```
 
-The token is a server-side BFF credential, not a user bearer. Missing or invalid service auth returns HTTP 403
+The token is a server-side BFF credential, not a user bearer. Missing configuration returns HTTP 503
+with `service_auth_not_configured`; invalid service auth returns HTTP 403
 with `service_auth_failed`; `x-kokoro-service-token` and user credentials are not accepted. `/healthz` and
-`/readyz` remain available without service auth. If the token is unset, the existing local fixture mode remains
-available for compatibility.
+`/readyz` remain available without service auth. If the token is unset, business routes fail closed with HTTP 503
+and `service_auth_not_configured`; there is no unauthenticated fixture mode.
 
 `surface_id` is optional and only selects a configuration override; it is not an identity or authorization boundary.
 
