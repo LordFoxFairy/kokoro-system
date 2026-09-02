@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { RuntimeManifestService } from "../../modules/runtime-manifest/service.js";
 import type { TenantRequestContext } from "../../modules/runtime-manifest/model.js";
-import type { TenantBindingVerifier } from "../../modules/runtime-manifest/ports.js";
 import { SystemDomainError } from "../../modules/system/errors.js";
 import type { ConfigInput, PageRequest, ReleaseInput, SiteInput, WorkspaceInput } from "../../modules/system/model.js";
 import type { SystemControlService } from "../../modules/system/service.js";
@@ -10,13 +9,14 @@ import { requireBffServiceAuth, ServiceAuthError, ServiceAuthNotConfiguredError 
 
 class RequestValidationError extends Error {}
 type JsonRecord = Readonly<Record<string, unknown>>;
-type HttpOptions = Readonly<{ control?: SystemControlService; binding?: TenantBindingVerifier; bffServiceToken?: string | null }>;
+type HttpOptions = Readonly<{ control?: SystemControlService; bffServiceToken?: string | null }>;
 
 function send(response: ServerResponse, status: number, value: unknown, requestId: string): void { response.statusCode = status; response.setHeader("content-type", "application/json; charset=utf-8"); response.setHeader("x-kokoro-request-id", requestId); response.end(JSON.stringify(value)); }
 function sendSuccess(response: ServerResponse, status: number, data: unknown, requestId: string): void { send(response, status, { data, meta: { request_id: requestId } }, requestId); }
 function sendError(response: ServerResponse, status: number, code: string, message: string, requestId: string): void { send(response, status, { error: { code, message }, meta: { request_id: requestId } }, requestId); }
 function requiredHeader(request: IncomingMessage, name: string): string { const value = request.headers[name]; if (typeof value !== "string" || value.trim() === "") throw new RequestValidationError(`${name} is required`); return value.trim(); }
 function optionalHeader(request: IncomingMessage, name: string): string | null { const value = request.headers[name]; return typeof value === "string" && value.trim() ? value.trim() : null; }
+function forwardedHost(request: IncomingMessage): string { const forwarded = optionalHeader(request, "forwarded"); if (forwarded) { const first = forwarded.split(",", 1)[0] ?? ""; const match = /(?:^|;)\s*host=(?:"([^"\\]*(?:\\.[^"\\]*)*)"|([^;\s]+))/iu.exec(first); const host = match?.[1] ?? match?.[2]; if (host) return host; } return optionalHeader(request, "host") ?? ""; }
 function requiredQuery(url: URL, name: string): string { const value = url.searchParams.get(name); if (!value?.trim()) throw new RequestValidationError(`${name} is required`); return value.trim(); }
 function context(request: IncomingMessage, requestId: string, surfaceId: string | null = null): TenantRequestContext { const permissionHeader = optionalHeader(request, "x-kokoro-iam-permissions"); return { tenantId: requiredHeader(request, "x-kokoro-tenant-id"), actorId: optionalHeader(request, "x-kokoro-actor-id"), organizationId: optionalHeader(request, "x-kokoro-organization-id"), surfaceId, permissions: permissionHeader ? permissionHeader.split(",").map((value) => value.trim()).filter(Boolean) : [], correlationId: requestId }; }
 function idempotencyKey(request: IncomingMessage): string { return requiredHeader(request, "idempotency-key"); }
@@ -27,20 +27,13 @@ function stringArray(input: JsonRecord, name: string): string[] { const value = 
 function booleanField(input: JsonRecord, name: string): boolean { const value = input[name]; if (typeof value !== "boolean") throw new RequestValidationError(`${name} is required`); return value; }
 function pageQuery(url: URL): PageRequest { const cursor = url.searchParams.get("cursor"); const limit = url.searchParams.get("limit"); return { ...(cursor === null ? {} : { cursor }), ...(limit === null ? {} : { limit: Number(limit) }) }; }
 function controlRequired(control: SystemControlService | undefined): SystemControlService { if (!control) throw new SystemDomainError("NOT_IMPLEMENTED", "system control plane is not configured", 501); return control; }
-function forwardedHost(request: IncomingMessage): string | null {
-  const value = request.headers.forwarded;
-  if (typeof value !== "string") return null;
-  const match = /(?:^|;)\s*host=([^;\s,]+)/iu.exec(value.split(",", 1)[0] ?? "");
-  return match?.[1]?.replace(/^"|"$/gu, "") ?? null;
-}
-function requestAuthority(request: IncomingMessage): string { return forwardedHost(request) ?? request.headers.host ?? ""; }
 
 export function createHttpServer(service: RuntimeManifestService, readiness: () => Promise<boolean>, options: HttpOptions = {}): Server { return createServer(async (request, response) => { const requestId = optionalHeader(request, "x-kokoro-request-id") ?? randomUUID(); try { const url = new URL(request.url ?? "/", "http://localhost"); if (request.method === "GET" && url.pathname === "/healthz") return sendSuccess(response, 200, { status: "ok", service: "kokoro-system" }, requestId); if (request.method === "GET" && url.pathname === "/readyz") { try { const ready = await readiness(); return sendSuccess(response, ready ? 200 : 503, { status: ready ? "ready" : "not_ready", service: "kokoro-system" }, requestId); } catch { return sendError(response, 503, "SYSTEM_UNAVAILABLE", "system unavailable", requestId); } }
     const manifestRoute = url.pathname === "/system/runtime-manifest" || url.pathname === "/rpc/kokoro.system.v1.SystemService/GetRuntimeManifest";
     if (manifestRoute || url.pathname.startsWith("/system/")) requireBffServiceAuth(request, options.bffServiceToken);
-    if ((request.method === "GET" || request.method === "POST") && manifestRoute) { const input = request.method === "POST" ? await body(request) : undefined; const productId = input ? stringField(input, "product_id") : requiredQuery(url, "product_id"); const locale = input ? (input.locale === undefined ? "en-US" : stringField(input, "locale")) : (url.searchParams.get("locale") ?? "en-US"); const surfaceId = input ? (input.surface_id === undefined ? null : stringField(input, "surface_id")) : (url.searchParams.get("surface_id") ?? null); const manifest = await service.get({ context: context(request, requestId, surfaceId), productId, locale, host: requestAuthority(request) }); return sendSuccess(response, 200, manifest, requestId); }
+    if ((request.method === "GET" || request.method === "POST") && manifestRoute) { const input = request.method === "POST" ? await body(request) : undefined; const productId = input ? stringField(input, "product_id") : requiredQuery(url, "product_id"); const locale = input ? (input.locale === undefined ? "en-US" : stringField(input, "locale")) : (url.searchParams.get("locale") ?? "en-US"); const surfaceId = input ? (input.surface_id === undefined ? null : stringField(input, "surface_id")) : (url.searchParams.get("surface_id") ?? null); const host = forwardedHost(request); const manifest = await service.get({ context: context(request, requestId, surfaceId), productId, locale, host }); return sendSuccess(response, 200, manifest, requestId); }
     const control = options.control;
-    if (control && url.pathname.startsWith("/system/") && url.pathname !== "/system/runtime-manifest") { const requestContext = context(request, requestId); if (options.binding) await options.binding.verify({ context: requestContext, host: requestAuthority(request) }); else if (options.bffServiceToken?.trim()) throw new SystemDomainError("SERVICE_AUTH_NOT_CONFIGURED", "tenant binding verifier is not configured", 503); }
+    if (control && url.pathname.startsWith("/system/") && url.pathname !== "/system/runtime-manifest") { context(request, requestId); }
     if (request.method === "GET" && url.pathname === "/system/sites") return sendSuccess(response, 200, await controlRequired(control).listSites(context(request, requestId), pageQuery(url)), requestId);
     if (request.method === "POST" && url.pathname === "/system/sites") { const input = await body(request); const value: SiteInput = { siteKey: stringField(input, "site_key"), hostname: stringField(input, "hostname"), displayName: stringField(input, "display_name") }; return sendSuccess(response, 201, await controlRequired(control).createSite(context(request, requestId), value, idempotencyKey(request)), requestId); }
     if (request.method === "GET" && url.pathname === "/system/workspaces") return sendSuccess(response, 200, await controlRequired(control).listWorkspaces(context(request, requestId), pageQuery(url)), requestId);

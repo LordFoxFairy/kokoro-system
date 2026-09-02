@@ -1,11 +1,12 @@
 # kokoro-system
 
-通用产品配置控制面，独立拥有 Site、Workspace、系统配置、站点策略和 Runtime Manifest 的配置事实。
-PostgreSQL 是配置与发布事实源，Redis 是 manifest 热缓存和运行时协调依赖；Redis 或 PostgreSQL 不可用时
-runtime manifest fail closed，不使用进程内降级缓存。
+`kokoro-system` 是租户级 Site、Host、Workspace、站点策略、系统配置与 Runtime Manifest 的唯一事实边界。
+PostgreSQL 保存配置与发布事实，Redis 只保存完整 manifest 热缓存和运行时协调状态；依赖不可用时 manifest fail closed，
+不使用进程内或旧快照降级。
 
-`tenant_id` 由 kokoro-iam 根据 Host/domain 提供并校验；system 只消费受信 `TenantRequestContext`，不建立第二套租户或身份事实。
-所有写入使用应用层冲突查询、PostgreSQL 行锁、软删除；数据库不使用外键、级联和业务唯一索引。
+`tenant_id` 是跨仓唯一隔离键，由受信 BFF/服务上下文传入。`site_id` 是 System 内部资源 ID，`host` 是 System
+内部用于解析 Site 的输入。System 在自己的数据库中校验 `tenant_id + host`，不调用 IAM 的 Host 接口，也不读取
+IAM 数据库。IAM 只负责 Tenant、用户、认证、组织、Role、Permission 与身份上下文。
 
 ## 文档入口
 
@@ -16,13 +17,12 @@ runtime manifest fail closed，不使用进程内降级缓存。
 - [`acceptance.md`](acceptance.md)：验收矩阵及 fixture 命令
 - [`risk-register.md`](risk-register.md)：风险、监控和上线前置条件
 
-System 不存储登录凭据、IAM 权限事实或 Model Provider 配置，不调用 Model Provider；它只接收 IAM/BFF
-服务端构造的 `TenantRequestContext`，并在实际 manifest/control 请求前校验 Host 与 tenant binding。
+System 不存储登录凭据、IAM 权限事实或 Model Provider 配置，不调用 Model Provider；它只消费受信
+`TenantRequestContext` 和 BFF 传入的 Forwarded/Host。浏览器提交的身份、租户或 Host header 不得直接透传为
+内部上下文。
 
-可选配置 `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 后，runtime manifest、RPC manifest 和全部 `/system/*` 业务路径
-还必须携带 `x-kokoro-service: web-bff` 以及匹配的 `x-kokoro-internal-secret` 或
-`Authorization: Bearer`；`/healthz`、`/readyz` 仍保持公开。未配置时保留既有本地 fixture 兼容模式。
+配置 `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 后，runtime manifest、RPC manifest 和全部 `/system/*` 业务路径必须携带
+`x-kokoro-service: web-bff` 以及匹配的 `x-kokoro-internal-secret` 或 `Authorization: Bearer`。健康探针保持公开；
+未配置 service token 时业务路由 fail closed。
 
-运行时必须配置 `DATABASE_URL`、`REDIS_URL`、`KOKORO_IAM_BASE_URL` 和
-`KOKORO_IAM_BACKEND_TOKEN`。system 在读取或缓存 manifest 前调用 IAM 的内部
-Tenant/domain binding 契约，Redis 不可用时不使用进程内降级缓存。
+运行时只需要 `DATABASE_URL`、`REDIS_URL` 以及可选的 System host、port、Redis namespace、BFF service token。

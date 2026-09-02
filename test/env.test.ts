@@ -5,8 +5,6 @@ import { loadEnv } from "../src/config/env.js";
 const baseEnv = {
   DATABASE_URL: "postgresql://user:password@localhost:5432/system",
   REDIS_URL: "redis://localhost:6379",
-  KOKORO_IAM_BASE_URL: "http://iam.test",
-  KOKORO_IAM_BACKEND_TOKEN: "iam-token",
 };
 
 describe("System environment", () => {

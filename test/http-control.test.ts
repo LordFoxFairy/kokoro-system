@@ -14,7 +14,7 @@ async function request(server: Server, path: string, init: Readonly<{ method?: s
 
 describe("System control HTTP contract", () => {
   it("exposes request_id, permission, pagination and idempotency semantics", async () => {
-    const server = createHttpServer(manifestService, async () => true, { control: new SystemControlService(new InMemorySystemControlRepository()), bffServiceToken: "service-token", binding: { verify: async () => undefined } });
+    const server = createHttpServer(manifestService, async () => true, { control: new SystemControlService(new InMemorySystemControlRepository()), bffServiceToken: "service-token" });
     const headers = { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "service-token", "x-kokoro-iam-permissions": "system:write,system:read", "x-kokoro-request-id": "00000000-0000-4000-8000-000000000010", "idempotency-key": "site-command" };
     const first = await request(server, "/system/sites", { method: "POST", headers, body: JSON.stringify({ site_key: "main", hostname: "a.example.test", display_name: "A" }) });
     expect(first.status).toBe(201); expect(first.requestId).toBe(headers["x-kokoro-request-id"]);
@@ -27,7 +27,7 @@ describe("System control HTTP contract", () => {
   });
 
   it("does not let a tenant without the IAM permission write a site", async () => {
-    const server = createHttpServer(manifestService, async () => true, { control: new SystemControlService(new InMemorySystemControlRepository()), bffServiceToken: "service-token", binding: { verify: async () => undefined } });
+    const server = createHttpServer(manifestService, async () => true, { control: new SystemControlService(new InMemorySystemControlRepository()), bffServiceToken: "service-token" });
     const result = await request(server, "/system/sites", { method: "POST", headers: { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "service-token", "x-kokoro-iam-permissions": "system:read", "idempotency-key": "denied" }, body: JSON.stringify({ site_key: "main", hostname: "a.example.test", display_name: "A" }) });
     expect(result.status).toBe(403); expect(result.body).toEqual({ error: { code: "FORBIDDEN", message: "permission denied" }, meta: { request_id: expect.any(String) } });
   });
@@ -38,26 +38,22 @@ describe("System control HTTP contract", () => {
     expect(result.status).toBe(200); expect(result.body).toMatchObject({ data: { tenantId: "tenant-a", productId: "p" }, meta: { request_id: expect.any(String) } });
   });
 
-  it("requires configured BFF auth and IAM tenant binding for control-plane routes", async () => {
-    let bindingCalls = 0;
+  it("requires configured BFF auth for control-plane routes", async () => {
     const server = createHttpServer(manifestService, async () => true, {
       control: new SystemControlService(new InMemorySystemControlRepository()),
       bffServiceToken: "service-token",
-      binding: { verify: async ({ context }) => { bindingCalls += 1; if (context.tenantId !== "tenant-a") throw new Error("tenant binding mismatch"); } },
     });
     const baseHeaders = { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-iam-permissions": "system:read" };
     const missingAuth = await request(server, "/system/sites", { headers: baseHeaders });
     expect(missingAuth.status).toBe(403);
-    expect(bindingCalls).toBe(0);
     const valid = await request(server, "/system/sites", { headers: { ...baseHeaders, "x-kokoro-service": "web-bff", authorization: "Bearer service-token" } });
     expect(valid.status).toBe(200);
-    expect(bindingCalls).toBe(1);
   });
 
-  it("fails closed when configured control auth has no tenant binding verifier", async () => {
-    const server = createHttpServer(manifestService, async () => true, { control: new SystemControlService(new InMemorySystemControlRepository()), bffServiceToken: "service-token" });
+  it("fails closed when BFF service auth is not configured", async () => {
+    const server = createHttpServer(manifestService, async () => true, { control: new SystemControlService(new InMemorySystemControlRepository()) });
     const result = await request(server, "/system/sites", { headers: { "x-kokoro-tenant-id": "tenant-a", "x-kokoro-service": "web-bff", "x-kokoro-internal-secret": "service-token", "x-kokoro-iam-permissions": "system:read" } });
     expect(result.status).toBe(503);
-    expect(result.body).toEqual({ error: { code: "SERVICE_AUTH_NOT_CONFIGURED", message: "tenant binding verifier is not configured" }, meta: { request_id: expect.any(String) } });
+    expect(result.body).toEqual({ error: { code: "service_auth_not_configured", message: "system service authentication is not configured" }, meta: { request_id: expect.any(String) } });
   });
 });

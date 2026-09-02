@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
-import type { ManifestCache, TenantBindingVerifier, SystemRepository } from "./ports.js";
+import type { ManifestCache, SiteHostResolver, SystemRepository } from "./ports.js";
 import type { RuntimeManifest, TenantRequestContext } from "./model.js";
 
 function cacheKey(context: TenantRequestContext, productId: string, locale: string): string {
   return `manifest:${context.tenantId}:${productId}:${locale}:${context.surfaceId ?? "default"}`;
 }
 export class RuntimeManifestService {
-  public constructor(private readonly repository: SystemRepository, private readonly cache: ManifestCache, private readonly binding: TenantBindingVerifier) {}
+  public constructor(private readonly repository: SystemRepository, private readonly cache: ManifestCache, private readonly hostResolver: SiteHostResolver) {}
   public async get(input: Readonly<{ context: TenantRequestContext; productId: string; locale: string; host: string }>): Promise<RuntimeManifest> {
-    await this.binding.verify({ context: input.context, host: input.host });
+    await this.hostResolver.verify({ context: input.context, host: input.host });
     const key = cacheKey(input.context, input.productId, input.locale);
     const cached = await this.cache.get(key);
     if (cached !== null) {

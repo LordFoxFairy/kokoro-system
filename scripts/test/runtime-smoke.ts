@@ -1,10 +1,9 @@
-import { createServer, type Server } from "node:http";
+import { type Server } from "node:http";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { createClient } from "redis";
 import { createSystemRuntime } from "../../src/bootstrap.js";
-import { IamTenantBindingClient } from "../../src/infrastructure/iam/tenant-binding-client.js";
 import { createHttpServer } from "../../src/interfaces/http/server.js";
 import { createSystemClient, SystemSdkError, type RuntimeManifest } from "../../sdk/typescript/src/client.js";
 
@@ -14,7 +13,6 @@ const productId = "00000000-0000-4000-8000-0000000000c1";
 const productKey = "kokoro";
 const releaseId = "00000000-0000-4000-8000-0000000000d1";
 const surfaceA = "00000000-0000-4000-8000-0000000000e1";
-const workloadToken = "system-runtime-smoke-workload";
 const bffServiceToken = "system-runtime-smoke-bff-service";
 const redisNamespace = `kokoro:system:smoke:${process.pid}:${Date.now()}`;
 
@@ -60,6 +58,8 @@ async function seed(databaseUrl: string): Promise<void> {
       );
     };
     await execute(connection, `INSERT INTO system_product (id, product_key, name, status, created_at, updated_at) VALUES (?, ?, ?, 'active', ?, ?)`, [productId, productKey, "Kokoro", now, now]);
+    await execute(connection, `INSERT INTO system_site (id, tenant_id, site_key, hostnames_json, display_name, status, version, created_at, updated_at) VALUES (?, ?, ?, ?::jsonb, ?, 'active', 1, ?, ?)`, [randomUUID(), tenantA, "main-a", JSON.stringify(["tenant-a.example.test"]), "Tenant A", now, now]);
+    await execute(connection, `INSERT INTO system_site (id, tenant_id, site_key, hostnames_json, display_name, status, version, created_at, updated_at) VALUES (?, ?, ?, ?::jsonb, ?, 'active', 1, ?, ?)`, [randomUUID(), tenantB, "main-b", JSON.stringify(["tenant-b.example.test"]), "Tenant B", now, now]);
     await execute(connection, `INSERT INTO system_config_release (id, release_key, status, digest, published_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?)`, [releaseId, "smoke-release", "1".repeat(64), now, now, now]);
     await execute(connection, `INSERT INTO system_release_binding (id, scope_type, scope_id, product_id, release_id, status, created_at, updated_at) VALUES (?, 'tenant', ?, ?, ?, 'active', ?, ?)`, [randomUUID(), tenantA, productId, releaseId, now, now]);
     await execute(connection, `INSERT INTO system_release_binding (id, scope_type, scope_id, product_id, release_id, status, created_at, updated_at) VALUES (?, 'tenant', ?, ?, ?, 'active', ?, ?)`, [randomUUID(), tenantB, productId, releaseId, now, now]);
@@ -104,17 +104,7 @@ async function main(): Promise<void> {
   const database = await createDatabase(baseDatabaseUrl);
   const redis = createClient({ url: testRedisUrl });
   await redis.connect();
-  const iamServer = createServer((request, response) => {
-    const url = new URL(request.url ?? "/", "http://localhost");
-    if (request.method !== "GET" || url.pathname !== "/internal/iam/tenant-binding") { response.statusCode = 404; response.end(); return; }
-    if (request.headers.authorization !== `Bearer ${workloadToken}`) { response.statusCode = 401; response.end(JSON.stringify({ error: "unauthorized" })); return; }
-    const host = url.searchParams.get("host");
-    const tenantId = host === "tenant-a.example.test" ? tenantA : host === "tenant-b.example.test" ? tenantB : undefined;
-    if (!tenantId) { response.statusCode = 404; response.end(JSON.stringify({ error: "unknown host" })); return; }
-    response.setHeader("content-type", "application/json"); response.end(JSON.stringify({ data: { tenant_id: tenantId, status: "active" } }));
-  });
-  const iam = await listen(iamServer);
-  const runtime = await createSystemRuntime({ databaseUrl: database.databaseUrl, redisUrl: testRedisUrl, redisNamespace, binding: new IamTenantBindingClient(iam.url, workloadToken) });
+  const runtime = await createSystemRuntime({ databaseUrl: database.databaseUrl, redisUrl: testRedisUrl, redisNamespace });
   const systemServer = createHttpServer(runtime.service, async () => { await runtime.pool.ping(); await runtime.redis.assertReady(); return true; }, { bffServiceToken });
   const system = await listen(systemServer);
   try {
@@ -142,7 +132,7 @@ async function main(): Promise<void> {
     assert(unknownPath.status === 404, "unknown path did not return 404");
 
     const mismatch = client(system.url, tenantB, "tenant-a.example.test");
-    await expectSdkStatus(() => mismatch.getRuntimeManifest({ productId: productKey, locale: "en-US" }), 503, "IAM binding mismatch");
+    await expectSdkStatus(() => mismatch.getRuntimeManifest({ productId: productKey, locale: "en-US" }), 503, "System Site/Host mismatch");
     await runtime.redis.set(`manifest:${tenantA}:${productKey}:en-US:default`, { ...tenantOnly, tenantId: tenantB }, 30);
     await expectSdkStatus(() => a.getRuntimeManifest({ productId: productKey, locale: "en-US" }), 503, "cache identity mismatch");
     console.log(JSON.stringify({ status: "PASS", listener: true, sdk: true, tenantIsolation: true, precedence: true, cacheIdentity: true, httpErrors: true }));
@@ -150,7 +140,6 @@ async function main(): Promise<void> {
     await system.close();
     await runtime.pool.close();
     await runtime.redis.close();
-    await iam.close();
     await redis.del(`${redisNamespace}:manifest:${tenantA}:${productKey}:en-US:surface-a`, `${redisNamespace}:manifest:${tenantA}:${productKey}:en-US:default`);
     await redis.quit();
     await database.drop();
