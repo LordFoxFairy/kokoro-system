@@ -1,0 +1,580 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Kokoro System HTTP API",
+    "version": "1.0.0",
+    "description": "Canonical HTTP contract owned by kokoro-system. The protobuf SiteService contract is owned separately under contract/proto."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Process is alive",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/health_envelope" } } }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "readiness",
+        "responses": {
+          "200": {
+            "description": "PostgreSQL and Redis are ready",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/health_envelope" } } }
+          },
+          "503": { "$ref": "#/components/responses/error_response" }
+        }
+      }
+    },
+    "/v1/system/runtime-manifest": {
+      "get": {
+        "operationId": "get_runtime_manifest",
+        "parameters": [
+          { "$ref": "#/components/parameters/tenant_id" },
+          { "$ref": "#/components/parameters/request_id" },
+          { "$ref": "#/components/parameters/product_id" },
+          { "$ref": "#/components/parameters/locale" },
+          { "$ref": "#/components/parameters/surface_id" }
+        ],
+        "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
+        "responses": {
+          "200": {
+            "description": "Resolved runtime manifest",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/runtime_manifest_envelope" } } }
+          },
+          "400": { "$ref": "#/components/responses/error_response" },
+          "403": { "$ref": "#/components/responses/error_response" },
+          "404": { "$ref": "#/components/responses/error_response" },
+          "503": { "$ref": "#/components/responses/error_response" }
+        }
+      }
+    },
+    "/v1/system/sites": {
+      "get": {
+        "operationId": "list_sites",
+        "parameters": [
+          { "$ref": "#/components/parameters/tenant_id" },
+          { "$ref": "#/components/parameters/request_id" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/cursor" }
+        ],
+        "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
+        "responses": {
+          "200": {
+            "description": "Site page",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/site_page_envelope" } } }
+          },
+          "400": { "$ref": "#/components/responses/error_response" },
+          "403": { "$ref": "#/components/responses/error_response" },
+          "503": { "$ref": "#/components/responses/error_response" }
+        }
+      },
+      "post": {
+        "operationId": "create_site",
+        "parameters": [
+          { "$ref": "#/components/parameters/tenant_id" },
+          { "$ref": "#/components/parameters/request_id" },
+          { "$ref": "#/components/parameters/idempotency_key" }
+        ],
+        "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/site_input" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Created site",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/site_envelope" } } }
+          },
+          "400": { "$ref": "#/components/responses/error_response" },
+          "403": { "$ref": "#/components/responses/error_response" },
+          "409": { "$ref": "#/components/responses/error_response" },
+          "503": { "$ref": "#/components/responses/error_response" }
+        }
+      }
+    },
+    "/v1/system/workspaces": {
+      "get": {
+        "operationId": "list_workspaces",
+        "parameters": [
+          { "$ref": "#/components/parameters/tenant_id" },
+          { "$ref": "#/components/parameters/request_id" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/cursor" }
+        ],
+        "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
+        "responses": {
+          "200": {
+            "description": "Workspace page",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/workspace_page_envelope" } } }
+          },
+          "400": { "$ref": "#/components/responses/error_response" },
+          "403": { "$ref": "#/components/responses/error_response" },
+          "503": { "$ref": "#/components/responses/error_response" }
+        }
+      },
+      "post": {
+        "operationId": "create_workspace",
+        "parameters": [
+          { "$ref": "#/components/parameters/tenant_id" },
+          { "$ref": "#/components/parameters/request_id" },
+          { "$ref": "#/components/parameters/idempotency_key" }
+        ],
+        "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/workspace_input" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Created workspace",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/workspace_envelope" } } }
+          },
+          "400": { "$ref": "#/components/responses/error_response" },
+          "403": { "$ref": "#/components/responses/error_response" },
+          "404": { "$ref": "#/components/responses/error_response" },
+          "409": { "$ref": "#/components/responses/error_response" },
+          "503": { "$ref": "#/components/responses/error_response" }
+        }
+      }
+    },
+    "/v1/system/sites/{site_id}/policy": {
+      "parameters": [
+        { "$ref": "#/components/parameters/site_id" },
+        { "$ref": "#/components/parameters/tenant_id" },
+        { "$ref": "#/components/parameters/request_id" }
+      ],
+      "get": {
+        "operationId": "get_site_policy",
+        "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
+        "responses": {
+          "200": {
+            "description": "Active site policy",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/site_policy_envelope" } } }
+          },
+          "403": { "$ref": "#/components/responses/error_response" },
+          "404": { "$ref": "#/components/responses/error_response" },
+          "503": { "$ref": "#/components/responses/error_response" }
+        }
+      },
+      "put": {
+        "operationId": "put_site_policy",
+        "parameters": [{ "$ref": "#/components/parameters/idempotency_key" }],
+        "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/site_policy_input" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated site policy",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/site_policy_envelope" } } }
+          },
+          "400": { "$ref": "#/components/responses/error_response" },
+          "403": { "$ref": "#/components/responses/error_response" },
+          "404": { "$ref": "#/components/responses/error_response" },
+          "409": { "$ref": "#/components/responses/error_response" },
+          "503": { "$ref": "#/components/responses/error_response" }
+        }
+      }
+    },
+    "/v1/system/config": {
+      "get": {
+        "operationId": "list_config",
+        "parameters": [
+          { "$ref": "#/components/parameters/tenant_id" },
+          { "$ref": "#/components/parameters/request_id" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/cursor" }
+        ],
+        "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
+        "responses": {
+          "200": {
+            "description": "Configuration page",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/config_page_envelope" } } }
+          },
+          "400": { "$ref": "#/components/responses/error_response" },
+          "403": { "$ref": "#/components/responses/error_response" },
+          "503": { "$ref": "#/components/responses/error_response" }
+        }
+      },
+      "post": {
+        "operationId": "upsert_config",
+        "parameters": [
+          { "$ref": "#/components/parameters/tenant_id" },
+          { "$ref": "#/components/parameters/request_id" },
+          { "$ref": "#/components/parameters/idempotency_key" }
+        ],
+        "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/config_input" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Upserted configuration",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/config_envelope" } } }
+          },
+          "400": { "$ref": "#/components/responses/error_response" },
+          "403": { "$ref": "#/components/responses/error_response" },
+          "409": { "$ref": "#/components/responses/error_response" },
+          "503": { "$ref": "#/components/responses/error_response" }
+        }
+      }
+    },
+    "/v1/system/releases": {
+      "post": {
+        "operationId": "create_release",
+        "parameters": [
+          { "$ref": "#/components/parameters/tenant_id" },
+          { "$ref": "#/components/parameters/request_id" },
+          { "$ref": "#/components/parameters/idempotency_key" }
+        ],
+        "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/release_input" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Created release",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/release_envelope" } } }
+          },
+          "400": { "$ref": "#/components/responses/error_response" },
+          "403": { "$ref": "#/components/responses/error_response" },
+          "409": { "$ref": "#/components/responses/error_response" },
+          "503": { "$ref": "#/components/responses/error_response" }
+        }
+      }
+    },
+    "/v1/system/releases/{release_id}/validate": {
+      "$ref": "#/components/pathItems/release_transition"
+    },
+    "/v1/system/releases/{release_id}/publish": {
+      "$ref": "#/components/pathItems/release_transition"
+    },
+    "/v1/system/releases/{release_id}/retire": {
+      "$ref": "#/components/pathItems/release_transition"
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "service_bearer": { "type": "http", "scheme": "bearer" },
+      "internal_secret": { "type": "apiKey", "in": "header", "name": "x-kokoro-internal-secret" },
+      "service_identity": { "type": "apiKey", "in": "header", "name": "x-kokoro-service" }
+    },
+    "parameters": {
+      "tenant_id": { "name": "x-kokoro-tenant-id", "in": "header", "required": true, "schema": { "type": "string", "minLength": 1 } },
+      "request_id": { "name": "x-kokoro-request-id", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+      "idempotency_key": { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 1, "maxLength": 128 } },
+      "product_id": { "name": "product_id", "in": "query", "required": true, "schema": { "type": "string", "minLength": 1 } },
+      "locale": { "name": "locale", "in": "query", "required": false, "schema": { "type": "string", "default": "en-US" } },
+      "surface_id": { "name": "surface_id", "in": "query", "required": false, "schema": { "type": "string" } },
+      "limit": { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } },
+      "cursor": { "name": "cursor", "in": "query", "required": false, "schema": { "type": "string" } },
+      "site_id": { "name": "site_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "release_id": { "name": "release_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+    },
+    "responses": {
+      "error_response": {
+        "description": "Stable API error",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error_envelope" } } }
+      }
+    },
+    "pathItems": {
+      "release_transition": {
+        "post": {
+          "operationId": "transition_release",
+          "parameters": [
+            { "$ref": "#/components/parameters/release_id" },
+            { "$ref": "#/components/parameters/tenant_id" },
+            { "$ref": "#/components/parameters/request_id" },
+            { "$ref": "#/components/parameters/idempotency_key" }
+          ],
+          "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
+          "responses": {
+            "200": {
+              "description": "Transitioned release",
+              "content": { "application/json": { "schema": { "$ref": "#/components/schemas/release_envelope" } } }
+            },
+            "400": { "$ref": "#/components/responses/error_response" },
+            "403": { "$ref": "#/components/responses/error_response" },
+            "404": { "$ref": "#/components/responses/error_response" },
+            "409": { "$ref": "#/components/responses/error_response" },
+            "503": { "$ref": "#/components/responses/error_response" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "meta": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["request_id"],
+        "properties": { "request_id": { "type": "string" } }
+      },
+      "error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "details": {}
+        }
+      },
+      "error_envelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error", "meta"],
+        "properties": {
+          "error": { "$ref": "#/components/schemas/error" },
+          "meta": { "$ref": "#/components/schemas/meta" }
+        }
+      },
+      "health": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status", "service"],
+        "properties": {
+          "status": { "type": "string", "enum": ["ok", "ready", "not_ready"] },
+          "service": { "type": "string", "const": "kokoro-system" }
+        }
+      },
+      "health_envelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["data", "meta"],
+        "properties": {
+          "data": { "$ref": "#/components/schemas/health" },
+          "meta": { "$ref": "#/components/schemas/meta" }
+        }
+      },
+      "runtime_manifest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tenant_id", "product_id", "locale", "navigation", "locale_namespaces", "theme", "feature_flags", "references", "config_version", "release_id", "digest"],
+        "properties": {
+          "tenant_id": { "type": "string" },
+          "product_id": { "type": "string" },
+          "locale": { "type": "string" },
+          "navigation": { "type": "array", "items": {} },
+          "locale_namespaces": { "type": "array", "items": {} },
+          "theme": { "type": "object" },
+          "feature_flags": { "type": "array", "items": {} },
+          "references": { "type": "array", "items": {} },
+          "config_version": { "type": "string" },
+          "release_id": { "type": ["string", "null"] },
+          "digest": { "type": "string" }
+        }
+      },
+      "runtime_manifest_envelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["data", "meta"],
+        "properties": {
+          "data": { "$ref": "#/components/schemas/runtime_manifest" },
+          "meta": { "$ref": "#/components/schemas/meta" }
+        }
+      },
+      "site_input": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["site_key", "hostname", "display_name"],
+        "properties": {
+          "site_key": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "hostname": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "display_name": { "type": "string", "minLength": 1, "maxLength": 160 }
+        }
+      },
+      "site": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "tenant_id", "site_key", "hostnames", "display_name", "status", "version", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tenant_id": { "type": "string" },
+          "site_key": { "type": "string" },
+          "hostnames": { "type": "array", "items": { "type": "string" } },
+          "display_name": { "type": "string" },
+          "status": { "type": "string", "enum": ["draft", "active", "suspended", "archived"] },
+          "version": { "type": "integer", "minimum": 1 },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "workspace_input": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["site_id", "workspace_key", "name"],
+        "properties": {
+          "site_id": { "type": "string", "format": "uuid" },
+          "workspace_key": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "name": { "type": "string", "minLength": 1, "maxLength": 160 }
+        }
+      },
+      "workspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "tenant_id", "site_id", "workspace_key", "name", "status", "version", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tenant_id": { "type": "string" },
+          "site_id": { "type": "string", "format": "uuid" },
+          "workspace_key": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["active", "archived"] },
+          "version": { "type": "integer", "minimum": 1 },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "site_policy_input": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["default_locale", "allowed_locales", "allowed_products", "public_manifest"],
+        "properties": {
+          "default_locale": { "type": "string" },
+          "allowed_locales": { "type": "array", "items": { "type": "string" } },
+          "allowed_products": { "type": "array", "items": { "type": "string" } },
+          "public_manifest": { "type": "boolean" }
+        }
+      },
+      "site_policy": {
+        "allOf": [
+          { "$ref": "#/components/schemas/site_policy_input" },
+          {
+            "type": "object",
+            "required": ["id", "tenant_id", "site_id", "version", "status", "updated_at"],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "tenant_id": { "type": "string" },
+              "site_id": { "type": "string", "format": "uuid" },
+              "version": { "type": "integer", "minimum": 1 },
+              "status": { "type": "string", "enum": ["active", "archived"] },
+              "updated_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        ]
+      },
+      "config_input": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["module_key", "config_key", "scope_type", "scope_id", "product_id", "locale", "value", "schema_version", "release_id"],
+        "properties": {
+          "module_key": { "type": "string" },
+          "config_key": { "type": "string" },
+          "scope_type": { "type": "string", "enum": ["global", "tenant", "product", "surface"] },
+          "scope_id": { "type": ["string", "null"] },
+          "product_id": { "type": ["string", "null"] },
+          "locale": { "type": ["string", "null"] },
+          "value": {},
+          "schema_version": { "type": "integer", "minimum": 1 },
+          "release_id": { "type": ["string", "null"] }
+        }
+      },
+      "config": {
+        "allOf": [
+          { "$ref": "#/components/schemas/config_input" },
+          {
+            "type": "object",
+            "required": ["id", "tenant_id", "status", "config_version", "digest", "updated_at"],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "tenant_id": { "type": ["string", "null"] },
+              "status": { "type": "string", "enum": ["active", "deleted"] },
+              "config_version": { "type": "integer", "minimum": 1 },
+              "digest": { "type": "string" },
+              "updated_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        ]
+      },
+      "release_input": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["release_key", "digest"],
+        "properties": {
+          "release_key": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      },
+      "release": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "tenant_id", "release_key", "status", "digest", "published_at", "version", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tenant_id": { "type": "string" },
+          "release_key": { "type": "string" },
+          "status": { "type": "string", "enum": ["draft", "validated", "published", "retired"] },
+          "digest": { "type": "string" },
+          "published_at": { "type": ["string", "null"], "format": "date-time" },
+          "version": { "type": "integer", "minimum": 1 },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "site_envelope": { "$ref": "#/components/schemas/site_envelope_shape" },
+      "site_envelope_shape": {
+        "type": "object",
+        "required": ["data", "meta"],
+        "properties": { "data": { "$ref": "#/components/schemas/site" }, "meta": { "$ref": "#/components/schemas/meta" } }
+      },
+      "workspace_envelope": {
+        "type": "object",
+        "required": ["data", "meta"],
+        "properties": { "data": { "$ref": "#/components/schemas/workspace" }, "meta": { "$ref": "#/components/schemas/meta" } }
+      },
+      "site_policy_envelope": {
+        "type": "object",
+        "required": ["data", "meta"],
+        "properties": { "data": { "$ref": "#/components/schemas/site_policy" }, "meta": { "$ref": "#/components/schemas/meta" } }
+      },
+      "config_envelope": {
+        "type": "object",
+        "required": ["data", "meta"],
+        "properties": { "data": { "$ref": "#/components/schemas/config" }, "meta": { "$ref": "#/components/schemas/meta" } }
+      },
+      "release_envelope": {
+        "type": "object",
+        "required": ["data", "meta"],
+        "properties": { "data": { "$ref": "#/components/schemas/release" }, "meta": { "$ref": "#/components/schemas/meta" } }
+      },
+      "site_page": {
+        "type": "object",
+        "required": ["items", "next_cursor"],
+        "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/site" } }, "next_cursor": { "type": ["string", "null"] } }
+      },
+      "workspace_page": {
+        "type": "object",
+        "required": ["items", "next_cursor"],
+        "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/workspace" } }, "next_cursor": { "type": ["string", "null"] } }
+      },
+      "config_page": {
+        "type": "object",
+        "required": ["items", "next_cursor"],
+        "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/config" } }, "next_cursor": { "type": ["string", "null"] } }
+      },
+      "site_page_envelope": {
+        "type": "object",
+        "required": ["data", "meta"],
+        "properties": { "data": { "$ref": "#/components/schemas/site_page" }, "meta": { "$ref": "#/components/schemas/meta" } }
+      },
+      "workspace_page_envelope": {
+        "type": "object",
+        "required": ["data", "meta"],
+        "properties": { "data": { "$ref": "#/components/schemas/workspace_page" }, "meta": { "$ref": "#/components/schemas/meta" } }
+      },
+      "config_page_envelope": {
+        "type": "object",
+        "required": ["data", "meta"],
+        "properties": { "data": { "$ref": "#/components/schemas/config_page" }, "meta": { "$ref": "#/components/schemas/meta" } }
+      }
+    }
+  }
+}

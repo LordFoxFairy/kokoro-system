@@ -22,6 +22,20 @@ export type RuntimeManifestRequest = Readonly<{
   surfaceId?: string;
 }>;
 
+type RuntimeManifestWire = Readonly<{
+  tenant_id: string;
+  product_id: string;
+  locale: string;
+  navigation: readonly unknown[];
+  locale_namespaces: readonly unknown[];
+  theme: Readonly<Record<string, unknown>>;
+  feature_flags: readonly unknown[];
+  references: readonly unknown[];
+  config_version: string;
+  release_id: string | null;
+  digest: string;
+}>;
+
 export type SystemClientOptions = Readonly<{
   baseUrl: string;
   tenantId: string;
@@ -114,7 +128,7 @@ async function getRuntimeManifest(
 ): Promise<RuntimeManifest> {
   const productId = requireValue("productId", options.request.productId);
   const requestId = requireRequestId(options.requestId());
-  const url = new URL(`${options.baseUrl}/system/runtime-manifest`);
+  const url = new URL(`${options.baseUrl}/v1/system/runtime-manifest`);
   url.searchParams.set("product_id", productId);
   if (options.request.locale !== undefined)
     url.searchParams.set(
@@ -169,7 +183,7 @@ async function getRuntimeManifest(
         details: sanitizeErrorDetails(body),
       });
     }
-    return body.data;
+    return runtimeManifestFromWire(body.data);
   } catch (error) {
     if (error instanceof SystemSdkError) throw error;
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -199,22 +213,38 @@ async function readJson(response: Response): Promise<unknown> {
 
 function isRuntimeManifestEnvelope(
   value: unknown,
-): value is { data: RuntimeManifest } {
+): value is { data: RuntimeManifestWire } {
   if (!isRecord(value) || !isRecord(value.data)) return false;
   const data = value.data;
   return (
-    typeof data.tenantId === "string" &&
-    typeof data.productId === "string" &&
+    typeof data.tenant_id === "string" &&
+    typeof data.product_id === "string" &&
     typeof data.locale === "string" &&
     Array.isArray(data.navigation) &&
-    Array.isArray(data.localeNamespaces) &&
+    Array.isArray(data.locale_namespaces) &&
     isRecord(data.theme) &&
-    Array.isArray(data.featureFlags) &&
+    Array.isArray(data.feature_flags) &&
     Array.isArray(data.references) &&
-    typeof data.configVersion === "string" &&
-    (data.releaseId === null || typeof data.releaseId === "string") &&
+    typeof data.config_version === "string" &&
+    (data.release_id === null || typeof data.release_id === "string") &&
     typeof data.digest === "string"
   );
+}
+
+function runtimeManifestFromWire(value: RuntimeManifestWire): RuntimeManifest {
+  return {
+    tenantId: value.tenant_id,
+    productId: value.product_id,
+    locale: value.locale,
+    navigation: value.navigation,
+    localeNamespaces: value.locale_namespaces,
+    theme: value.theme,
+    featureFlags: value.feature_flags,
+    references: value.references,
+    configVersion: value.config_version,
+    releaseId: value.release_id,
+    digest: value.digest,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -231,7 +261,7 @@ function sanitizeErrorDetails(
   value: unknown,
 ): Readonly<{ code: string }> | undefined {
   if (!isRecord(value)) return undefined;
-  const code = value.code;
+  const code = isRecord(value.error) ? value.error.code : value.code;
   return typeof code === "string" && /^[A-Z][A-Z0-9_.-]{0,63}$/u.test(code)
     ? { code }
     : undefined;

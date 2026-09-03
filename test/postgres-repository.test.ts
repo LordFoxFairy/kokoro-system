@@ -1,29 +1,98 @@
 import { describe, expect, it } from "vitest";
-import { PostgresSystemRepository } from "../src/modules/runtime-manifest/postgres-repository.js";
-import type { SqlPool } from "../src/infrastructure/postgres/client.js";
+import { PostgresSystemRepository } from "../src/infrastructure/repositories/runtime-manifest/postgres-system.repository.js";
+import type { SqlPool } from "../src/infrastructure/persistence/postgres/client.js";
 
 describe("PostgresSystemRepository", () => {
   it("resolves surface, tenant, product, locale and release precedence deterministically", async () => {
     let released = false;
     const queries: Array<{ sql: string; values: readonly unknown[] }> = [];
     const client = {
-      query: async <Row>(sql: string, values: readonly unknown[] = []): Promise<{ rows: readonly Row[]; affectedRows: number }> => {
+      query: async <Row>(
+        sql: string,
+        values: readonly unknown[] = [],
+      ): Promise<{ rows: readonly Row[]; affectedRows: number }> => {
         queries.push({ sql, values });
-        if (sql.includes("FROM system_product")) return { rows: [{ id: "product-uuid", product_key: "product-a" }] as Row[], affectedRows: 1 };
-        if (sql.includes("FROM system_release_binding")) return { rows: [{ release_id: "release-a" }] as Row[], affectedRows: 1 };
+        if (sql.includes("FROM system_product"))
+          return {
+            rows: [{ id: "product-uuid", product_key: "product-a" }] as Row[],
+            affectedRows: 1,
+          };
+        if (sql.includes("FROM system_release_binding"))
+          return {
+            rows: [{ release_id: "release-a" }] as Row[],
+            affectedRows: 1,
+          };
         released = true;
-        return { rows: [
-          { id: "global", module_key: "theme", scope_type: "global", scope_id: null, locale: null, value_json: JSON.stringify({ source: "global" }), config_version: 1, release_id: null, digest: "a" },
-          { id: "product", module_key: "theme", scope_type: "product", scope_id: "product-a", locale: null, value_json: JSON.stringify({ source: "product" }), config_version: 2, release_id: null, digest: "b" },
-          { id: "tenant", module_key: "theme", scope_type: "tenant", scope_id: "tenant-a", locale: "en-US", value_json: JSON.stringify({ source: "tenant" }), config_version: 3, release_id: null, digest: "c" },
-          { id: "surface", module_key: "theme", scope_type: "surface", scope_id: "surface-a", locale: "en-US", value_json: JSON.stringify({ source: "surface" }), config_version: 4, release_id: "release-a", digest: "d" },
-        ] as Row[], affectedRows: 4 };
+        return {
+          rows: [
+            {
+              id: "global",
+              module_key: "theme",
+              config_key: "theme",
+              scope_type: "global",
+              scope_id: null,
+              locale: null,
+              value_json: JSON.stringify({ source: "global" }),
+              config_version: 1,
+              release_id: null,
+              digest: "a",
+            },
+            {
+              id: "product",
+              module_key: "theme",
+              config_key: "theme",
+              scope_type: "product",
+              scope_id: "product-a",
+              locale: null,
+              value_json: JSON.stringify({ source: "product" }),
+              config_version: 2,
+              release_id: null,
+              digest: "b",
+            },
+            {
+              id: "tenant",
+              module_key: "theme",
+              config_key: "theme",
+              scope_type: "tenant",
+              scope_id: "tenant-a",
+              locale: "en-US",
+              value_json: JSON.stringify({ source: "tenant" }),
+              config_version: 3,
+              release_id: null,
+              digest: "c",
+            },
+            {
+              id: "surface",
+              module_key: "theme",
+              config_key: "theme",
+              scope_type: "surface",
+              scope_id: "surface-a",
+              locale: "en-US",
+              value_json: JSON.stringify({ source: "surface" }),
+              config_version: 4,
+              release_id: "release-a",
+              digest: "d",
+            },
+          ] as Row[],
+          affectedRows: 4,
+        };
       },
       release: () => undefined,
     };
-    const pool = { connect: async () => client, ping: async () => undefined, close: async () => undefined } satisfies SqlPool;
+    const pool = {
+      connect: async () => client,
+      ping: async () => undefined,
+      close: async () => undefined,
+    } satisfies SqlPool;
     const result = await new PostgresSystemRepository(pool).getManifest({
-      context: { tenantId: "tenant-a", actorId: null, organizationId: null, surfaceId: "surface-a", permissions: [], correlationId: "request-a" },
+      context: {
+        tenantId: "tenant-a",
+        actorId: null,
+        organizationId: null,
+        surfaceId: "surface-a",
+        permissions: [],
+        correlationId: "request-a",
+      },
       productId: "product-a",
       locale: "en-US",
     });
@@ -31,23 +100,62 @@ describe("PostgresSystemRepository", () => {
     expect(result.theme).toEqual({ source: "surface" });
     expect(result.tenantId).toBe("tenant-a");
     expect(result.releaseId).toBe("release-a");
-    expect(queries.find(({ sql }) => sql.includes("FROM system_release_binding"))?.values).toEqual(["tenant-a", "product-uuid"]);
-    expect(queries.find(({ sql }) => sql.includes("FROM system_config_record"))?.values).toContain("product-uuid");
+    expect(queries.every(({ sql }) => !sql.includes("?"))).toBe(true);
+    expect(
+      queries.every(
+        ({ sql }) => !/\b(SELECT|INSERT|UPDATE|DELETE)\b[^$]*\?/iu.test(sql),
+      ),
+    ).toBe(true);
+    expect(
+      queries.find(({ sql }) => sql.includes("FROM system_release_binding"))
+        ?.values,
+    ).toEqual(["tenant-a", "product-uuid"]);
+    expect(
+      queries.find(({ sql }) => sql.includes("FROM system_config_record"))
+        ?.values,
+    ).toContain("product-uuid");
   });
 
   it("accepts a v1 product key without sending it to UUID columns", async () => {
     const client = {
-      query: async <Row>(sql: string): Promise<{ rows: readonly Row[]; affectedRows: number }> => {
-        if (sql.includes("FROM system_product")) return { rows: [] as Row[], affectedRows: 0 };
+      query: async <Row>(
+        sql: string,
+      ): Promise<{ rows: readonly Row[]; affectedRows: number }> => {
+        if (sql.includes("FROM system_product"))
+          return { rows: [] as Row[], affectedRows: 0 };
         throw new Error(`unexpected product-dependent query: ${sql}`);
       },
       release: () => undefined,
     };
-    const pool = { connect: async () => client, ping: async () => undefined, close: async () => undefined } satisfies SqlPool;
-    await expect(new PostgresSystemRepository(pool).getManifest({
-      context: { tenantId: "tenant-a", actorId: null, organizationId: null, surfaceId: "surface-a", permissions: [], correlationId: "request-a" },
+    const pool = {
+      connect: async () => client,
+      ping: async () => undefined,
+      close: async () => undefined,
+    } satisfies SqlPool;
+    await expect(
+      new PostgresSystemRepository(pool).getManifest({
+        context: {
+          tenantId: "tenant-a",
+          actorId: null,
+          organizationId: null,
+          surfaceId: "surface-a",
+          permissions: [],
+          correlationId: "request-a",
+        },
+        productId: "kokoro",
+        locale: "en-US",
+      }),
+    ).resolves.toMatchObject({
+      tenantId: "tenant-a",
       productId: "kokoro",
       locale: "en-US",
-    })).resolves.toMatchObject({ tenantId: "tenant-a", productId: "kokoro", locale: "en-US", navigation: [], localeNamespaces: [], theme: {}, featureFlags: [], references: [], configVersion: "0", releaseId: null });
+      navigation: [],
+      localeNamespaces: [],
+      theme: {},
+      featureFlags: [],
+      references: [],
+      configVersion: "0",
+      releaseId: null,
+    });
   });
 });

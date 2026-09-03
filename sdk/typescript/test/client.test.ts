@@ -16,13 +16,26 @@ const manifest = {
   releaseId: "release-1",
   digest: "sha256:fixture",
 };
+const wireManifest = {
+  tenant_id: "tenant-1",
+  product_id: "admin",
+  locale: "zh-CN",
+  navigation: [],
+  locale_namespaces: ["admin"],
+  theme: { mode: "light" },
+  feature_flags: [],
+  references: [],
+  config_version: "7",
+  release_id: "release-1",
+  digest: "sha256:fixture",
+};
 
 describe("System SDK client", () => {
   it("requests a runtime manifest with trusted tenant context", async () => {
     const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
     const fetcher: typeof fetch = async (input, init) => {
       calls.push({ input, init });
-      return new Response(JSON.stringify({ data: manifest }), {
+      return new Response(JSON.stringify({ data: wireManifest }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
@@ -47,7 +60,7 @@ describe("System SDK client", () => {
 
     expect(calls).toHaveLength(1);
     expect(String(calls[0]?.input)).toBe(
-      "http://system.example.test/api/system/runtime-manifest?product_id=admin&locale=zh-CN&surface_id=admin-web",
+      "http://system.example.test/api/v1/system/runtime-manifest?product_id=admin&locale=zh-CN&surface_id=admin-web",
     );
     expect(calls[0]?.init?.headers).toEqual({
       authorization: "Bearer workload-token",
@@ -235,7 +248,7 @@ describe("System SDK client", () => {
     const server = createServer((request, response) => {
       observedHost = request.headers.host;
       response.setHeader("content-type", "application/json");
-      response.end(JSON.stringify({ data: manifest }));
+      response.end(JSON.stringify({ data: wireManifest }));
     });
     await new Promise<void>((resolve) =>
       server.listen(0, "127.0.0.1", resolve),

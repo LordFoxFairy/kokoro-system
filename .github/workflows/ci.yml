@@ -39,18 +39,27 @@ jobs:
       TEST_DATABASE_URL: postgresql://postgres:kokoro_ci@127.0.0.1:55432/kokoro_system
       TEST_REDIS_URL: redis://127.0.0.1:56379
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
-          version: 11.2.2
-      - uses: actions/setup-node@v4
+          version: 11.25.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm db:apply
-      - run: pnpm contract:check
-      - run: pnpm check
-      - run: pnpm test:unit
+      - run: pnpm db:apply-schema
+      - run: pnpm verify
+      - run: pnpm test:runtime-real-system
       - run: pnpm test:integration
+      - name: Scan source, dependencies, and secrets
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
       - run: docker build --tag kokoro-system:ci .

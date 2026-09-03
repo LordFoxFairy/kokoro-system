@@ -1,8 +1,30 @@
-export { RuntimeManifestService } from "./modules/runtime-manifest/service.js";
-export type { RuntimeManifest, TenantRequestContext, ConfigRecord } from "./modules/runtime-manifest/model.js";
-export type { ManifestCache, SiteHostResolver, SystemRepository } from "./modules/runtime-manifest/ports.js";
-export { SystemControlService } from "./modules/system/application/service.js";
-export { InMemorySystemControlRepository } from "./infrastructure/persistence/in-memory-system-control-repository.js";
-export type { ConfigInput, Page, PageRequest, ReleaseInput, SiteInput, WorkspaceInput } from "./modules/system/application/dto.js";
-export type { ConfigRelease, Site, SitePolicy, SystemConfig, Workspace } from "./modules/system/domain/models.js";
-export type { SystemControlRepository } from "./modules/system/application/ports.js";
+export { RuntimeManifestService } from "./application/runtime-manifest/services/runtime-manifest.service.js";
+export type {
+  RuntimeManifest,
+  TenantRequestContext,
+  ConfigRecord,
+} from "./domain/runtime-manifest/models/index.js";
+export type {
+  ManifestCache,
+  SiteHostResolver,
+  SystemRepository,
+} from "./application/runtime-manifest/ports/index.js";
+export { SystemControlService } from "./application/system/services/system-control.service.js";
+export { SiteQueryService } from "./application/system/services/site-query.service.js";
+export type {
+  ConfigInput,
+  Page,
+  PageRequest,
+  ReleaseInput,
+  SiteInput,
+  WorkspaceInput,
+} from "./application/system/dto/index.js";
+export type {
+  ConfigRelease,
+  Site,
+  SiteResolution,
+  SitePolicy,
+  SystemConfig,
+  Workspace,
+} from "./domain/system/models/index.js";
+export type { SystemControlRepository } from "./application/system/ports/system-control-repository.js";

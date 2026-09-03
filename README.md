@@ -1,10 +1,10 @@
 # kokoro-system
 
-System configuration control plane for Site, Workspace, site policy, release and Runtime Manifest.
+System configuration control plane for Site, Workspace, site policy, release and Runtime Manifest. The code uses explicit domain/application/infrastructure/interfaces/bootstrap layers.
 
-Start with [`docs/README.md`](docs/README.md). The source of truth for cross-repository wire schemas remains
-the parent repository `contract/`; this repository owns its application implementation and consumer-facing
-integration notes.
+Start with [`INDEX.md`](INDEX.md) and [`docs/README.md`](docs/README.md). This repository owns its
+consumer-facing wire contract under `contract/` and keeps generated protobuf types under
+`src/generated/`; generated files are read-only and must be regenerated from the local contract source.
 
 ```bash
 pnpm install
@@ -18,7 +18,7 @@ pnpm start
 System accepts only IAM/BFF server-side tenant context. It does not store credentials or authorization facts,
 and it does not call Model Provider services.
 
-PostgreSQL is the durable system fact store and Redis is the manifest cache/coordination dependency. The service
+PostgreSQL is the durable system fact store. Its single V1 schema is `database/schema.sql`; timestamps use UTC-aware `TIMESTAMPTZ(3)` and all PostgreSQL parameters use `$1`, `$2`, ... and Redis is the manifest cache/coordination dependency. The service
 fails readiness when either boundary is unavailable; this repository does not add another database runtime.
 
 ## Production image
@@ -40,3 +40,7 @@ The BFF service token must match the value used by the BFF's upstream secret con
 `x-kokoro-internal-secret` or `Authorization: Bearer` credential on runtime manifest and control-plane routes.
 Business routes fail closed with `service_auth_not_configured` when the token is missing; only health/readiness
 probes remain public.
+
+The image `HEALTHCHECK` probes `/readyz`. Request and lifecycle logs are JSON objects containing
+`service`, `operation`, `request_id`, `trace_id`, `result`, and `duration_ms`. Graceful shutdown uses the
+total deadline configured by `KOKORO_SYSTEM_SHUTDOWN_DEADLINE_MS` (default `10000`).

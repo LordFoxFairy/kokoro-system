@@ -14,6 +14,7 @@ IAM 数据库。IAM 只负责 Tenant、用户、认证、组织、Role、Permiss
 - [`technical-plan.md`](technical-plan.md)：模块、状态机、持久化和依赖边界
 - [`bff-integration.md`](bff-integration.md)：Web/Admin BFF 接入约束
 - [`runbook.md`](runbook.md)：本地启动、readiness、故障恢复和回滚
+- [`SLO.md`](SLO.md)：生产 SLI/SLO、错误预算与告警阈值
 - [`acceptance.md`](acceptance.md)：验收矩阵及 fixture 命令
 - [`risk-register.md`](risk-register.md)：风险、监控和上线前置条件
 
@@ -21,8 +22,10 @@ System 不存储登录凭据、IAM 权限事实或 Model Provider 配置，不�
 `TenantRequestContext` 和 BFF 传入的 Forwarded/Host。浏览器提交的身份、租户或 Host header 不得直接透传为
 内部上下文。
 
-配置 `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 后，runtime manifest、RPC manifest 和全部 `/system/*` 业务路径必须携带
+配置 `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 后，runtime manifest、SiteService Connect 和全部 `/v1/system/*` 业务路径必须携带
 `x-kokoro-service: web-bff` 以及匹配的 `x-kokoro-internal-secret` 或 `Authorization: Bearer`。健康探针保持公开；
 未配置 service token 时业务路由 fail closed。
 
 运行时只需要 `DATABASE_URL`、`REDIS_URL` 以及可选的 System host、port、Redis namespace、BFF service token。
+生产镜像用 `/readyz` 执行 `HEALTHCHECK`，结构化 JSON 日志统一包含 `service`、`operation`、`request_id`、
+`trace_id`、`result`、`duration_ms`；`KOKORO_SYSTEM_SHUTDOWN_DEADLINE_MS` 控制 shutdown 总 deadline。

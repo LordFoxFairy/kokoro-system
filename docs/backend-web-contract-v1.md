@@ -14,7 +14,7 @@ Site 与 Host 绑定由 System 自己保存和校验，不创建 IAM Site 表，
 ## 2. Runtime Manifest API
 
 ```http
-GET /system/runtime-manifest?product_id=PRODUCT_ID&locale=LOCALE&surface_id=SURFACE_ID
+GET /v1/system/runtime-manifest?product_id=PRODUCT_ID&locale=LOCALE&surface_id=SURFACE_ID
 Forwarded: host=TENANT_HOST
 x-kokoro-tenant-id: TENANT_ID
 x-kokoro-actor-id: ACTOR_ID       # optional
@@ -24,7 +24,7 @@ x-kokoro-request-id: REQUEST_ID
 System 必须在读取 PostgreSQL/Redis 业务数据前确认本仓 Site Host 记录属于 `TENANT_ID`。BFF 负责生成受信上下文；
 浏览器不能提交或决定 `tenant_id`。
 
-启用 `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 后，runtime manifest、RPC manifest 和 `/system/*` 业务接口还需要：
+启用 `KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 后，runtime manifest、SiteService Connect 和 `/v1/system/*` 业务接口还需要：
 
 ```http
 x-kokoro-service: web-bff
@@ -75,12 +75,12 @@ mutation 要求 `Idempotency-Key`，同 tenant/key/hash 重放原响应，不同
 ## 7. Control-plane BFF surface
 
 ```text
-GET/POST /system/sites
-GET/POST /system/workspaces
-GET/PUT  /system/sites/SITE_ID/policy
-GET/POST /system/config
-POST     /system/releases
-POST     /system/releases/RELEASE_ID/{validate,publish,retire}
+GET/POST /v1/system/sites
+GET/POST /v1/system/workspaces
+GET/PUT  /v1/system/sites/SITE_ID/policy
+GET/POST /v1/system/config
+POST     /v1/system/releases
+POST     /v1/system/releases/RELEASE_ID/{validate,publish,retire}
 ```
 
 BFF supplies the trusted tenant context and permission set, performs session/CSRF checks at its own boundary, sends the

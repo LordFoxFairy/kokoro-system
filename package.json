@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22 <25"
   },
-  "packageManager": "pnpm@11.2.2",
+  "packageManager": "pnpm@11.25.0",
   "scripts": {
     "dev": "tsx src/main.ts",
     "start": "node dist/main.js",
@@ -14,9 +14,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --no-file-parallelism",
     "test:unit": "pnpm test && pnpm sdk:test",
-    "test:integration": "pnpm test:runtime-smoke",
+    "test:integration": "pnpm test:postgres-concurrency && pnpm test:runtime-smoke",
     "test:contract": "pnpm exec vitest run --no-file-parallelism test/schema-contract.test.ts",
-    "contract:check": "pnpm test:contract",
+    "contract:lint": "buf lint contract && tsx scripts/verify-openapi-contract.ts",
+    "contract:generate": "buf generate --template contract/buf.gen.yaml contract && tsx scripts/normalize-generated-contract.ts",
+    "contract:check": "pnpm contract:lint && pnpm contract:generate && pnpm verify:contract-provenance",
+    "verify:contract-provenance": "tsx scripts/verify-contract-provenance.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm build && pnpm sdk:typecheck && pnpm sdk:build",
     "verify": "pnpm contract:check && pnpm check && pnpm test:unit",
     "sdk:build": "pnpm --dir sdk/typescript build",
@@ -24,20 +27,24 @@
     "sdk:test": "pnpm --dir sdk/typescript test",
     "lint": "eslint src test scripts sdk/typescript/src sdk/typescript/test",
     "db:apply-schema": "tsx scripts/apply-schema.ts",
-    "db:apply": "pnpm db:apply-schema",
     "test:runtime-smoke": "tsx scripts/test/runtime-smoke.ts",
-    "test:runtime-real-system": "tsx scripts/test/runtime-real-system-smoke.ts"
+    "test:runtime-real-system": "tsx scripts/test/runtime-real-system-smoke.ts",
+    "test:postgres-concurrency": "tsx scripts/test/postgres-idempotency-concurrency.ts"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "2.14.0",
+    "@connectrpc/connect": "2.1.2",
+    "@connectrpc/connect-node": "2.1.2",
     "pg": "^8.16.3",
-    "redis": "^5.8.2",
-    "@bufbuild/protobuf": "2.14.0"
+    "redis": "^5.8.2"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.5",
+    "@bufbuild/buf": "1.72.0",
+    "@bufbuild/protoc-gen-es": "2.14.0",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.15.21",
     "@types/pg": "^8.15.5",
-    "eslint": "^9.39.1",
+    "eslint": "^10.9.1",
     "tsx": "^4.19.4",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.67.0",
