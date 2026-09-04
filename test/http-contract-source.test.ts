@@ -6,6 +6,81 @@ const source = new URL(
   import.meta.url,
 );
 
+const operationMethods = [
+  "get",
+  "post",
+  "put",
+  "patch",
+  "delete",
+  "head",
+  "options",
+  "trace",
+] as const;
+
+const governanceByOperation = {
+  health: { idempotency: "not-applicable", permission: "none" },
+  readiness: { idempotency: "not-applicable", permission: "none" },
+  get_runtime_manifest: {
+    idempotency: "inherent",
+    permission: "service-authenticated-tenant-context",
+  },
+  list_sites: { idempotency: "inherent", permission: "system:read" },
+  create_site: { idempotency: "required-key", permission: "system:write" },
+  list_workspaces: { idempotency: "inherent", permission: "system:read" },
+  create_workspace: {
+    idempotency: "required-key",
+    permission: "system:write",
+  },
+  get_site_policy: { idempotency: "inherent", permission: "system:read" },
+  put_site_policy: {
+    idempotency: "required-key",
+    permission: "system:write",
+  },
+  list_config: { idempotency: "inherent", permission: "system:read" },
+  upsert_config: { idempotency: "required-key", permission: "system:write" },
+  create_release: {
+    idempotency: "required-key",
+    permission: "system:write",
+  },
+  transition_release: {
+    idempotency: "required-key",
+    permission: "system:publish",
+  },
+} as const;
+
+function record(
+  value: unknown,
+  name: string,
+): Readonly<Record<string, unknown>> {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    throw new Error(`${name} must be an object`);
+  return Object.fromEntries(Object.entries(value));
+}
+
+function operationDefinitions(
+  document: Readonly<Record<string, unknown>>,
+): readonly Readonly<Record<string, unknown>>[] {
+  const paths = record(document.paths, "OpenAPI paths");
+  const components = record(document.components, "OpenAPI components");
+  const pathItems = record(components.pathItems, "OpenAPI component pathItems");
+  const definitions: Readonly<Record<string, unknown>>[] = [];
+  for (const [groupName, group] of [
+    ["paths", paths],
+    ["components.pathItems", pathItems],
+  ] as const) {
+    for (const [path, rawPathItem] of Object.entries(group)) {
+      const pathItem = record(rawPathItem, `${groupName}.${path}`);
+      for (const method of operationMethods) {
+        if (pathItem[method] === undefined) continue;
+        definitions.push(
+          record(pathItem[method], `${groupName}.${path}.${method}`),
+        );
+      }
+    }
+  }
+  return definitions;
+}
+
 describe("canonical System HTTP contract", () => {
   it("defines every production HTTP boundary under an explicit v1 path", () => {
     expect(existsSync(source)).toBe(true);
@@ -63,5 +138,31 @@ describe("canonical System HTTP contract", () => {
       expect(text).toContain(`"${field}"`);
     for (const field of ["tenantId", "productId", "nextCursor", "siteKey"])
       expect(text).not.toContain(`"${field}"`);
+  });
+
+  it("governs every direct and reusable OpenAPI operation", () => {
+    const parsed: unknown = JSON.parse(readFileSync(source, "utf8"));
+    const document = record(parsed, "OpenAPI document");
+    const operations = operationDefinitions(document);
+    expect(operations).toHaveLength(Object.keys(governanceByOperation).length);
+
+    for (const operation of operations) {
+      const operationId = operation.operationId;
+      if (
+        typeof operationId !== "string" ||
+        !(operationId in governanceByOperation)
+      )
+        throw new Error(`unexpected OpenAPI operationId: ${String(operationId)}`);
+      const expected = Object.entries(governanceByOperation).find(
+        ([candidate]) => candidate === operationId,
+      )?.[1];
+      if (expected === undefined)
+        throw new Error(`missing governance expectation: ${operationId}`);
+      expect(operation["x-kokoro-owner"]).toBe("kokoro-system");
+      expect(operation["x-kokoro-visibility"]).toBe("internal-owner");
+      expect(operation["x-kokoro-stability"]).toBe("stable");
+      expect(operation["x-kokoro-idempotency"]).toBe(expected.idempotency);
+      expect(operation["x-kokoro-permission"]).toBe(expected.permission);
+    }
   });
 });

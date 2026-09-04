@@ -4,6 +4,34 @@ import { describe, expect, it } from "vitest";
 
 const root = resolve(import.meta.dirname, "../..");
 
+const requiredDeliveryPaths = [
+  "README.md",
+  "INDEX.md",
+  "docs/INDEX.md",
+  "docs/CURRENT.md",
+  "docs/TECHNICAL_DESIGN.md",
+  "docs/API_CONTRACT.md",
+  "docs/DATA_MODEL.md",
+  "docs/SECURITY.md",
+  "docs/RELIABILITY.md",
+  "docs/ACCEPTANCE.md",
+  "docs/SLO.md",
+  "docs/RUNBOOK.md",
+  "docs/ADR",
+  "contract/README.md",
+] as const;
+
+const supersededDeliveryPaths = [
+  "docs/README.md",
+  "docs/technical-plan.md",
+  "docs/api-contract.md",
+  "docs/acceptance.md",
+  "docs/runbook.md",
+  "docs/backend-web-contract-v1.md",
+  "docs/bff-integration.md",
+  "docs/risk-register.md",
+] as const;
+
 function files(relative: string): string[] {
   const directory = resolve(root, relative);
   return readdirSync(directory).flatMap((entry) => {
@@ -16,6 +44,22 @@ function files(relative: string): string[] {
 
 function source(path: string): string {
   return readFileSync(path, "utf8");
+}
+
+function hasExactRelativePath(relative: string): boolean {
+  let current = root;
+  for (const part of relative.split("/")) {
+    if (!existsSync(current) || !statSync(current).isDirectory()) return false;
+    if (!readdirSync(current).includes(part)) return false;
+    current = resolve(current, part);
+  }
+  return existsSync(current);
+}
+
+function record(value: unknown, name: string): Readonly<Record<string, unknown>> {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    throw new Error(`${name} must be an object`);
+  return Object.fromEntries(Object.entries(value));
 }
 
 function stringLiterals(text: string): string[] {
@@ -118,6 +162,48 @@ describe("System layer architecture", () => {
         resolve(root, "src/infrastructure/persistence/postgres/client.ts"),
       ),
     ).toBe(true);
+  });
+
+  it("keeps one exact-case delivery documentation set and local contract provenance", () => {
+    const missing = requiredDeliveryPaths.filter(
+      (path) => !hasExactRelativePath(path),
+    );
+    const superseded = supersededDeliveryPaths.filter((path) =>
+      hasExactRelativePath(path),
+    );
+    expect(missing).toEqual([]);
+    expect(superseded).toEqual([]);
+
+    const adrDirectory = resolve(root, "docs/ADR");
+    const adrFiles = existsSync(adrDirectory)
+      ? readdirSync(adrDirectory).filter((entry) => /^\d{4}-.+\.md$/u.test(entry))
+      : [];
+    expect(adrFiles.length).toBeGreaterThan(0);
+
+    const contractReadmePath = resolve(root, "contract/README.md");
+    const contractReadme = existsSync(contractReadmePath)
+      ? source(contractReadmePath).toLowerCase()
+      : "";
+    for (const field of [
+      "owner",
+      "visibility",
+      "version",
+      "generation",
+      "breaking",
+      "provenance",
+      "consumer",
+    ])
+      expect(contractReadme).toContain(field);
+  });
+
+  it("enables strict catch variables explicitly", () => {
+    const parsed: unknown = JSON.parse(source(resolve(root, "tsconfig.json")));
+    const config = record(parsed, "tsconfig");
+    const compilerOptions = record(
+      config.compilerOptions,
+      "tsconfig.compilerOptions",
+    );
+    expect(compilerOptions.useUnknownInCatchVariables).toBe(true);
   });
 
   it("keeps PostgreSQL parameter binding explicit", () => {

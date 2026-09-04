@@ -10,6 +10,11 @@
     "/healthz": {
       "get": {
         "operationId": "health",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "not-applicable",
+        "x-kokoro-permission": "none",
         "responses": {
           "200": {
             "description": "Process is alive",
@@ -21,6 +26,11 @@
     "/readyz": {
       "get": {
         "operationId": "readiness",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "not-applicable",
+        "x-kokoro-permission": "none",
         "responses": {
           "200": {
             "description": "PostgreSQL and Redis are ready",
@@ -33,6 +43,11 @@
     "/v1/system/runtime-manifest": {
       "get": {
         "operationId": "get_runtime_manifest",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "inherent",
+        "x-kokoro-permission": "service-authenticated-tenant-context",
         "parameters": [
           { "$ref": "#/components/parameters/tenant_id" },
           { "$ref": "#/components/parameters/request_id" },
@@ -56,6 +71,11 @@
     "/v1/system/sites": {
       "get": {
         "operationId": "list_sites",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "inherent",
+        "x-kokoro-permission": "system:read",
         "parameters": [
           { "$ref": "#/components/parameters/tenant_id" },
           { "$ref": "#/components/parameters/request_id" },
@@ -75,6 +95,11 @@
       },
       "post": {
         "operationId": "create_site",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "required-key",
+        "x-kokoro-permission": "system:write",
         "parameters": [
           { "$ref": "#/components/parameters/tenant_id" },
           { "$ref": "#/components/parameters/request_id" },
@@ -100,6 +125,11 @@
     "/v1/system/workspaces": {
       "get": {
         "operationId": "list_workspaces",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "inherent",
+        "x-kokoro-permission": "system:read",
         "parameters": [
           { "$ref": "#/components/parameters/tenant_id" },
           { "$ref": "#/components/parameters/request_id" },
@@ -119,6 +149,11 @@
       },
       "post": {
         "operationId": "create_workspace",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "required-key",
+        "x-kokoro-permission": "system:write",
         "parameters": [
           { "$ref": "#/components/parameters/tenant_id" },
           { "$ref": "#/components/parameters/request_id" },
@@ -150,6 +185,11 @@
       ],
       "get": {
         "operationId": "get_site_policy",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "inherent",
+        "x-kokoro-permission": "system:read",
         "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
         "responses": {
           "200": {
@@ -163,6 +203,11 @@
       },
       "put": {
         "operationId": "put_site_policy",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "required-key",
+        "x-kokoro-permission": "system:write",
         "parameters": [{ "$ref": "#/components/parameters/idempotency_key" }],
         "security": [{ "service_bearer": [], "service_identity": [] }, { "internal_secret": [], "service_identity": [] }],
         "requestBody": {
@@ -185,6 +230,11 @@
     "/v1/system/config": {
       "get": {
         "operationId": "list_config",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "inherent",
+        "x-kokoro-permission": "system:read",
         "parameters": [
           { "$ref": "#/components/parameters/tenant_id" },
           { "$ref": "#/components/parameters/request_id" },
@@ -204,6 +254,11 @@
       },
       "post": {
         "operationId": "upsert_config",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "required-key",
+        "x-kokoro-permission": "system:write",
         "parameters": [
           { "$ref": "#/components/parameters/tenant_id" },
           { "$ref": "#/components/parameters/request_id" },
@@ -229,6 +284,11 @@
     "/v1/system/releases": {
       "post": {
         "operationId": "create_release",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "required-key",
+        "x-kokoro-permission": "system:write",
         "parameters": [
           { "$ref": "#/components/parameters/tenant_id" },
           { "$ref": "#/components/parameters/request_id" },
@@ -289,6 +349,11 @@
       "release_transition": {
         "post": {
           "operationId": "transition_release",
+          "x-kokoro-owner": "kokoro-system",
+          "x-kokoro-visibility": "internal-owner",
+          "x-kokoro-stability": "stable",
+          "x-kokoro-idempotency": "required-key",
+          "x-kokoro-permission": "system:publish",
           "parameters": [
             { "$ref": "#/components/parameters/release_id" },
             { "$ref": "#/components/parameters/tenant_id" },
