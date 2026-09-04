@@ -244,6 +244,17 @@ describe("System layer architecture", () => {
     expect(release).toContain("sbom: true");
     expect(release).toContain("provenance: mode=max");
     expect(release).toMatch(/trivy|vulnerability/iu);
+    const packageJson = record(
+      JSON.parse(source(resolve(root, "package.json"))),
+      "package.json",
+    );
+    const scripts = record(packageJson.scripts, "package.json.scripts");
+    expect(scripts["test:integration"]).toBe(
+      "pnpm test:postgres-concurrency && pnpm test:runtime-smoke && pnpm test:real-consistency",
+    );
+    expect(scripts["test:real-consistency"]).toBe(
+      "vitest run --no-file-parallelism test/integration/*.test.ts",
+    );
     expect(source(resolve(root, "Dockerfile"))).toMatch(
       /HEALTHCHECK[^\n]*\/readyz/iu,
     );

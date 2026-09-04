@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type {
+  ManifestCache,
   ManifestCacheIdentity,
   SiteHostResolver,
-  SystemRepository,
 } from "../../src/application/runtime-manifest/ports/index.js";
 import { RuntimeManifestService } from "../../src/application/runtime-manifest/services/runtime-manifest.service.js";
 import { SystemControlService } from "../../src/application/system/services/system-control.service.js";
@@ -116,28 +116,34 @@ describeReal("real PostgreSQL/Redis runtime manifest consistency", () => {
     await fixture.close();
   });
 
-  it("fences and removes a stale fill that completes after retire invalidation", async () => {
+  it("removes a real Redis fill written after retire cleanup and before the post-write fence", async () => {
     const tenantId = `tenant:race:${randomUUID()}`;
     const seeded = await seedPublishedManifest(fixture, tenantId);
     const postgres = new PostgresSystemRepository(fixture.pool);
-    const readStarted = deferred();
-    const continueRead = deferred();
-    let reads = 0;
-    const gated: SystemRepository = {
-      getManifestGeneration: (tenant) =>
-        postgres.getManifestGeneration(tenant),
-      getManifest: async (input) => {
-        const manifest = await postgres.getManifest(input);
-        reads += 1;
-        if (reads === 1) {
-          readStarted.resolve();
-          await continueRead.promise;
+    const beforeFirstSet = deferred();
+    const allowFirstSet = deferred();
+    const firstSetCompleted = deferred();
+    const allowPostWriteFence = deferred();
+    const redis = fixture.cache("race");
+    let setCount = 0;
+    const cache: ManifestCache = {
+      assertReady: () => redis.assertReady(),
+      get: (identity) => redis.get(identity),
+      set: async (identity, value, ttlSeconds) => {
+        setCount += 1;
+        if (setCount === 1) {
+          beforeFirstSet.resolve();
+          await allowFirstSet.promise;
+          await redis.set(identity, value, ttlSeconds);
+          firstSetCompleted.resolve();
+          await allowPostWriteFence.promise;
+          return;
         }
-        return manifest;
+        await redis.set(identity, value, ttlSeconds);
       },
+      delete: (identity) => redis.delete(identity),
     };
-    const cache = fixture.cache("race");
-    const service = new RuntimeManifestService(gated, cache, hostResolver);
+    const service = new RuntimeManifestService(postgres, cache, hostResolver);
     const requestContext = context(tenantId);
     const pending = service.get({
       context: requestContext,
@@ -145,18 +151,15 @@ describeReal("real PostgreSQL/Redis runtime manifest consistency", () => {
       locale: "en-US",
       host: "tenant.example.test",
     });
-    await readStarted.promise;
+    await beforeFirstSet.promise;
     const control = new SystemControlService(
       new PostgresSystemControlRepository(fixture.pool),
-      cache,
+      redis,
     );
     await control.retireRelease(requestContext, seeded.releaseId, randomUUID());
-    continueRead.resolve();
+    allowFirstSet.resolve();
+    await firstSetCompleted.promise;
 
-    const result = await pending;
-    expect(result.releaseId).toBeNull();
-    expect(source(result)).toBe("base");
-    expect(reads).toBe(2);
     const staleIdentity: ManifestCacheIdentity = {
       tenantId,
       productId: seeded.productKey,
@@ -164,6 +167,17 @@ describeReal("real PostgreSQL/Redis runtime manifest consistency", () => {
       surfaceId: null,
       generation: "0",
     };
+    expect(
+      await fixture.redis.exists(
+        runtimeManifestCacheKey(fixture.namespace("race"), staleIdentity),
+      ),
+    ).toBe(1);
+    allowPostWriteFence.resolve();
+
+    const result = await pending;
+    expect(result.releaseId).toBeNull();
+    expect(source(result)).toBe("base");
+    expect(setCount).toBe(2);
     expect(
       await fixture.redis.exists(
         runtimeManifestCacheKey(fixture.namespace("race"), staleIdentity),
