@@ -7,6 +7,7 @@ import { PostgresRepository, requireRow, utcTimestamp } from "./support.js";
 import { mapRelease } from "./mappers.js";
 import type { Row } from "./support.js";
 import { SystemDomainError } from "../../../domain/system/errors/system-domain.error.js";
+import { decodeIntegerString } from "../../persistence/postgres/value-decoders.js";
 
 export class PostgresReleaseRepository extends PostgresRepository {
   public constructor(pool: SqlPool, transactionClient: SqlClient | null = null) {
@@ -40,7 +41,7 @@ export class PostgresReleaseRepository extends PostgresRepository {
         status: "draft",
         digest: input.digest,
         publishedAt: null,
-        version: 1,
+        version: "1",
         createdAt: time,
         updatedAt: time,
       };
@@ -62,7 +63,7 @@ export class PostgresReleaseRepository extends PostgresRepository {
     context: TenantRequestContext,
     releaseId: string,
     status: ConfigRelease["status"],
-    expectedVersion: number,
+    expectedVersion: string,
   ): Promise<ConfigRelease> {
     return this.withTransaction(async (client) => {
       const current = requireRow(
@@ -92,11 +93,20 @@ export class PostgresReleaseRepository extends PostgresRepository {
           "release was modified concurrently",
           409,
         );
+      if (status === "published" || status === "retired")
+        await client.query(
+          "INSERT INTO system_runtime_manifest_generation (tenant_id, generation, updated_at) VALUES ($1, 1, $2) ON CONFLICT (tenant_id) DO UPDATE SET generation = system_runtime_manifest_generation.generation + 1, updated_at = EXCLUDED.updated_at",
+          [context.tenantId, time],
+        );
+      const currentVersion = decodeIntegerString(
+        current.version,
+        "system_config_release.version",
+      );
       return mapRelease({
         ...current,
         status,
         published_at: status === "published" ? time : current.published_at,
-        version: Number(current.version) + 1,
+        version: (BigInt(currentVersion) + 1n).toString(),
         updated_at: time,
       });
     });

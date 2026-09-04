@@ -11,6 +11,7 @@ import {
   decodeBoolean,
   decodeEnum,
   decodeInteger,
+  decodeIntegerString,
   decodeJson,
   decodeNullableString,
   decodeString,
@@ -31,7 +32,7 @@ export function mapSite(row: Row): Site {
       "suspended",
       "archived",
     ]),
-    version: decodeInteger(row.version, "system_site.version"),
+    version: decodeIntegerString(row.version, "system_site.version"),
     createdAt: decodeTimestamp(row.created_at, "system_site.created_at"),
     updatedAt: decodeTimestamp(row.updated_at, "system_site.updated_at"),
   };
@@ -46,7 +47,7 @@ export function mapSiteResolution(row: Row): SiteResolution {
       "system_site_policy.default_locale",
     ),
     timezone: decodeString(row.timezone, "system_site.timezone"),
-    generation: decodeInteger(row.version, "system_site.version"),
+    generation: decodeIntegerString(row.version, "system_site.version"),
   };
 }
 export function mapWorkspace(row: Row): Workspace {
@@ -63,7 +64,7 @@ export function mapWorkspace(row: Row): Workspace {
       "active",
       "archived",
     ]),
-    version: decodeInteger(row.version, "system_workspace.version"),
+    version: decodeIntegerString(row.version, "system_workspace.version"),
     createdAt: decodeTimestamp(row.created_at, "system_workspace.created_at"),
     updatedAt: decodeTimestamp(row.updated_at, "system_workspace.updated_at"),
   };
@@ -73,7 +74,7 @@ export function mapPolicy(row: Row): SitePolicy {
     id: decodeString(row.id, "system_site_policy.id"),
     tenantId: decodeString(row.tenant_id, "system_site_policy.tenant_id"),
     siteId: decodeString(row.site_id, "system_site_policy.site_id"),
-    version: decodeInteger(row.version, "system_site_policy.version"),
+    version: decodeIntegerString(row.version, "system_site_policy.version"),
     status: decodeEnum(row.status, "system_site_policy.status", [
       "active",
       "archived",
@@ -142,7 +143,7 @@ export function mapConfig(row: Row): SystemConfig {
       "active",
       "deleted",
     ]),
-    configVersion: decodeInteger(
+    configVersion: decodeIntegerString(
       row.config_version,
       "system_config_record.config_version",
     ),
@@ -179,7 +180,10 @@ export function mapRelease(row: Row): ConfigRelease {
             row.published_at,
             "system_config_release.published_at",
           ),
-    version: decodeInteger(row.version, "system_config_release.version"),
+    version: decodeIntegerString(
+      row.version,
+      "system_config_release.version",
+    ),
     createdAt: decodeTimestamp(
       row.created_at,
       "system_config_release.created_at",

@@ -69,7 +69,7 @@ describe("generated SiteService Connect handler", () => {
           canonicalHost: "tenant.example.test",
           defaultLocale: "en-US",
           timezone: "America/New_York",
-          generation: 7,
+          generation: "7",
         }),
       },
     });

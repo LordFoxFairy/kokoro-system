@@ -11,7 +11,8 @@
   Runtime Manifest 与本仓 command receipt 的事实 owner。
 - HTTP 提供 `/healthz`、`/readyz`、`/v1/system/*` runtime/control-plane routes；Connect 提供
   `kokoro.site.v1.SiteService/ResolveSiteByHost`。
-- PostgreSQL 是 durable fact store；Redis logical DB 2 缓存完整 Runtime Manifest，TTL 固定 30 秒。
+- PostgreSQL 是 durable fact store，并保存 tenant Runtime Manifest generation；Redis logical DB 2 缓存按 generation 隔离的完整
+  Runtime Manifest，TTL 固定 30 秒。
 - 生产组合根只装配 PostgreSQL repository 与 Redis cache，不装配 InMemory/Fake。
 - canonical schema 只有 `database/schema.sql`，`db:apply-schema` 只接受空 database；不存在 migration 目录与外键。
 - HTTP wire 使用 snake_case 和统一 `data|error + meta.request_id` envelope。
@@ -55,7 +56,14 @@
   `published` 才解析 release；draft、validated、retired 和 foreign-tenant binding 都按无可见 release 处理。
 - Release publish/retire 在 PostgreSQL idempotent transaction 完成后失效该 tenant 的全部 Runtime Manifest cache；若
   Redis 失效失败，请求失败，同一 idempotency key replay 会重试失效。
-- Manifest `config_version` 使用 `BigInt` 求数值最大值，不再对 PostgreSQL BIGINT 字符串做字典序排序。
+- publish/retire 与 tenant generation 推进属于同一 PostgreSQL transaction；cache read/fill 前后复核 generation，竞态旧填充会
+  被删除并重读。不同部署 namespace 中的旧 generation key 即使残留也不会再命中。
+- Redis key 对 tenant/product/locale/surface 使用 base64url 分段，null surface 有显式 sentinel；tenant invalidation 使用编码后
+  的精确前缀，不受冒号或 Redis glob 字符影响。
+- Config 写事务以 caller tenant 锁定 release，仅允许 `draft`/`validated`；published/retired 返回稳定 `INVALID_STATE`，foreign
+  tenant 返回 `NOT_FOUND`。
+- Manifest 与 control-plane 的 PostgreSQL `BIGINT` 值全部以十进制字符串穿过 row/domain/receipt/HTTP；数值比较和递增使用
+  `BigInt`/数据库算术，不经过 JavaScript `number`。
 
 完成证据必须来自当前 committed tree 上重新执行 [`ACCEPTANCE.md`](ACCEPTANCE.md) 的命令；本文不固化会过期的
 “全绿”自报。
@@ -67,8 +75,8 @@
 1. **Release 管理 surface 不完整**：HTTP 可创建并转换 Config Release，但没有 Product、Release Binding 管理 surface；
    publish 不自动创建 binding。当前真实 smoke 通过 fixture 写 active binding，再验证只有同 tenant published release 可见，
    且 publish/retire 会失效 tenant cache。
-2. **Config 关系校验不足**：`POST /v1/system/config` 接收 `product_id`、`release_id`，repository 未验证它们存在、
-   tenant/状态一致；不同 idempotency key 的同一 config identity 并发写也没有数据库唯一约束兜底。
+2. **Config 关系校验仍不完整**：release owner/可写状态已在 transaction 内校验；`product_id` 的存在、状态及与 scope 的一致性
+   尚未校验，不同 idempotency key 的同一 config identity 并发写也没有数据库唯一约束兜底。
 3. **Schema validation 未实现**：`schema_version` 被保存，但 `value` 没有按 module/schema 注册表做运行时校验。
 4. **Policy enforcement 未闭环**：manifest assembly 尚未执行 Site Policy 的 allowed product/locale/public rules。
 5. **生产 service credential**：当前只有一个静态共享 token，无 key id、双 key 轮换窗口、mTLS/workload identity；
@@ -83,8 +91,8 @@
 3. 1 MB body 限制在 body 全部读入内存后检查，不是 streaming early-reject；SDK 读取响应也没有 byte 上限。
 4. Runtime Manifest 依赖 Redis 并 fail closed；没有经批准的 stale snapshot/degraded mode。该行为是当前取舍，
    生产容量与依赖预算尚未用数据验证。
-5. Cache 只有 release publish/retire 的 tenant-scoped mutation invalidation；Config/Policy 尚未主动失效，binding 也没有
-   application writer。Cache identity 复核 tenant/product/locale，surface 只靠 key 隔离。
+5. Cache 只有 release publish/retire 的 durable generation + tenant-scoped cleanup；Config/Policy 尚未主动推进 generation，
+   binding 也没有 application writer。Cache identity 复核 tenant/product/locale，surface 通过无歧义 key 分隔。
 6. Manifest digest 基于 `JSON.stringify`，没有跨语言 canonical JSON 规范或签名。
 
 ### Contract 与代码健康缺口
@@ -101,6 +109,7 @@
 
 ## 5. 非目标
 
-本阶段不新增 Product/Profile/Release Binding API，不修改 canonical Schema、wire contract、SDK compatibility alias、
-Audit owner、readyz、其他仓 contract 或部署拓扑。上述其余缺口不是在文档中宣称已解决，而是后续由 System owner
+本阶段不新增 Product/Profile/Release Binding API，不修改 SDK compatibility alias、Audit owner、readyz、其他仓 contract
+或部署拓扑。canonical Schema 只新增 tenant manifest generation；HTTP contract 只把 BIGINT response 收敛为十进制字符串。
+上述其余缺口不是在文档中宣称已解决，而是后续由 System owner
 通过 contract-first、测试先行的独立变更闭环。

@@ -4,7 +4,7 @@ export type SitePolicy = Readonly<{
   id: string;
   tenantId: string;
   siteId: string;
-  version: number;
+  version: string;
   status: SitePolicyStatus;
   defaultLocale: string;
   allowedLocales: readonly string[];

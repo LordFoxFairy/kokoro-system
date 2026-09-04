@@ -3,7 +3,17 @@ import type {
   TenantRequestContext,
 } from "../../../domain/runtime-manifest/models/index.js";
 import type { SiteResolution } from "../../../domain/system/models/index.js";
+
+export type ManifestCacheIdentity = Readonly<{
+  tenantId: string;
+  productId: string;
+  locale: string;
+  surfaceId: string | null;
+  generation: string;
+}>;
+
 export interface SystemRepository {
+  getManifestGeneration(tenantId: string): Promise<string>;
   getManifest(
     input: Readonly<{
       context: TenantRequestContext;
@@ -18,7 +28,12 @@ export interface SiteHostResolver {
   ): Promise<SiteResolution>;
 }
 export interface ManifestCache {
-  get(key: string): Promise<RuntimeManifest | null>;
-  set(key: string, value: RuntimeManifest, ttlSeconds: number): Promise<void>;
+  get(identity: ManifestCacheIdentity): Promise<RuntimeManifest | null>;
+  set(
+    identity: ManifestCacheIdentity,
+    value: RuntimeManifest,
+    ttlSeconds: number,
+  ): Promise<void>;
+  delete(identity: ManifestCacheIdentity): Promise<void>;
   assertReady(): Promise<void>;
 }

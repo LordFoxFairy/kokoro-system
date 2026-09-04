@@ -7,7 +7,7 @@ export type Workspace = Readonly<{
   workspaceKey: string;
   name: string;
   status: WorkspaceStatus;
-  version: number;
+  version: string;
   createdAt: string;
   updatedAt: string;
 }>;

@@ -6,7 +6,7 @@ import { PostgresRepository, requireRow, utcTimestamp } from "./support.js";
 import { mapPolicy } from "./mappers.js";
 import type { Row } from "./support.js";
 import {
-  decodeInteger,
+  decodeIntegerString,
   decodeString,
 } from "../../persistence/postgres/value-decoders.js";
 
@@ -46,8 +46,15 @@ export class PostgresPolicyRepository extends PostgresRepository {
         ? decodeString(oldRow.id, "system_site_policy.id")
         : randomUUID();
       const version = oldRow
-        ? decodeInteger(oldRow.version, "system_site_policy.version") + 1
-        : 1;
+        ? (
+            BigInt(
+              decodeIntegerString(
+                oldRow.version,
+                "system_site_policy.version",
+              ),
+            ) + 1n
+          ).toString()
+        : "1";
       const time = utcTimestamp();
       if (oldRow) {
         await client.query(

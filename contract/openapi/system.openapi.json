@@ -432,7 +432,7 @@
           "theme": { "type": "object" },
           "feature_flags": { "type": "array", "items": {} },
           "references": { "type": "array", "items": {} },
-          "config_version": { "type": "string" },
+          "config_version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
           "release_id": { "type": ["string", "null"] },
           "digest": { "type": "string" }
         }
@@ -467,7 +467,7 @@
           "hostnames": { "type": "array", "items": { "type": "string" } },
           "display_name": { "type": "string" },
           "status": { "type": "string", "enum": ["draft", "active", "suspended", "archived"] },
-          "version": { "type": "integer", "minimum": 1 },
+          "version": { "type": "string", "pattern": "^[1-9][0-9]*$" },
           "created_at": { "type": "string", "format": "date-time" },
           "updated_at": { "type": "string", "format": "date-time" }
         }
@@ -493,7 +493,7 @@
           "workspace_key": { "type": "string" },
           "name": { "type": "string" },
           "status": { "type": "string", "enum": ["active", "archived"] },
-          "version": { "type": "integer", "minimum": 1 },
+          "version": { "type": "string", "pattern": "^[1-9][0-9]*$" },
           "created_at": { "type": "string", "format": "date-time" },
           "updated_at": { "type": "string", "format": "date-time" }
         }
@@ -519,7 +519,7 @@
               "id": { "type": "string", "format": "uuid" },
               "tenant_id": { "type": "string" },
               "site_id": { "type": "string", "format": "uuid" },
-              "version": { "type": "integer", "minimum": 1 },
+              "version": { "type": "string", "pattern": "^[1-9][0-9]*$" },
               "status": { "type": "string", "enum": ["active", "archived"] },
               "updated_at": { "type": "string", "format": "date-time" }
             }
@@ -552,7 +552,7 @@
               "id": { "type": "string", "format": "uuid" },
               "tenant_id": { "type": ["string", "null"] },
               "status": { "type": "string", "enum": ["active", "deleted"] },
-              "config_version": { "type": "integer", "minimum": 1 },
+              "config_version": { "type": "string", "pattern": "^[1-9][0-9]*$" },
               "digest": { "type": "string" },
               "updated_at": { "type": "string", "format": "date-time" }
             }
@@ -579,7 +579,7 @@
           "status": { "type": "string", "enum": ["draft", "validated", "published", "retired"] },
           "digest": { "type": "string" },
           "published_at": { "type": ["string", "null"], "format": "date-time" },
-          "version": { "type": "integer", "minimum": 1 },
+          "version": { "type": "string", "pattern": "^[1-9][0-9]*$" },
           "created_at": { "type": "string", "format": "date-time" },
           "updated_at": { "type": "string", "format": "date-time" }
         }

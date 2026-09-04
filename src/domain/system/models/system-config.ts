@@ -13,7 +13,7 @@ export type SystemConfig = Readonly<{
   schemaVersion: number;
   value: unknown;
   status: ConfigStatus;
-  configVersion: number;
+  configVersion: string;
   releaseId: string | null;
   digest: string;
   updatedAt: string;

@@ -4,5 +4,5 @@ export type SiteResolution = Readonly<{
   canonicalHost: string;
   defaultLocale: string;
   timezone: string;
-  generation: number;
+  generation: string;
 }>;

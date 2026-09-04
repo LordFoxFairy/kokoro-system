@@ -43,14 +43,18 @@ infrastructure -> application/domain ports
    没有 Forwarded 时退回 `Host`。
 3. `normalizeHost` 拒绝空值、控制字符、userinfo、path/query/fragment、wildcard，转小写并移除尾随点。
 4. PostgreSQL `SiteHostResolver` 以 tenant + active Site + active Host 查询，且在 cache/database manifest 读取前执行。
-5. Redis key 为 `<namespace>:manifest:<tenant>:<product>:<locale>:<surface-or-default>`；hit 后复核
-   tenant/product/locale identity。
+5. 从 PostgreSQL 读取 tenant generation；Redis key 为
+   `<namespace>:manifest:v2:tenant:<base64url>:generation:<decimal>:product:<base64url>:locale:<base64url>:surface:<none|value:base64url>`；
+   hit 后复核 tenant/product/locale identity。
 6. Cache miss 时，repository 将 product key/UUID 解析成 active Product；active tenant+product binding 必须联查到
    `release.tenant_id = request tenant` 且 release 状态为 `published`，否则按无可见 release 处理，再读取 active Config records。
 7. 对相同 `module_key + config_key` 按 `surface > tenant > product > global`、精确 locale、绑定 release、
    config version、ID 决定优先级，投影 navigation/localization/theme/feature flags/references。
 8. `config_version` 以 PostgreSQL BIGINT 对应的 `BigInt` 数值顺序求最大值；使用
-   SHA-256(`JSON.stringify(manifest-with-empty-digest)`) 生成 digest，写 Redis 30 秒后返回 snake_case wire。
+   SHA-256(`JSON.stringify(manifest-with-empty-digest)`) 生成 digest，写 Redis 30 秒。
+9. cache hit 后再次读取 PostgreSQL generation；miss 在 fill 前后都复核 generation。若已变化，跳过旧写入或删除已写入的
+   旧 generation key 并重试，最多三次后 fail closed。因 generation 与 publish/retire 同事务提交，commit 后进程即使在
+   Redis cleanup 前退出，旧 key 也不再可寻址。
 
 Product 不存在时当前返回 identity-preserving empty manifest（`config_version="0"`、`release_id=null`），不是 404。
 Redis、PostgreSQL、cache decode/identity 任一失败都映射为 `503 SYSTEM_UNAVAILABLE`；不存在进程内或 stale snapshot 降级。
@@ -86,12 +90,14 @@ hash 返回 409。Operation 抛错时整个事务回滚，不留下成功 respon
 命令只生成一个 Site、Host 与 completed receipt。
 
 普通 mutation 需要 `system:write`；release transition 需要 `system:publish`；global config upsert 先要求 write，再额外要求
-publish。Site 创建把 Site 与初始 Host 放在同一事务；Workspace/Policy 先按 tenant 检查 Site。Config/Release 的关系缺口
-见 [`CURRENT.md`](CURRENT.md)。
+publish。Site 创建把 Site 与初始 Host 放在同一事务；Workspace/Policy 先按 tenant 检查 Site。Config upsert 若携带
+`release_id`，会以 `id + caller tenant` 对 release 执行 `FOR UPDATE`，仅 `draft`/`validated` 可继续写；该锁与 publish/retire
+共用 release row，避免状态检查后再被发布的窗口。Product 关系缺口见 [`CURRENT.md`](CURRENT.md)。
 
-Publish/retire 的 PostgreSQL mutation 与 receipt 先提交，再由 application 通过 cache invalidation port 删除该 tenant 的
-Runtime Manifest keys。Redis 失效失败时 command 返回 dependency failure；相同 idempotency key replay 不重复状态转换，
-但会再次执行失效，使 committed release 状态最终与 cache 可见性收敛。Validate 不改变 release 可见性，因此不失效 cache。
+Publish/retire 的 release update、receipt 与 tenant manifest generation 推进位于同一 PostgreSQL transaction。提交后
+application 通过 cache invalidation port 清理该 tenant 当前 namespace 的 Runtime Manifest keys；Redis 失败时 command 返回
+dependency failure，相同 idempotency key replay 不重复状态转换或 generation 推进，但会再次清理。Redis cleanup 是容量与快速
+收敛机制，不是正确性前提；validate 不改变 release 可见性或 generation。
 
 ## 5. 状态与并发
 
@@ -107,6 +113,9 @@ Runtime Manifest keys。Redis 失效失败时 command 返回 dependency failure�
 
 V1 不使用数据库 foreign key。关系完整性由 tenant predicate、存在性查询、同事务写入、固定 row lock、CHECK 与有业务
 语义的 UNIQUE 维护。尚未完整维护的关系必须作为缺口而不是依赖文档假设，详见 [`DATA_MODEL.md`](DATA_MODEL.md)。
+
+所有 BIGINT 序号在 Domain/Application/receipt/HTTP 中是 canonical decimal string；仅 `schema_version INT` 保持 JavaScript
+number。Repository 使用 PostgreSQL 算术或 `BigInt` 做递增/排序，Connect `uint64 generation` 只在 wire mapper 处转换为 bigint。
 
 ## 6. Runtime、timeout 与 lifecycle
 
@@ -132,6 +141,8 @@ Contract generation、breaking 与 provenance 的当前能力/缺口见 [`../con
 
 - Vitest 覆盖 domain/application、HTTP/Connect、tenant isolation、boundary decoder、failure recovery、shutdown、
   architecture 与 contract source。
+- 真实 PostgreSQL/Redis integration 覆盖 publish/retire 期间并发旧回填、旧部署 namespace 重启、冒号 tenant 精确失效、
+  null/literal-default surface 分隔、release 可写状态与 `9007199254740993` 边界。
 - PostgreSQL concurrency script 覆盖真实 row lock/receipt；runtime smoke 创建隔离 database、复用共享 Redis namespace，
   验证 listener/SDK/Site Host/precedence/cache isolation、draft/retired/foreign-tenant release fail-closed、publish/retire
   cache invalidation 与 BIGINT version 顺序。

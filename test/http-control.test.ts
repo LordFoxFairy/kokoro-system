@@ -102,7 +102,7 @@ describe("System control HTTP contract", () => {
     expect(first.status).toBe(201);
     expect(first.requestId).toBe(headers["x-kokoro-request-id"]);
     expect(first.body).toMatchObject({
-      data: { site_key: "main" },
+      data: { site_key: "main", version: "1" },
       meta: { request_id: headers["x-kokoro-request-id"] },
     });
     expect(first.body).not.toHaveProperty("data.siteKey");
@@ -368,4 +368,5 @@ describe("System control HTTP contract", () => {
       },
     });
   });
+
 });

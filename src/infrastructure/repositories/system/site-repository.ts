@@ -72,7 +72,7 @@ export class PostgresSiteRepository extends PostgresRepository {
         hostnames: [hostname],
         displayName: input.displayName,
         status: "active",
-        version: 1,
+        version: "1",
         createdAt: time,
         updatedAt: time,
       };

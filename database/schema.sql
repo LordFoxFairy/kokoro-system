@@ -54,6 +54,13 @@ CREATE INDEX IF NOT EXISTS ix_system_config_release_tenant_status ON system_conf
 CREATE UNIQUE INDEX IF NOT EXISTS uq_system_config_release_tenant_key
   ON system_config_release (COALESCE(tenant_id, ''), release_key) WHERE status <> 'retired';
 
+CREATE TABLE IF NOT EXISTS system_runtime_manifest_generation (
+  tenant_id TEXT PRIMARY KEY,
+  generation BIGINT NOT NULL DEFAULT 1,
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT ck_system_runtime_manifest_generation_positive CHECK (generation > 0)
+);
+
 CREATE TABLE IF NOT EXISTS system_release_binding (
   id UUID PRIMARY KEY,
   scope_type VARCHAR(32) NOT NULL,

@@ -78,7 +78,7 @@ export class PostgresWorkspaceRepository extends PostgresRepository {
         workspaceKey: input.workspaceKey,
         name: input.name,
         status: "active",
-        version: 1,
+        version: "1",
         createdAt: time,
         updatedAt: time,
       };

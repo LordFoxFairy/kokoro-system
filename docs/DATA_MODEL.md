@@ -13,7 +13,9 @@
 - V1 明确不使用 `FOREIGN KEY`/`REFERENCES`；关系由 application/repository transaction、tenant predicate、row lock、
   CHECK 与业务 UNIQUE 维护。
 - 瞬时点使用 `TIMESTAMPTZ(3)`；应用 row mapper 输出 RFC 3339 UTC；tenant ID 为 opaque `TEXT`，资源 ID 为 UUID。
-- Redis 不保存 durable fact，只缓存完整 Runtime Manifest，TTL 30 秒。
+- Redis 不保存 durable fact，只缓存按 PostgreSQL tenant generation 分区的完整 Runtime Manifest，TTL 30 秒。
+- PostgreSQL `BIGINT` 序号在 TypeScript domain/application/receipt 与 HTTP JSON 中统一表示为 canonical decimal string，
+  不转换为可能丢精度的 JavaScript `number`。
 
 ## 2. Schema owner inventory
 
@@ -22,6 +24,7 @@
 | `system_product` | Product catalog key/name/status | global | Manifest read；无 HTTP writer |
 | `system_product_profile` | Product profile/version | global | Schema only；当前 source 无 reader/writer |
 | `system_config_release` | Config release/digest/state/version | nullable column；HTTP writer 为 tenant | HTTP create/transition；Manifest 只读取同 tenant published release |
+| `system_runtime_manifest_generation` | tenant cache visibility generation | required primary key | publish/retire transaction 推进；Manifest read fence |
 | `system_release_binding` | scope/product 到 release 的 active binding | `scope_type/scope_id` 表达 | Manifest 将 active tenant binding 与同 tenant published release 联查；无 application writer |
 | `system_config_record` | module/config/scope/locale/value/version/release | global 可 null，其余 tenant | HTTP list/upsert；Manifest assembly |
 | `system_audit_event` | 未接入的 audit-shaped schema artifact | nullable | Schema only；当前 source 无 writer/reader，需与 IAM Audit owner 重新确认 |
@@ -61,12 +64,16 @@ system_config_release.id
 - Policy put 先查同 tenant Site，锁当前 active policy，原位 version + 1。
 - Site Host resolve 同时约束 tenant、active Site、active Host，并用 tenant+site LEFT JOIN active policy。
 - Release transition 锁 release，检查顺序状态，并按 expected version update。
+- publish/retire 在 release/receipt 同一 transaction 内 upsert并递增 tenant manifest generation；缺行在读路径解释为 generation 0，
+  首次可见性变化创建 generation 1。
+- Config 写入若携带 release，先按 `release.id + caller tenant` 锁行；只有 `draft`/`validated` 可写，published/retired 被拒绝，
+  foreign tenant 与不存在统一为 `NOT_FOUND`。
 - Manifest 的 tenant binding 与 Config Release 按 `release_id` 联查，并同时要求 binding active、release tenant 与请求 tenant
   一致、release status=`published`；不满足时 release-specific Config 不进入结果。
 
 **缺口**
 
-- Config upsert 未验证 `product_id`、`release_id` 的存在、tenant、状态或 scope 一致性。
+- Config upsert 尚未验证 `product_id` 的存在/状态以及 product/release 与 scope 的完整一致性。
 - Release Binding 没有 application writer，publish 也不自动创建 binding。
 - Product/Profile 没有 application management surface。
 - 不同 idempotency key 并发创建同一 Config identity 时，当前“先查再写”没有 UNIQUE 兜底，可能产生重复 active rows。
@@ -95,6 +102,7 @@ system_config_release.id
 |---|---|
 | Product/Profile | `active/archived` |
 | Config Release | `draft/validated/published/retired`、version > 0、digest 64 位小写 hex |
+| Runtime Manifest Generation | tenant 主键、generation > 0；缺行代表初始 generation 0 |
 | Release Binding | `global/tenant/product/surface` scope、`active/archived`、非 global 必须有 scope_id |
 | Config Record | scope enum、`active/deleted`、schema/config version > 0、digest hex |
 | Site | `draft/active/suspended/archived`、version > 0 |
@@ -108,7 +116,7 @@ transition 已实现。
 ## 6. 查询、索引与 cursor
 
 - Manifest lookup 使用 product status/key、tenant+product active binding、release tenant/status 与
-  tenant/locale/module/scope/product/status config indexes；输出 version 使用 BIGINT 数值最大值。
+  tenant/locale/module/scope/product/status config indexes；先后读取 generation 主键做 fence，输出 version 使用 BIGINT 数值最大值。
 - Site/Host、Workspace、Policy query 的索引以 tenant 作为前导或显式过滤条件。
 - Audit Event 索引支持 tenant+time 与 command 查找，但当前没有 runtime query。
 - Command Receipt 唯一索引支持 claim conflict，created index为未来 retention/inspection 提供顺序。

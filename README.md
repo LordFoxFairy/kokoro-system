@@ -12,13 +12,17 @@ Config Release、Release Binding 与 System Policy 事实。它是内部服务�
 
 **已实现**
 
-- PostgreSQL 保存 System-owned durable facts；Redis logical DB 2 只用于 Runtime Manifest 热缓存和协调。
+- PostgreSQL 保存 System-owned durable facts 与 tenant manifest generation；Redis logical DB 2 只用于带 generation fence 的
+  Runtime Manifest 热缓存和可回收副本。
 - System 通过 `tenant_id + normalized host` 查询本仓 Site/Host，既不读取 IAM 数据库，也不调用 IAM Host API。
 - `/v1/system/*` 与 SiteService Connect RPC 要求 `web-bff` service identity 和共享 service token；
   `/healthz`、`/readyz` 保持公开。
 - Control-plane 权限来自通过服务认证后的受信上下文：`system:read`、`system:write`、`system:publish`。
 - Mutation 使用 tenant-scoped `Idempotency-Key` receipt；release 只允许
   `draft -> validated -> published -> retired`。
+- publish/retire 在同一 PostgreSQL transaction 推进 tenant manifest generation，再清理 Redis；并发 miss 通过写后 fence
+  丢弃旧 generation，进程崩溃或旧 cache namespace 不会把旧 manifest 重新变成当前事实。
+- Config 只可写入 caller tenant 的 `draft`/`validated` release；HTTP 中所有 PostgreSQL `BIGINT` response 均使用十进制字符串。
 
 **不属于本仓**
 

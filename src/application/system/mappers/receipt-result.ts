@@ -31,6 +31,12 @@ function number(value: unknown): number {
   return value;
 }
 
+function positiveIntegerString(value: unknown): string {
+  const candidate = string(value);
+  if (!/^[1-9][0-9]*$/u.test(candidate)) throw invalidReceipt();
+  return candidate;
+}
+
 function boolean(value: unknown): boolean {
   if (typeof value !== "boolean") throw invalidReceipt();
   return value;
@@ -68,7 +74,7 @@ export function parseSiteReceipt(value: unknown): Site {
     hostnames: strings(input.hostnames),
     displayName: string(input.displayName),
     status: oneOf(input.status, ["draft", "active", "suspended", "archived"]),
-    version: number(input.version),
+    version: positiveIntegerString(input.version),
     createdAt: string(input.createdAt),
     updatedAt: string(input.updatedAt),
   };
@@ -83,7 +89,7 @@ export function parseWorkspaceReceipt(value: unknown): Workspace {
     workspaceKey: string(input.workspaceKey),
     name: string(input.name),
     status: oneOf(input.status, ["active", "archived"]),
-    version: number(input.version),
+    version: positiveIntegerString(input.version),
     createdAt: string(input.createdAt),
     updatedAt: string(input.updatedAt),
   };
@@ -95,7 +101,7 @@ export function parsePolicyReceipt(value: unknown): SitePolicy {
     id: string(input.id),
     tenantId: string(input.tenantId),
     siteId: string(input.siteId),
-    version: number(input.version),
+    version: positiveIntegerString(input.version),
     status: oneOf(input.status, ["active", "archived"]),
     defaultLocale: string(input.defaultLocale),
     allowedLocales: strings(input.allowedLocales),
@@ -114,7 +120,7 @@ export function parseReleaseReceipt(value: unknown): ConfigRelease {
     status: oneOf(input.status, ["draft", "validated", "published", "retired"]),
     digest: string(input.digest),
     publishedAt: nullableString(input.publishedAt),
-    version: number(input.version),
+    version: positiveIntegerString(input.version),
     createdAt: string(input.createdAt),
     updatedAt: string(input.updatedAt),
   };
@@ -134,7 +140,7 @@ export function parseConfigReceipt(value: unknown): SystemConfig {
     value: input.value,
     schemaVersion: number(input.schemaVersion),
     status: oneOf(input.status, ["active", "deleted"]),
-    configVersion: number(input.configVersion),
+    configVersion: positiveIntegerString(input.configVersion),
     releaseId: nullableString(input.releaseId),
     digest: string(input.digest),
     updatedAt: string(input.updatedAt),

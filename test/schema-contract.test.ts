@@ -30,5 +30,9 @@ describe("system SQL contract", () => {
     expect(sql).toContain("uq_system_site_policy_active");
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS system_site\s*\(/u);
     expect(sql).toMatch(/system_site\s*\([\s\S]*tenant_id TEXT NOT NULL/u);
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS system_runtime_manifest_generation\s*\([\s\S]*tenant_id TEXT PRIMARY KEY[\s\S]*generation BIGINT NOT NULL/u,
+    );
+    expect(sql).toContain("ck_system_runtime_manifest_generation_positive");
   });
 });

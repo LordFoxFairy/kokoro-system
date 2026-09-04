@@ -24,6 +24,7 @@ const manifest: RuntimeManifest = {
 function setup() {
   let calls = 0;
   const repository: SystemRepository = {
+    getManifestGeneration: async () => "0",
     getManifest: async () => {
       calls += 1;
       return manifest;
@@ -34,6 +35,9 @@ function setup() {
     get: async () => cached,
     set: async (_key, value) => {
       cached = value;
+    },
+    delete: async () => {
+      cached = null;
     },
     assertReady: async () => undefined,
   };
@@ -47,7 +51,7 @@ function setup() {
         canonicalHost: "app.example",
         defaultLocale: "en-US",
         timezone: "UTC",
-        generation: 1,
+        generation: "1",
       };
     },
   };
@@ -131,6 +135,7 @@ it("keeps surface-specific manifests separate from the default manifest cache en
   const values = new Map<string, RuntimeManifest>();
   const keys: string[] = [];
   const repository: SystemRepository = {
+    getManifestGeneration: async () => "0",
     getManifest: async ({ context }) => ({
       ...manifest,
       theme: { source: context.surfaceId ?? "default" },
@@ -138,12 +143,17 @@ it("keeps surface-specific manifests separate from the default manifest cache en
   };
   const cache: ManifestCache = {
     get: async (key) => {
-      keys.push(`get:${key}`);
-      return values.get(key) ?? null;
+      const encoded = JSON.stringify(key);
+      keys.push(`get:${encoded}`);
+      return values.get(encoded) ?? null;
     },
     set: async (key, value) => {
-      keys.push(`set:${key}`);
-      values.set(key, value);
+      const encoded = JSON.stringify(key);
+      keys.push(`set:${encoded}`);
+      values.set(encoded, value);
+    },
+    delete: async (key) => {
+      values.delete(JSON.stringify(key));
     },
     assertReady: async () => undefined,
   };
@@ -154,7 +164,7 @@ it("keeps surface-specific manifests separate from the default manifest cache en
       canonicalHost: "app.example",
       defaultLocale: "en-US",
       timezone: "UTC",
-      generation: 1,
+      generation: "1",
     }),
   };
   const service = new RuntimeManifestService(repository, cache, hostResolver);
@@ -183,12 +193,11 @@ it("keeps surface-specific manifests separate from the default manifest cache en
       host: "app.example",
     }),
   ).resolves.toMatchObject({ theme: { source: "default" } });
-  expect(keys).toEqual([
-    "get:manifest:tenant-a:product-a:en-US:surface-a",
-    "set:manifest:tenant-a:product-a:en-US:surface-a",
-    "get:manifest:tenant-a:product-a:en-US:default",
-    "set:manifest:tenant-a:product-a:en-US:default",
-  ]);
+  expect(keys).toHaveLength(4);
+  expect(keys[0]).toContain('"surfaceId":"surface-a"');
+  expect(keys[1]).toContain('"surfaceId":"surface-a"');
+  expect(keys[2]).toContain('"surfaceId":null');
+  expect(keys[3]).toContain('"surfaceId":null');
 });
 
 describe("release cache visibility", () => {

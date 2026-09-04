@@ -72,6 +72,24 @@ function emptyManifest(
 
 export class PostgresSystemRepository implements SystemRepository {
   public constructor(private readonly pool: SqlPool) {}
+  public async getManifestGeneration(tenantId: string): Promise<string> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<Row>(
+        "SELECT generation FROM system_runtime_manifest_generation WHERE tenant_id = $1 LIMIT 1",
+        [tenantId],
+      );
+      const value = result.rows[0]?.generation;
+      return value === undefined
+        ? "0"
+        : decodeIntegerString(
+            value,
+            "system_runtime_manifest_generation.generation",
+          );
+    } finally {
+      client.release();
+    }
+  }
   public async getManifest(
     input: Readonly<{
       context: TenantRequestContext;

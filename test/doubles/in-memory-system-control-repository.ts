@@ -104,7 +104,7 @@ export class InMemorySystemControlRepository implements SystemControlRepository 
       hostnames: [input.hostname],
       displayName: input.displayName,
       status: "active",
-      version: 1,
+      version: "1",
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -156,7 +156,7 @@ export class InMemorySystemControlRepository implements SystemControlRepository 
       workspaceKey: input.workspaceKey,
       name: input.name,
       status: "active",
-      version: 1,
+      version: "1",
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -186,7 +186,7 @@ export class InMemorySystemControlRepository implements SystemControlRepository 
       id: previous?.id ?? randomUUID(),
       tenantId: tenant(context),
       siteId,
-      version: (previous?.version ?? 0) + 1,
+      version: (BigInt(previous?.version ?? "0") + 1n).toString(),
       updatedAt: now(),
     };
     this.policies.set(siteId, value);
@@ -217,7 +217,7 @@ export class InMemorySystemControlRepository implements SystemControlRepository 
       status: "draft",
       digest: input.digest,
       publishedAt: null,
-      version: 1,
+      version: "1",
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -239,6 +239,19 @@ export class InMemorySystemControlRepository implements SystemControlRepository 
     context: TenantRequestContext,
     input: ConfigInput,
   ): Promise<SystemConfig> {
+    if (input.releaseId !== null) {
+      const release = this.releases.find(
+        (item) =>
+          item.id === input.releaseId && item.tenantId === tenant(context),
+      );
+      if (!release)
+        throw new SystemDomainError("NOT_FOUND", "release not found", 404);
+      if (release.status !== "draft" && release.status !== "validated")
+        throw new SystemDomainError(
+          "INVALID_STATE",
+          "release is not writable",
+        );
+    }
     const timestamp = now();
     const tenantId = input.scopeType === "global" ? null : tenant(context);
     const index = this.configs.findIndex(
@@ -259,7 +272,9 @@ export class InMemorySystemControlRepository implements SystemControlRepository 
       tenantId,
       ...input,
       status: "active",
-      configVersion: (existing?.configVersion ?? 0) + 1,
+      configVersion: (
+        BigInt(existing?.configVersion ?? "0") + 1n
+      ).toString(),
       digest: createHash("sha256")
         .update(JSON.stringify(input.value))
         .digest("hex"),
@@ -283,7 +298,7 @@ export class InMemorySystemControlRepository implements SystemControlRepository 
     context: TenantRequestContext,
     releaseId: string,
     status: ConfigRelease["status"],
-    expectedVersion: number,
+    expectedVersion: string,
   ): Promise<ConfigRelease> {
     const index = this.releases.findIndex(
       (item) => item.id === releaseId && item.tenantId === tenant(context),
@@ -303,7 +318,7 @@ export class InMemorySystemControlRepository implements SystemControlRepository 
       ...current,
       status,
       publishedAt: status === "published" ? now() : current.publishedAt,
-      version: current.version + 1,
+      version: (BigInt(current.version) + 1n).toString(),
       updatedAt: now(),
     };
     this.releases[index] = value;

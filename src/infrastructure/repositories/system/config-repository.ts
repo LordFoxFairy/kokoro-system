@@ -17,9 +17,11 @@ import {
 import { mapConfig } from "./mappers.js";
 import type { Row } from "./support.js";
 import {
-  decodeInteger,
+  decodeEnum,
+  decodeIntegerString,
   decodeString,
 } from "../../persistence/postgres/value-decoders.js";
+import { SystemDomainError } from "../../../domain/system/errors/system-domain.error.js";
 
 export class PostgresConfigRepository extends PostgresRepository {
   public constructor(pool: SqlPool, transactionClient: SqlClient | null = null) {
@@ -44,22 +46,36 @@ export class PostgresConfigRepository extends PostgresRepository {
     input: ConfigInput,
   ): Promise<SystemConfig> {
     return this.withTransaction(async (client) => {
+      if (input.releaseId !== null) {
+        const release = await client.query<Row>(
+          "SELECT status FROM system_config_release WHERE id = $1 AND tenant_id = $2 LIMIT 1 FOR UPDATE",
+          [input.releaseId, context.tenantId],
+        );
+        const releaseRow = release.rows[0];
+        if (releaseRow === undefined)
+          throw new SystemDomainError("NOT_FOUND", "release not found", 404);
+        const releaseStatus = decodeEnum(
+          releaseRow.status,
+          "system_config_release.status",
+          ["draft", "validated", "published", "retired"],
+        );
+        if (releaseStatus !== "draft" && releaseStatus !== "validated")
+          throw new SystemDomainError(
+            "INVALID_STATE",
+            "release is not writable",
+          );
+      }
       const tenantId = input.scopeType === "global" ? null : context.tenantId;
       const existing = await client.query<Row>(
-        "SELECT id, config_version FROM system_config_record WHERE status = 'active' AND ((tenant_id = $1) OR (tenant_id IS NULL AND $2 IS NULL)) AND module_key = $3 AND config_key = $4 AND scope_type = $5 AND ((scope_id = $6) OR (scope_id IS NULL AND $7 IS NULL)) AND ((product_id = $8) OR (product_id IS NULL AND $9 IS NULL)) AND ((locale = $10) OR (locale IS NULL AND $11 IS NULL)) AND ((release_id = $12) OR (release_id IS NULL AND $13 IS NULL)) LIMIT 1 FOR UPDATE",
+        "SELECT id, config_version FROM system_config_record WHERE status = 'active' AND tenant_id IS NOT DISTINCT FROM $1::text AND module_key = $2 AND config_key = $3 AND scope_type = $4 AND scope_id IS NOT DISTINCT FROM $5::text AND product_id IS NOT DISTINCT FROM $6::uuid AND locale IS NOT DISTINCT FROM $7::varchar AND release_id IS NOT DISTINCT FROM $8::uuid LIMIT 1 FOR UPDATE",
         [
-          tenantId,
           tenantId,
           input.moduleKey,
           input.configKey,
           input.scopeType,
           input.scopeId,
-          input.scopeId,
-          input.productId,
           input.productId,
           input.locale,
-          input.locale,
-          input.releaseId,
           input.releaseId,
         ],
       );
@@ -68,11 +84,15 @@ export class PostgresConfigRepository extends PostgresRepository {
         ? decodeString(existingRow.id, "system_config_record.id")
         : randomUUID();
       const configVersion = existingRow
-        ? decodeInteger(
-            existingRow.config_version,
-            "system_config_record.config_version",
-          ) + 1
-        : 1;
+        ? (
+            BigInt(
+              decodeIntegerString(
+                existingRow.config_version,
+                "system_config_record.config_version",
+              ),
+            ) + 1n
+          ).toString()
+        : "1";
       const time = utcTimestamp();
       const digest = createHash("sha256")
         .update(JSON.stringify(input.value))

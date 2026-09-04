@@ -7,7 +7,7 @@ export type Site = Readonly<{
   hostnames: readonly string[];
   displayName: string;
   status: SiteStatus;
-  version: number;
+  version: string;
   createdAt: string;
   updatedAt: string;
 }>;

@@ -12,7 +12,7 @@
 | GOV-03 | `contract/README.md` 含 owner/visibility/version/generation/breaking/provenance/consumer workflow | architecture + Root slice | 通过 |
 | GOV-04 | 每个 direct/reusable OpenAPI operation 有 5 个 governance extensions | contract test + verifier + Root slice | 通过 |
 | GOV-05 | 顶层 tsconfig 显式 `useUnknownInCatchVariables=true` | architecture + Root slice + typecheck | 通过 |
-| GOV-06 | Generated、runtime、Schema 与跨仓边界 | owner contract test + `git diff` scope review | 仅 `kokoro.site.v1`；generated 由隔离重生成逐字节验证；runtime 只含本 P1 release/manifest/cache 闭环；Schema/contract/其他仓不变 |
+| GOV-06 | Generated、runtime、Schema 与跨仓边界 | owner contract test + `git diff` scope review | 仅 `kokoro.site.v1`；generated 由隔离重生成逐字节验证；Schema 只新增 tenant manifest generation；OpenAPI 只收敛 BIGINT string wire；其他仓不变 |
 | GOV-07 | lint/typecheck/test/build/contract 均在 committed tree 重跑 | 第 5 节 | 全部 exit 0 |
 
 ## 2. Runtime behavior matrix
@@ -38,6 +38,10 @@
 | SYS-17 | Manifest 只解析 active binding 指向的同 tenant published release；draft/retired/foreign tenant fail closed | postgres repository + real runtime smoke |
 | SYS-18 | publish/retire 后按 tenant 失效 cache，失效失败可用同 key replay 重试 | runtime-manifest + real runtime smoke |
 | SYS-19 | Manifest `config_version` 按 BIGINT 数值语义求最大值 | postgres repository + real runtime smoke |
+| SYS-20 | publish/retire 与 durable tenant generation 同事务；并发旧回填被 fence 删除并重读 | release repository + real PostgreSQL/Redis consistency tests |
+| SYS-21 | 旧 deployment namespace/restart 不命中旧 generation；冒号 tenant 精确失效，null surface 与字符串 `default` 不碰撞 | Redis key unit + real consistency tests |
+| SYS-22 | Config release 以 tenant 锁行且仅 draft/validated 可写；published/retired/foreign tenant 使用稳定错误 | config repository/application/HTTP + real consistency tests |
+| SYS-23 | 所有 control-plane BIGINT 以十进制字符串穿过 DB/domain/receipt/HTTP，覆盖 9007199254740993 与递增顺序 | boundary/contract/repository + real consistency tests |
 
 ## 3. Contract acceptance
 
@@ -52,6 +56,8 @@ pnpm contract:check
 验收时检查：
 
 - OpenAPI 3.1、仅显式 V1/Probe path、snake_case、common envelope；
+- HTTP response 中 Site/Workspace/Policy/Config/Release 的 BIGINT 字段使用 canonical positive decimal string；Runtime Manifest
+  `config_version` 允许字符串 `0`；
 - 13 个 direct/reusable operation definition 的治理 metadata；
 - Buf lint；
 - proto source inventory/digest 与 `contract/provenance.json` 一致，且不声明 `kokoro.common.v1`；
@@ -77,7 +83,8 @@ pnpm test:integration
 ```
 
 `test:runtime-smoke`/`test:runtime-real-system` 创建并删除带随机名的隔离 database，使用进程唯一 Redis namespace；
-`test:postgres-concurrency` 在 base database 写入随机 tenant fixture 并在 finally 清理。
+Vitest real consistency tests 创建并删除随机 PostgreSQL schema/Redis namespace；`test:postgres-concurrency` 在 base database
+写入随机 tenant fixture 并在 finally 清理。
 
 ## 5. Required local gate
 
@@ -143,7 +150,7 @@ digest、scanner result、SBOM/attestation 和 smoke output。
 以下项目仍是缺口，不因本阶段通过而改变：
 
 - Product/Profile/Release Binding 的完整 application/API 生命周期，以及 Config/Policy/未来 Binding mutation cache invalidation；
-- Config foreign-reference/schema validation、不同 key 并发唯一性、Policy enforcement；
+- Config product-reference/schema validation、不同 key 并发唯一性、Policy enforcement；
 - 生产 TLS/network policy/secret rotation、rate limit、capacity/load/failover/restore exercise；
 - metrics/traces/dashboard/alerts 与 30 天 SLI/SLO；
 - OpenAPI breaking/provenance/consumer artifact 自动化；

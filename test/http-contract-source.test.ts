@@ -81,6 +81,29 @@ function operationDefinitions(
   return definitions;
 }
 
+function schemaProperty(
+  schemas: Readonly<Record<string, unknown>>,
+  schemaName: string,
+  propertyName: string,
+): Readonly<Record<string, unknown>> {
+  const schema = record(schemas[schemaName], `schema ${schemaName}`);
+  const candidates = Array.isArray(schema.allOf) ? schema.allOf : [schema];
+  for (const candidate of candidates) {
+    const candidateRecord = record(candidate, `schema ${schemaName} member`);
+    if (candidateRecord.properties === undefined) continue;
+    const properties = record(
+      candidateRecord.properties,
+      `schema ${schemaName} properties`,
+    );
+    if (properties[propertyName] !== undefined)
+      return record(
+        properties[propertyName],
+        `schema ${schemaName}.${propertyName}`,
+      );
+  }
+  throw new Error(`missing schema property ${schemaName}.${propertyName}`);
+}
+
 describe("canonical System HTTP contract", () => {
   it("defines every production HTTP boundary under an explicit v1 path", () => {
     expect(existsSync(source)).toBe(true);
@@ -164,5 +187,26 @@ describe("canonical System HTTP contract", () => {
       expect(operation["x-kokoro-idempotency"]).toBe(expected.idempotency);
       expect(operation["x-kokoro-permission"]).toBe(expected.permission);
     }
+  });
+
+  it("represents every PostgreSQL BIGINT response as a canonical decimal string", () => {
+    const parsed: unknown = JSON.parse(readFileSync(source, "utf8"));
+    const document = record(parsed, "OpenAPI document");
+    const components = record(document.components, "OpenAPI components");
+    const schemas = record(components.schemas, "OpenAPI schemas");
+    const positive = { type: "string", pattern: "^[1-9][0-9]*$" };
+    for (const [schemaName, propertyName] of [
+      ["site", "version"],
+      ["workspace", "version"],
+      ["site_policy", "version"],
+      ["config", "config_version"],
+      ["release", "version"],
+    ] as const)
+      expect(schemaProperty(schemas, schemaName, propertyName)).toEqual(
+        positive,
+      );
+    expect(schemaProperty(schemas, "runtime_manifest", "config_version")).toEqual(
+      { type: "string", pattern: "^(0|[1-9][0-9]*)$" },
+    );
   });
 });

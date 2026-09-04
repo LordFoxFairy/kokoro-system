@@ -412,7 +412,7 @@ export function createHttpServer(
           "public_manifest",
         ]);
         const value = {
-          version: 1,
+          version: "1",
           status: "active" as const,
           defaultLocale: stringField(input, "default_locale"),
           allowedLocales: stringArray(input, "allowed_locales"),

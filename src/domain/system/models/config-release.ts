@@ -7,7 +7,7 @@ export type ConfigRelease = Readonly<{
   status: ReleaseStatus;
   digest: string;
   publishedAt: string | null;
-  version: number;
+  version: string;
   createdAt: string;
   updatedAt: string;
 }>;

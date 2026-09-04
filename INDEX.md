@@ -1,6 +1,6 @@
 # kokoro-system 代码与边界地图
 
-状态：当前实现地图，2026-09-03。规范性机器事实源优先级为 `contract/` 与 `database/schema.sql`；本文只解释入口，
+状态：当前实现地图，2026-09-04。规范性机器事实源优先级为 `contract/` 与 `database/schema.sql`；本文只解释入口，
 不复制字段定义。
 
 ## 运行时依赖方向
@@ -22,15 +22,15 @@ domain -> no HTTP, PostgreSQL, Redis, generated wire or Node runtime imports
 | `src/domain/system/enums/` | 有限状态与 config scope 类型 |
 | `src/domain/system/errors/` | 稳定 application/domain error carrier |
 | `src/application/runtime-manifest/ports/` | Manifest repository、cache、Site Host resolver ports |
-| `src/application/runtime-manifest/services/` | 先验证 Site/Host、再读缓存/事实源的 manifest 用例 |
+| `src/application/runtime-manifest/services/` | 先验证 Site/Host，再以 PostgreSQL tenant generation 对 cache read/fill 做前后 fence |
 | `src/application/system/dto/` | Control-plane command/query DTO 与 opaque cursor page |
 | `src/application/system/mappers/` | Durable receipt replay 的 unknown-to-domain decoder |
 | `src/application/system/ports/` | System control repository 与 permission vocabulary |
 | `src/application/system/services/` | Permission、idempotency、release state machine 与 Site query 编排 |
 | `src/infrastructure/persistence/postgres/` | Pool、transaction client、timeout 与 row value decoder |
-| `src/infrastructure/repositories/runtime-manifest/` | Product/release/config 查询、precedence 与 manifest projection |
-| `src/infrastructure/repositories/system/` | Site、Host、Workspace、Policy、Config、Release、receipt repositories |
-| `src/infrastructure/redis/` | 完整 Runtime Manifest cache、TTL、解码与 readiness |
+| `src/infrastructure/repositories/runtime-manifest/` | Tenant generation、Product/release/config 查询、precedence 与 manifest projection |
+| `src/infrastructure/repositories/system/` | Site、Host、Workspace、Policy、Config release write guard、Release/generation、receipt repositories |
+| `src/infrastructure/redis/` | 无歧义 key codec、generation-versioned Runtime Manifest cache、tenant cleanup、TTL、解码与 readiness |
 | `src/interfaces/http/` | Node HTTP router、JSON envelope、body/header validation、BFF service auth |
 | `src/interfaces/rpc/` | 由 generated descriptor 注册的 Connect SiteService handler |
 | `src/interfaces/observability/` | 结构化日志接口与 stdout 实现 |
@@ -53,6 +53,7 @@ domain -> no HTTP, PostgreSQL, Redis, generated wire or Node runtime imports
 | `scripts/verify-contract-provenance.ts` | Proto source digest drift gate |
 | `sdk/typescript/src/` | 手写 server-only Runtime Manifest client；不是 OpenAPI generated SDK |
 | `test/architecture/`、`test/contract/` | 分层、文档拓扑、contract owner/provenance/generated drift 与 CI/release 门禁 |
+| `test/integration/` | 随机 PostgreSQL schema/Redis namespace 下的 cache fence、release write guard 与 BIGINT 真实验证 |
 | `scripts/test/` | PostgreSQL/Redis/runtime/production-image smoke 与幂等并发验证 |
 
 ## HTTP 与 RPC surface

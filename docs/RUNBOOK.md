@@ -112,7 +112,7 @@ Runtime smoke 创建/删除隔离 database，需要 CREATEDB；PostgreSQL concur
 | `service_auth_failed` | service identity、credential、BFF secret version | 校验 BFF/System secret一致；调查伪造/泄漏 |
 | `FORBIDDEN` | `x-kokoro-iam-permissions` 与 operation | 在 BFF/IAM admission 修复；不要直接放宽 System |
 | Runtime 404 | tenant、Forwarded/Host、active Site/Host | 修复可信 Host 或本仓 Site/Host lifecycle |
-| Runtime 503 | DB/Redis、cache decode/identity、row decoder | 用 request/trace id 定位；检查 dependency 与 namespace key |
+| Runtime 503 | DB/Redis、cache decode/identity、generation 连续变化、row decoder | 用 request/trace id 定位；检查 dependency、tenant generation 与 namespace key |
 | `INVALID_CURSOR` | cursor 是否原样来自上一页 | 丢弃自建 cursor，从第一页重试 |
 | `IDEMPOTENCY_KEY_REUSED` | 同 key 是否绑定不同 payload/operation | 原 payload 重放或为新 command 生成新 key |
 | `INVALID_STATE` | release 当前状态 | 只执行下一合法 transition |
@@ -129,7 +129,8 @@ redis-cli -u "$REDIS_URL" --scan \
   --pattern "${KOKORO_SYSTEM_REDIS_NAMESPACE:-kokoro:system}:manifest:*"
 ```
 
-4. 对 malformed/identity-mismatch key，先记录 key name、request id、发生时间（不记录 value 中的敏感内容），经 owner 审核后
+4. key 使用 `manifest:v2:tenant:<base64url>:generation:<decimal>:...:surface:<none|value:base64url>`；不要把编码 segment
+   当成原始 tenant/surface。对 malformed/identity-mismatch key，先记录 key name、request id、发生时间（不记录 value 中的敏感内容），经 owner 审核后
    对明确 key 使用 `UNLINK`；不要批量删除未审查 namespace。
 5. Redis 恢复后等待 `/readyz` 200，再用两个 tenant/surface 请求验证隔离和重新填充。
 
@@ -147,13 +148,16 @@ Runtime 当前不会在 Redis 故障时绕过 cache；不要临时增加进程�
 
 - Release transition 只能向前；不要直接把 retired/published 状态改回去。
 - 错误配置应通过新的 idempotent config/release command 修正，而不是改历史 receipt。
-- 当前 publish 不建立 Release Binding、也不主动 invalidation；若 incident 涉及 binding，先冻结发布并由 System owner 按
-  [`CURRENT.md`](CURRENT.md) 的已知缺口处理，不能假设 API 已提供完整回滚。
-- Redis manifest 最多 30 秒 TTL 不是发布原子性保证；检查 PostgreSQL binding/config facts 和 cache key 后再恢复流量。
+- 当前 publish 不建立 Release Binding；若 incident 涉及 binding，先冻结发布并由 System owner 按 [`CURRENT.md`](CURRENT.md)
+  的已知缺口处理，不能假设 API 已提供完整回滚。
+- publish/retire 会在 PostgreSQL transaction 内推进 tenant generation，并在 commit 后清理当前 Redis namespace。检查
+  `system_runtime_manifest_generation`、release/binding/config facts 和 generation key；30 秒 TTL 只是容量回收，不是发布
+  原子性保证。旧 deployment namespace 的旧 generation key 可以留待 TTL，但当前 generation 请求不得命中它。
+- Config 若引用 release，只有同 tenant `draft`/`validated` 可写；不要通过 SQL 把 published/retired release 改回可写状态。
 
 ## 9. Code/image rollback
 
-本阶段没有 Schema/runtime 变更。一般 code rollback：
+当前 canonical Schema 含 `system_runtime_manifest_generation`，没有 down migration。一般 code rollback：
 
 1. 记录当前 commit、immutable image digest、deployment、request/trace IDs。
 2. 将流量切回已验证的前一 immutable image；不要使用 mutable tag 作为唯一证据。

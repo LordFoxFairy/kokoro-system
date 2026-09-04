@@ -62,9 +62,9 @@ Receipt claim、hash compare、aggregate mutation、serialized response completi
 `FOR UPDATE` lock。Transaction 中任一步失败都会 rollback。Completed replay 先从 JSONB 解码成对应 domain shape，
 异常数据 fail closed。
 
-Release publish/retire 在 PostgreSQL transaction commit 后执行 tenant-scoped Redis invalidation。失效失败会让 command
-返回 dependency failure；由于 receipt 已完成，调用方以同一 idempotency key 重试时会 replay release result 并再次执行
-失效，而不会重复转换状态。
+Release publish/retire 在 receipt/release PostgreSQL transaction 内推进 tenant manifest generation，commit 后执行 tenant-scoped
+Redis cleanup。cleanup 失败会让 command 返回 dependency failure；由于 receipt 与 generation 已完成，调用方以同一
+idempotency key 重试时会 replay release result 并再次清理，而不会重复转换状态或 generation。
 
 并发验证脚本用同一 tenant/key 同时发起两个 Site create，并检查 Site/Host/receipt 各一条。它是局部一致性证据，不覆盖：
 
@@ -75,26 +75,30 @@ Release publish/retire 在 PostgreSQL transaction commit 后执行 tenant-scoped
 
 ## 6. Cache consistency
 
-Runtime Manifest key：
+Runtime Manifest key（各自由 base64url 或显式 sentinel 无歧义编码）：
 
 ```text
-<namespace>:manifest:<tenant>:<product>:<locale>:<surface-or-default>
+<namespace>:manifest:v2:tenant:<tenant>:generation:<decimal>:product:<product>:locale:<locale>:surface:<none|value:surface>
 ```
 
-Cache hit 复核 tenant/product/locale；decode/identity mismatch 失败为 503，不回退 PostgreSQL。Miss 从 PostgreSQL assembly
-后写入 30 秒 TTL。
+每次请求先从 PostgreSQL 读取 tenant generation，再访问对应 generation key；cache hit 后再次读取 generation，miss 则在
+fill 前后各复核一次。Fence 变化时跳过旧写入或删除已写入的旧 key 并重试，不返回旧 manifest。Cache hit 复核
+tenant/product/locale；decode/identity mismatch 失败为 503，
+不回退 PostgreSQL。Miss 从 PostgreSQL assembly 后写入 30 秒 TTL。
 
-Release publish/retire 成功提交后，Redis 使用 `SCAN` 限定当前 System namespace，并只删除匹配 tenant manifest prefix 的
-keys。Manifest repository 同时要求 active binding 指向同 tenant published release，因此 draft、validated、retired 与
-foreign-tenant binding 在 cache miss 时都 fail closed。真实 runtime smoke 覆盖发布前缓存、publish 后失效可见、retire 后
-失效隐藏以及其他 tenant cache 不被删除。
+Release publish/retire 在同一 transaction 推进 durable generation；提交后 Redis 使用 `SCAN` 限定当前 System namespace，并
+只删除匹配 base64url tenant prefix 的 keys。若进程在 commit 与 cleanup 间退出，或另一个 deployment namespace 留有旧 key，
+新请求仍只查询新 generation。并发 miss 若跨越 cleanup，写前 fence 会跳过旧填充；若变化发生在写入窗口，写后 fence 会
+删除并重读。Manifest repository 还要求
+active binding 指向同 tenant published release，因此 draft、validated、retired 与 foreign-tenant binding 在 cache miss 时
+fail closed。
 
 **缺口**
 
 - Config/Policy mutation 没有主动 invalidation；Binding 尚无 application writer，因此其未来 mutation 必须复用同一
   tenant invalidation port。
-- PostgreSQL commit 与 Redis invalidation 不是单一原子事务；正常失败由同 key replay 重试收敛，process 在两者之间退出时
-  仍由 30 秒 TTL 提供最终收敛上界。
+- Redis cleanup 与 PostgreSQL commit 不是单一原子事务，但可见性由 transaction 内 durable generation 决定，不再依赖
+  30 秒 TTL 作为发布正确性边界；旧 generation key 仅占用容量并最终 TTL 淘汰。
 - Surface identity 不在 manifest value 中，只通过 key 分区。
 - 没有 hit/miss/decode/digest mismatch metrics。
 - 没有 stampede protection、single-flight、negative-cache policy 或 cache capacity test。
@@ -111,7 +115,8 @@ foreign-tenant binding 在 cache miss 时都 fail closed。真实 runtime smoke 
 | Permission/service auth failure | 403；未配置 token 为 503 | 修复 caller context/secret；不要绕过 guard |
 | Idempotency digest conflict | 409 | Caller 检查 command identity，使用原 payload 或新 key |
 | Invalid release transition | 400 INVALID_STATE | 读取当前状态，只执行下一合法 transition |
-| Release cache invalidation 失败 | command 503；release receipt 已 durable | 使用同一 idempotency key 重试，replay 后再次失效 |
+| Release cache cleanup 失败 | command 503；release/receipt/generation 已 durable | 新读使用新 generation；同 key replay 后再次清理 |
+| 并发 miss 回填旧 manifest | 请求检测 generation 变化后删除旧 key 并重读 | 三次连续 generation 变化则 503，调用方可安全重试 GET |
 | Shutdown deadline exceeded | lifecycle error log，exit code 1 | 平台替换实例并调查 hanging closer |
 
 详细命令见 [`RUNBOOK.md`](RUNBOOK.md)。
@@ -131,6 +136,7 @@ unexpected error 只记录 error class name，不泄漏原 payload/credential。
 | `pnpm test` | unit/transport/architecture/contract source、Redis/PostgreSQL decoder、simulated recovery/shutdown |
 | `pnpm test:postgres-concurrency` | 真实 PostgreSQL receipt lock/atomicity |
 | `pnpm test:runtime-smoke` | 隔离 database + 共享 Redis；listener/SDK/tenant/precedence/release visibility/cache invalidation/BIGINT version/errors |
+| `test/integration/*consistency.test.ts` | 真实 PostgreSQL/Redis generation fence、旧 namespace、编码隔离、release write lock 与 BIGINT 边界 |
 | `pnpm test:runtime-real-system` | canonical schema + System Site/Host + Manifest + Connect |
 | image smoke | production image non-root entry、health/readiness against dependencies |
 

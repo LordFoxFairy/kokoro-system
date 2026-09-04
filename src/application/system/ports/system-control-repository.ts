@@ -59,7 +59,7 @@ export type SystemControlDataRepository = {
     context: TenantRequestContext,
     releaseId: string,
     status: ReleaseStatus,
-    expectedVersion: number,
+    expectedVersion: string,
   ): Promise<ConfigRelease>;
 };
 

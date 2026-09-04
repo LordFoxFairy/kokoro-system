@@ -34,7 +34,7 @@ const siteResolution = {
   canonicalHost: "a.example.test",
   defaultLocale: "en-US",
   timezone: "UTC",
-  generation: 1,
+  generation: "1",
 } as const;
 
 describe("dependency failure and recovery fixtures", () => {
@@ -51,8 +51,14 @@ describe("dependency failure and recovery fixtures", () => {
       set: async () => {
         if (!redisReady) throw new Error("redis down");
       },
+      delete: async () => {
+        if (!redisReady) throw new Error("redis down");
+      },
     };
-    const repository: SystemRepository = { getManifest: async () => value };
+    const repository: SystemRepository = {
+      getManifestGeneration: async () => "0",
+      getManifest: async () => value,
+    };
     const service = new RuntimeManifestService(repository, cache, {
       resolve: async () => siteResolution,
     } satisfies SiteHostResolver);
@@ -78,6 +84,10 @@ describe("dependency failure and recovery fixtures", () => {
   it("recovers after a PostgreSQL repository error without using an in-process fallback", async () => {
     let postgresReady = false;
     const repository: SystemRepository = {
+      getManifestGeneration: async () => {
+        if (!postgresReady) throw new Error("postgres down");
+        return "0";
+      },
       getManifest: async () => {
         if (!postgresReady) throw new Error("postgres down");
         return value;
@@ -87,6 +97,7 @@ describe("dependency failure and recovery fixtures", () => {
       assertReady: async () => undefined,
       get: async () => null,
       set: async () => undefined,
+      delete: async () => undefined,
     };
     const service = new RuntimeManifestService(repository, cache, {
       resolve: async () => siteResolution,

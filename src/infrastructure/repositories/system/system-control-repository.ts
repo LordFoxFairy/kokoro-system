@@ -113,7 +113,7 @@ class PostgresSystemControlDataRepository
     context: TenantRequestContext,
     releaseId: string,
     status: ReleaseStatus,
-    expectedVersion: number,
+    expectedVersion: string,
   ): Promise<ConfigRelease> {
     return this.releases.update(context, releaseId, status, expectedVersion);
   }

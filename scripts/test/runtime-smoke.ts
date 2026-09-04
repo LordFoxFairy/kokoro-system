@@ -10,6 +10,7 @@ import {
   SystemSdkError,
   type RuntimeManifest,
 } from "../../sdk/typescript/src/client.js";
+import { runtimeManifestCacheKey } from "../../src/infrastructure/redis/runtime-manifest-cache-key.js";
 
 const tenantA = "00000000-0000-4000-8000-0000000000a1";
 const tenantB = "00000000-0000-4000-8000-0000000000b1";
@@ -130,7 +131,7 @@ async function seed(databaseUrl: string): Promise<void> {
         locale: string | null;
         configKey: string;
         value: unknown;
-        version: number;
+        version: string;
         releaseId: string | null;
       }>,
     ): Promise<void> => {
@@ -207,7 +208,7 @@ async function seed(databaseUrl: string): Promise<void> {
       locale: null,
       configKey: "default",
       value: { source: "global" },
-      version: 1,
+      version: "1",
       releaseId: null,
     });
     await insertRecord({
@@ -220,7 +221,7 @@ async function seed(databaseUrl: string): Promise<void> {
       locale: "en-US",
       configKey: "default",
       value: { source: "tenant-a" },
-      version: 2,
+      version: "2",
       releaseId: null,
     });
     await insertRecord({
@@ -233,7 +234,7 @@ async function seed(databaseUrl: string): Promise<void> {
       locale: "en-US",
       configKey: "version-nine",
       value: { enabled: true },
-      version: 9,
+      version: "9",
       releaseId: null,
     });
     await insertRecord({
@@ -246,7 +247,7 @@ async function seed(databaseUrl: string): Promise<void> {
       locale: "en-US",
       configKey: "version-ten",
       value: { enabled: true },
-      version: 10,
+      version: "9007199254740993",
       releaseId: null,
     });
     await insertRecord({
@@ -259,7 +260,7 @@ async function seed(databaseUrl: string): Promise<void> {
       locale: "en-US",
       configKey: "default",
       value: { source: "tenant-b" },
-      version: 2,
+      version: "2",
       releaseId: null,
     });
     await insertRecord({
@@ -272,7 +273,7 @@ async function seed(databaseUrl: string): Promise<void> {
       locale: "en-US",
       configKey: "default",
       value: { source: "surface-a" },
-      version: 3,
+      version: "3",
       releaseId,
     });
     await insertRecord({
@@ -285,7 +286,7 @@ async function seed(databaseUrl: string): Promise<void> {
       locale: "en-US",
       configKey: "main",
       value: [{ label: "Dashboard", href: "/" }],
-      version: 4,
+      version: "4",
       releaseId,
     });
   } finally {
@@ -396,7 +397,10 @@ async function main(): Promise<void> {
       "draft release binding did not fail closed",
     );
     assert(draftCached.digest === draftSurface.digest, "draft cache changed");
-    assert(draftTenant.configVersion === "10", "BIGINT version order failed");
+    assert(
+      draftTenant.configVersion === "9007199254740993",
+      "BIGINT version precision failed",
+    );
 
     await transitionRelease(system.url, "validate");
     const validatedCached = await a.getRuntimeManifest({
@@ -409,7 +413,13 @@ async function main(): Promise<void> {
       "validated release became visible before publication",
     );
     await transitionRelease(system.url, "publish");
-    const tenantBCacheKey = `${redisNamespace}:manifest:${tenantB}:${productKey}:en-US:default`;
+    const tenantBCacheKey = runtimeManifestCacheKey(redisNamespace, {
+      tenantId: tenantB,
+      productId: productKey,
+      locale: "en-US",
+      surfaceId: null,
+      generation: "0",
+    });
     assert(
       (await redis.exists(tenantBCacheKey)) === 1,
       "tenant publication invalidated another tenant cache",
@@ -505,7 +515,13 @@ async function main(): Promise<void> {
       "System Site/Host mismatch",
     );
     await runtime.redis.set(
-      `manifest:${tenantA}:${productKey}:en-US:default`,
+      {
+        tenantId: tenantA,
+        productId: productKey,
+        locale: "en-US",
+        surfaceId: null,
+        generation: "2",
+      },
       { ...tenantOnly, tenantId: tenantB },
       30,
     );
@@ -532,11 +548,11 @@ async function main(): Promise<void> {
     await system.close();
     await runtime.pool.close();
     await runtime.redis.close();
-    await redis.del(
-      `${redisNamespace}:manifest:${tenantA}:${productKey}:en-US:surface-a`,
-      `${redisNamespace}:manifest:${tenantA}:${productKey}:en-US:default`,
-      `${redisNamespace}:manifest:${tenantB}:${productKey}:en-US:default`,
-    );
+    for await (const keys of redis.scanIterator({
+      MATCH: `${redisNamespace}:*`,
+      COUNT: 100,
+    }))
+      if (keys.length > 0) await redis.del(keys);
     await redis.quit();
     await database.drop();
   }

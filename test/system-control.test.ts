@@ -138,7 +138,7 @@ describe("SystemControlService", () => {
       context("tenant-a"),
       site.id,
       {
-        version: 1,
+        version: "1",
         status: "active",
         defaultLocale: "en-US",
         allowedLocales: ["en-US"],
@@ -149,7 +149,7 @@ describe("SystemControlService", () => {
     );
     await expect(
       service.getPolicy(context("tenant-a"), site.id),
-    ).resolves.toMatchObject({ version: 1, defaultLocale: "en-US" });
+    ).resolves.toMatchObject({ version: "1", defaultLocale: "en-US" });
     await expect(
       service.getPolicy(context("tenant-b"), site.id),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -171,6 +171,92 @@ describe("SystemControlService", () => {
     await expect(
       service.listConfigs(context("tenant-b"), {}),
     ).resolves.toMatchObject({ items: [] });
-    expect(policy.version).toBe(1);
+    expect(policy.version).toBe("1");
+  });
+
+  it("only writes config into a same-tenant draft or validated release", async () => {
+    const service = createService();
+    const draft = await service.createRelease(
+      context("tenant-a"),
+      { releaseKey: "draft", digest: "a".repeat(64) },
+      "create-draft",
+    );
+    const config = (releaseId: string) => ({
+      moduleKey: "theme",
+      configKey: `config-${releaseId}`,
+      scopeType: "tenant" as const,
+      scopeId: "tenant-a",
+      productId: null,
+      locale: "en-US",
+      value: { mode: "dark" },
+      schemaVersion: 1,
+      releaseId,
+    });
+    const writeContext = context("tenant-a", ["system:write"]);
+
+    await expect(
+      service.upsertConfig(writeContext, config(draft.id), "write-draft"),
+    ).resolves.toMatchObject({ releaseId: draft.id, configVersion: "1" });
+    await service.validateRelease(
+      context("tenant-a"),
+      draft.id,
+      "validate-draft",
+    );
+    await expect(
+      service.upsertConfig(
+        writeContext,
+        { ...config(draft.id), configKey: "validated" },
+        "write-validated",
+      ),
+    ).resolves.toMatchObject({ releaseId: draft.id });
+    await service.publishRelease(
+      context("tenant-a"),
+      draft.id,
+      "publish-draft",
+    );
+    await expect(
+      service.upsertConfig(
+        writeContext,
+        { ...config(draft.id), configKey: "published" },
+        "write-published",
+      ),
+    ).rejects.toMatchObject({
+      code: "INVALID_STATE",
+      status: 400,
+      message: "release is not writable",
+    });
+    await service.retireRelease(
+      context("tenant-a"),
+      draft.id,
+      "retire-draft",
+    );
+    await expect(
+      service.upsertConfig(
+        writeContext,
+        { ...config(draft.id), configKey: "retired" },
+        "write-retired",
+      ),
+    ).rejects.toMatchObject({
+      code: "INVALID_STATE",
+      status: 400,
+      message: "release is not writable",
+    });
+
+    const foreign = await service.createRelease(
+      context("tenant-b"),
+      { releaseKey: "foreign", digest: "b".repeat(64) },
+      "create-foreign",
+    );
+    await expect(
+      service.upsertConfig(
+        writeContext,
+        { ...config(foreign.id), configKey: "foreign" },
+        "write-foreign",
+      ),
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      status: 404,
+      message: "release not found",
+    });
   });
 });
