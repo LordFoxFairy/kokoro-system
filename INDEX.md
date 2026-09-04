@@ -16,7 +16,7 @@ domain -> no HTTP, PostgreSQL, Redis, generated wire or Node runtime imports
 
 | 路径 | 当前职责 |
 |---|---|
-| `src/domain/runtime-manifest/models/` | Tenant request context、config record 与 manifest 领域数据 |
+| `src/domain/runtime-manifest/models/` | Tenant request context、scope 与唯一 Runtime Manifest 领域模型 |
 | `src/domain/runtime-manifest/services/` | Host 规范化纯规则 |
 | `src/domain/system/models/` | Site、Workspace、Policy、Config、Release 与 Site resolution 模型 |
 | `src/domain/system/enums/` | 有限状态与 config scope 类型 |
@@ -46,14 +46,14 @@ domain -> no HTTP, PostgreSQL, Redis, generated wire or Node runtime imports
 |---|---|
 | `contract/openapi/system.openapi.json` | HTTP OpenAPI 3.1 machine contract 与 operation governance metadata |
 | `contract/proto/kokoro/site/v1/site.proto` | SiteService Connect RPC source |
-| `contract/provenance.json` | Proto source file digest inventory；覆盖范围和缺口见 `contract/README.md` |
+| `contract/provenance.json` | Proto/OpenAPI/generated digest、V1 fresh-cutover classification 与 consumer inventory |
 | `database/schema.sql` | 唯一 V1 canonical schema；无 migration、无 foreign key |
 | `scripts/apply-schema.ts` | advisory-lock 下向空 database 安装 canonical schema |
 | `scripts/verify-openapi-contract.ts` | OpenAPI version/path/governance metadata gate |
 | `scripts/verify-contract-provenance.ts` | Proto source digest drift gate |
 | `sdk/typescript/src/` | 手写 server-only Runtime Manifest client；不是 OpenAPI generated SDK |
 | `test/architecture/`、`test/contract/` | 分层、文档拓扑、contract owner/provenance/generated drift 与 CI/release 门禁 |
-| `test/integration/` | 随机 PostgreSQL schema/Redis namespace 下的 cache fence、release write guard 与 BIGINT 真实验证 |
+| `test/integration/` | 随机 PostgreSQL schema/Redis namespace 下的真实 SET fence、双连接 release/config lock 与 BIGINT 验证 |
 | `scripts/test/` | PostgreSQL/Redis/runtime/production-image smoke 与幂等并发验证 |
 
 ## HTTP 与 RPC surface

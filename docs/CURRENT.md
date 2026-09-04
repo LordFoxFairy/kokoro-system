@@ -32,9 +32,9 @@
 | Service auth | `x-kokoro-service: web-bff` + internal secret 或 Bearer；常量时间 token 比较；业务 route fail closed | `src/interfaces/http/service-auth.ts`、HTTP/RPC tests |
 | Tenant/Host | Manifest 和 SiteService 在本仓按 active `tenant_id + normalized hostname` 解析 Site | `postgres-site-host-resolver.ts`、tenant/Connect tests |
 | Permission | Control reads=`system:read`；普通 mutation=`system:write`；release transition=`system:publish`；global config 还要求 publish | `system-control.service.ts` |
-| Idempotency | tenant + key receipt、request hash、row lock、mutation 与 response completion 同事务 | `receipt-repository.ts`、PostgreSQL concurrency script |
+| Idempotency | tenant + key receipt；digest 基于 operation 与 canonical wire command，不含数据库/合成 version；row lock、mutation 与 response completion 同事务 | `system-control.service.ts`、receipt/replay tests、PostgreSQL concurrency script |
 | Release state | `draft -> validated -> published -> retired`，基于 version 更新；Manifest 只解析 active binding 指向的同 tenant published release；publish/retire 后按 tenant 失效缓存 | application/repository/real runtime tests |
-| Boundary decoding | Redis cache 与 PostgreSQL rows 从 `unknown` 做运行时 shape/enum/time 解码 | value/cache decoder tests |
+| Boundary decoding | Redis cache、SDK response 与 PostgreSQL rows 从 `unknown` 做运行时 shape/enum/time/decimal 解码 | value/cache/SDK decoder tests |
 | Availability gate | `/readyz` 同时 ping PostgreSQL/Redis；镜像 HEALTHCHECK 使用 readiness | bootstrap、Dockerfile、smoke tests |
 | Shutdown | SIGINT/SIGTERM 并发关闭 HTTP/PostgreSQL/Redis，默认总 deadline 10 秒 | `shutdown.ts`、tests |
 | Supply chain | Action SHA 固定、fs/image 阻断扫描、候选镜像 smoke、SBOM/provenance/attestation 配置 | `.github/workflows/` |
@@ -64,6 +64,12 @@
   tenant 返回 `NOT_FOUND`。
 - Manifest 与 control-plane 的 PostgreSQL `BIGINT` 值全部以十进制字符串穿过 row/domain/receipt/HTTP；数值比较和递增使用
   `BigInt`/数据库算术，不经过 JavaScript `number`。
+- Mutation digest 包含稳定 operation 与 canonicalized wire payload；Policy 的 status/version 由 repository 产生，不进入 command
+  DTO 或 digest。相同 command 可在数据库状态变化后重放原 durable response。
+- 真实 Redis 测试在旧 generation `SET` 完成后、写后 fence 前建立 barrier，并证明 publish/retire 后的旧 key 被删除；真实
+  PostgreSQL 测试使用两个 backend PID 和 `pg_blocking_pids` 验证 Config 与 publish/retire 共用 release row lock。
+- BIGINT integer-to-decimal-string 被明确分类为无已发布 baseline 的 `v1-fresh-cutover`；OpenAPI、Proto source、generated output
+  digest 与消费者盘点记录在 `contract/provenance.json` 和 `contract/README.md`。
 
 完成证据必须来自当前 committed tree 上重新执行 [`ACCEPTANCE.md`](ACCEPTANCE.md) 的命令；本文不固化会过期的
 “全绿”自报。
@@ -99,8 +105,8 @@
 
 1. OpenAPI 尚未完整声明实现读取的 `Forwarded`/Host、actor、organization、permissions、trace headers；其
    `x-kokoro-request-id` 声明 UUID，但服务端接受任意非空字符串。
-2. OpenAPI breaking comparison、generated artifact digest/source commit、OpenAPI provenance 尚未自动化；
-   `contract/provenance.json` 当前只验证 proto source digest。
+2. OpenAPI semantic breaking comparison 与已发布 artifact/source-commit provenance 尚未自动化；当前 gate 已校验 OpenAPI、Proto
+   source、generated output digest 和本次 V1 fresh-cutover classification，但尚无发布 registry baseline。
 3. TypeScript SDK 是手写且只覆盖 Runtime Manifest；`workloadToken` compatibility alias 仍在 SDK public options。
 4. `src/interfaces/http/server.ts` 超过 400 行评审线，需按 context/header/body/router/error mapping 职责拆分；
    本阶段不触碰 runtime。

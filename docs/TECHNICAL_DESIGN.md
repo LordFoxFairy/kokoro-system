@@ -85,9 +85,10 @@ service auth
 -> COMMIT
 ```
 
-Receipt key space 是整个 tenant，不包含 operation name。相同 tenant/key/hash 重放已保存的 domain result；相同 key 不同
-hash 返回 409。Operation 抛错时整个事务回滚，不留下成功 response。PostgreSQL 并发脚本验证同 key 的两个并发 Site
-命令只生成一个 Site、Host 与 completed receipt。
+Receipt key space 是整个 tenant。Request digest 包含受信 operation name 与递归 key-sorted wire payload；path identity 和
+transition target 属于 payload，数据库当前 version 与 repository 合成字段不属于 payload。相同 tenant/key/hash 即使数据库
+状态随后变化也重放已保存的 domain result；相同 key 不同 hash 返回 409。Operation 抛错时整个事务回滚，不留下成功
+response。PostgreSQL 并发脚本验证同 key 的两个并发 Site 命令只生成一个 Site、Host 与 completed receipt。
 
 普通 mutation 需要 `system:write`；release transition 需要 `system:publish`；global config upsert 先要求 write，再额外要求
 publish。Site 创建把 Site 与初始 Host 放在同一事务；Workspace/Policy 先按 tenant 检查 Site。Config upsert 若携带
@@ -141,8 +142,9 @@ Contract generation、breaking 与 provenance 的当前能力/缺口见 [`../con
 
 - Vitest 覆盖 domain/application、HTTP/Connect、tenant isolation、boundary decoder、failure recovery、shutdown、
   architecture 与 contract source。
-- 真实 PostgreSQL/Redis integration 覆盖 publish/retire 期间并发旧回填、旧部署 namespace 重启、冒号 tenant 精确失效、
-  null/literal-default surface 分隔、release 可写状态与 `9007199254740993` 边界。
+- 真实 PostgreSQL/Redis integration 覆盖 cleanup 后真实 Redis `SET` 到写后 generation fence 的 barrier、旧部署 namespace
+  重启、冒号 tenant 精确失效、null/literal-default surface 分隔，以及两个独立 PostgreSQL backend 的 Config-first、
+  publish-first、retire-first row-lock 顺序与 `9007199254740993` 边界。
 - PostgreSQL concurrency script 覆盖真实 row lock/receipt；runtime smoke 创建隔离 database、复用共享 Redis namespace，
   验证 listener/SDK/Site Host/precedence/cache isolation、draft/retired/foreign-tenant release fail-closed、publish/retire
   cache invalidation 与 BIGINT version 顺序。
@@ -157,4 +159,4 @@ Contract generation、breaking 与 provenance 的当前能力/缺口见 [`../con
 2. 为 Config relationship/schema validation 写失败测试并补事务不变量。
 3. 拆分超过 400 行的 HTTP server，同时保持 wire 行为不变。
 4. 增加 bounded inbound timeout/streaming size guard、Redis command deadline、metrics/tracing 与 production alert artifacts。
-5. 自动化 OpenAPI breaking comparison、全 contract/generated provenance 与 consumer artifact 发布。
+5. 首次 V1 发布后自动化 OpenAPI breaking comparison、source-commit/artifact provenance 与 consumer matrix。

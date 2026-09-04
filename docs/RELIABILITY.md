@@ -62,6 +62,9 @@ Receipt claim、hash compare、aggregate mutation、serialized response completi
 `FOR UPDATE` lock。Transaction 中任一步失败都会 rollback。Completed replay 先从 JSONB 解码成对应 domain shape，
 异常数据 fail closed。
 
+Request digest 由受信 operation 与 canonical wire command 组成；object key 递归排序，array 顺序保留。数据库当前 version、
+Policy repository 生成的 status/version 和其他读取时状态不进入 digest，因此同一命令在状态推进后仍可重放原 response。
+
 Release publish/retire 在 receipt/release PostgreSQL transaction 内推进 tenant manifest generation，commit 后执行 tenant-scoped
 Redis cleanup。cleanup 失败会让 command 返回 dependency failure；由于 receipt 与 generation 已完成，调用方以同一
 idempotency key 重试时会 replay release result 并再次清理，而不会重复转换状态或 generation。
@@ -70,7 +73,6 @@ idempotency key 重试时会 replay release result 并再次清理，而不会�
 
 - 不同 key 对同一 natural identity 的全部并发组合；
 - process crash/connection loss 的每个 PostgreSQL commit 边界；
-- operation name 未进入 hash 的跨 operation key reuse；
 - receipt retention、归档或长期 replay compatibility。
 
 ## 6. Cache consistency
@@ -136,7 +138,7 @@ unexpected error 只记录 error class name，不泄漏原 payload/credential。
 | `pnpm test` | unit/transport/architecture/contract source、Redis/PostgreSQL decoder、simulated recovery/shutdown |
 | `pnpm test:postgres-concurrency` | 真实 PostgreSQL receipt lock/atomicity |
 | `pnpm test:runtime-smoke` | 隔离 database + 共享 Redis；listener/SDK/tenant/precedence/release visibility/cache invalidation/BIGINT version/errors |
-| `test/integration/*consistency.test.ts` | 真实 PostgreSQL/Redis generation fence、旧 namespace、编码隔离、release write lock 与 BIGINT 边界 |
+| `pnpm test:real-consistency` | 真实 Redis SET/post-write fence、旧 namespace、编码隔离，以及两个独立 PostgreSQL backend 的 release/config row-lock 与 BIGINT 边界 |
 | `pnpm test:runtime-real-system` | canonical schema + System Site/Host + Manifest + Connect |
 | image smoke | production image non-root entry、health/readiness against dependencies |
 

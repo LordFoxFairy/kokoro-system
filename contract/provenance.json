@@ -1,12 +1,57 @@
 {
-  "authority": "local contract/proto",
+  "authority": "local contract sources",
   "source": "contract/proto",
-  "version": 1,
+  "version": 2,
   "files": [
     "kokoro/site/v1/site.proto"
   ],
   "protoSha256": {
     "kokoro/site/v1/site.proto": "e0a4c42cbf5403eddee62af2c40dfb1c055fa1153a0f3f2db79d5f591ad0cc2a"
   },
-  "combinedSha256": "e0a4c42cbf5403eddee62af2c40dfb1c055fa1153a0f3f2db79d5f591ad0cc2a"
+  "combinedSha256": "e0a4c42cbf5403eddee62af2c40dfb1c055fa1153a0f3f2db79d5f591ad0cc2a",
+  "openapi": {
+    "file": "openapi/system.openapi.json",
+    "sha256": "a1b6ec7e2458b6c64d285cb532f664bdc47322eacb7a5309015ae8d839e8faac"
+  },
+  "generated": {
+    "source": "contract/proto",
+    "output": "src/generated/proto",
+    "files": [
+      "kokoro/site/v1/site_pb.ts"
+    ],
+    "sha256": {
+      "kokoro/site/v1/site_pb.ts": "f6547c8cdc2a74fbecdfe59895a5a347ef2b0e1a2f765db8b0c4e2c2f08e8c23"
+    },
+    "combinedSha256": "f6547c8cdc2a74fbecdfe59895a5a347ef2b0e1a2f765db8b0c4e2c2f08e8c23"
+  },
+  "releaseClassification": {
+    "contractVersion": "1.0.0",
+    "httpRouteGeneration": "v1",
+    "baseline": "none-unpublished",
+    "classification": "v1-fresh-cutover",
+    "change": "http-bigint-integer-to-canonical-decimal-string",
+    "publishedCompatibilityRequired": false
+  },
+  "consumers": [
+    {
+      "consumer": "kokoro-system-typescript-sdk",
+      "surface": "runtime-manifest",
+      "disposition": "updated-and-tested"
+    },
+    {
+      "consumer": "kokoro-bff",
+      "surface": "runtime-manifest",
+      "disposition": "current-decimal-string-path-compatible"
+    },
+    {
+      "consumer": "control-plane-service-callers",
+      "surface": "system-control-http",
+      "disposition": "generate-from-final-v1-before-first-release"
+    },
+    {
+      "consumer": "site-service-callers",
+      "surface": "kokoro.site.v1",
+      "disposition": "protobuf-wire-unchanged"
+    }
+  ]
 }

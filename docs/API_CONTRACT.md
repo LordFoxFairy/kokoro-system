@@ -185,8 +185,10 @@ Response：
 
 ## 8. Idempotency 与并发
 
-Mutation 的 key space 是 `(tenant_id, idempotency_key)`，跨所有 operation 共用。Request hash 当前基于 application input
-的 `JSON.stringify`，未包含 operation name；调用方必须为每个逻辑 command 生成 tenant 内全局唯一 key。
+Mutation 的 key space 是 `(tenant_id, idempotency_key)`，跨所有 operation 共用。Request digest 对
+`{ operation, payload }` 做递归 key 排序后计算 SHA-256：operation 是受信 application 语义，payload 只包含规范化 wire body、
+path identity 与 transition target，不包含数据库当前 version 或 Policy 的合成 status/version。JSON object field 顺序不改变
+digest；array 顺序保持业务语义。调用方仍须为每个逻辑 command 生成 tenant 内全局唯一 key。
 
 - 同 tenant/key/hash：返回首次 durable response；
 - 同 tenant/key、不同 hash：`409 IDEMPOTENCY_KEY_REUSED`；
@@ -225,4 +227,6 @@ Connect/protobuf 映射；以 proto 为准。
   production callback 当前在依赖失败时通常抛错。
 - Server 没有由 OpenAPI 自动生成的 runtime validator；tests 只覆盖已列举 shape。
 - TypeScript SDK 手写且只覆盖 Runtime Manifest；没有 control-plane generated client。
-- OpenAPI breaking diff 和完整 provenance 未自动化。详见 [`../contract/README.md`](../contract/README.md)。
+- 首次发布后的 OpenAPI semantic breaking baseline、source-commit/published-artifact provenance 与自动 consumer matrix 尚未
+  自动化；当前 V1 fresh-cutover classification 和 source/generated digest 已进入 contract gate。详见
+  [`../contract/README.md`](../contract/README.md)。

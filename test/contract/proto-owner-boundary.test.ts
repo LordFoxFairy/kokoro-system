@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 
 const root = resolve(import.meta.dirname, "../..");
 const protoRoot = resolve(root, "contract/proto");
+const openapiPath = resolve(root, "contract/openapi/system.openapi.json");
 const generatedRoot = resolve(root, "src/generated/proto");
 
 function posixRelative(base: string, path: string): string {
@@ -123,6 +124,91 @@ describe("System protobuf owner boundary", () => {
       combined.update(content);
     }
     expect(provenance.combinedSha256).toBe(combined.digest("hex"));
+  });
+
+  it("records the V1 fresh-cutover classification and every contract artifact digest", async () => {
+    const parsed: unknown = JSON.parse(
+      await readFile(resolve(root, "contract/provenance.json"), "utf8"),
+    );
+    const provenance = record(parsed, "provenance");
+    expect(provenance.authority).toBe("local contract sources");
+    expect(provenance.version).toBe(2);
+
+    const openapi = record(provenance.openapi, "provenance.openapi");
+    expect(openapi.file).toBe("openapi/system.openapi.json");
+    expect(openapi.sha256).toBe(
+      createHash("sha256").update(await readFile(openapiPath)).digest("hex"),
+    );
+
+    const generated = record(provenance.generated, "provenance.generated");
+    const generatedPaths = (await files(generatedRoot, ".ts")).map((path) =>
+      posixRelative(generatedRoot, path),
+    );
+    const generatedDigests = record(
+      generated.sha256,
+      "provenance.generated.sha256",
+    );
+    expect(generated.source).toBe("contract/proto");
+    expect(generated.output).toBe("src/generated/proto");
+    expect(stringArray(generated.files, "provenance.generated.files")).toEqual(
+      generatedPaths,
+    );
+    expect(Object.keys(generatedDigests).sort()).toEqual(generatedPaths);
+    const generatedCombined = createHash("sha256");
+    for (const path of generatedPaths) {
+      const content = await readFile(resolve(generatedRoot, path));
+      expect(
+        stringValue(
+          generatedDigests[path],
+          `provenance.generated.sha256.${path}`,
+        ),
+      ).toBe(createHash("sha256").update(content).digest("hex"));
+      generatedCombined.update(content);
+    }
+    expect(generated.combinedSha256).toBe(generatedCombined.digest("hex"));
+
+    const classification = record(
+      provenance.releaseClassification,
+      "provenance.releaseClassification",
+    );
+    expect(classification).toEqual({
+      contractVersion: "1.0.0",
+      httpRouteGeneration: "v1",
+      baseline: "none-unpublished",
+      classification: "v1-fresh-cutover",
+      change: "http-bigint-integer-to-canonical-decimal-string",
+      publishedCompatibilityRequired: false,
+    });
+    const openapiDocument = record(
+      JSON.parse(await readFile(openapiPath, "utf8")),
+      "OpenAPI document",
+    );
+    expect(record(openapiDocument.info, "OpenAPI info").version).toBe(
+      classification.contractVersion,
+    );
+
+    expect(provenance.consumers).toEqual([
+      {
+        consumer: "kokoro-system-typescript-sdk",
+        surface: "runtime-manifest",
+        disposition: "updated-and-tested",
+      },
+      {
+        consumer: "kokoro-bff",
+        surface: "runtime-manifest",
+        disposition: "current-decimal-string-path-compatible",
+      },
+      {
+        consumer: "control-plane-service-callers",
+        surface: "system-control-http",
+        disposition: "generate-from-final-v1-before-first-release",
+      },
+      {
+        consumer: "site-service-callers",
+        surface: "kokoro.site.v1",
+        disposition: "protobuf-wire-unchanged",
+      },
+    ]);
   });
 
   it("keeps checked-in generated bindings byte-identical to canonical generation", async () => {

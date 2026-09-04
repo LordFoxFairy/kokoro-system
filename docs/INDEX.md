@@ -30,7 +30,7 @@
 |---|---|---|
 | HTTP 字段、路径、响应 | `../contract/openapi/system.openapi.json` | OpenAPI 3.1；operation metadata 也在此处 |
 | Connect RPC message/service | `../contract/proto/` | 由 Buf/protoc 生成 TypeScript descriptor |
-| Proto source digest | `../contract/provenance.json` | 当前只覆盖 proto；限制见 `../contract/README.md` |
+| Contract provenance/classification | `../contract/provenance.json` | Proto/OpenAPI/generated digest、V1 fresh-cutover 与 consumer inventory；发布 provenance 限制见 `../contract/README.md` |
 | 数据库表与约束 | `../database/schema.sql` | V1 canonical schema；文档不复制为可执行 SQL |
 | 当前运行行为 | `../src/` + `../test/` | 文档与实现冲突时先登记缺口，再由 owner 收敛 |
 | 跨仓 owner/依赖规则 | Root `AGENTS.md` 与 `docs/ARCHITECTURE_STANDARD.md` | Root 不拥有本仓 wire source |

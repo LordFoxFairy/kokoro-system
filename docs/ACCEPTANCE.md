@@ -25,7 +25,7 @@
 | SYS-04 | runtime/control/Connect 要求 BFF service auth，probe 公开 | HTTP/Connect tests |
 | SYS-05 | read/write/publish permission 边界 | system-control + HTTP control tests |
 | SYS-06 | JSON 未声明字段、错误类型、缺 header/query、非法 cursor 被拒绝 | HTTP control/server tests |
-| SYS-07 | 同 key/hash replay，同 key不同 hash 409 | system-control + PostgreSQL concurrency |
+| SYS-07 | Digest 使用 operation + canonical wire command，不含当前/合成 version；同 key/hash 跨状态 replay，同 key不同 hash 409 | system-control + PostgreSQL concurrency |
 | SYS-08 | 同 key 并发只产生一条 Site/Host/receipt | `pnpm test:postgres-concurrency` |
 | SYS-09 | release 只按 draft->validated->published->retired 前进 | system-control tests |
 | SYS-10 | Config precedence：surface/tenant/product/global、locale、release、version | postgres repository + runtime smoke |
@@ -38,9 +38,9 @@
 | SYS-17 | Manifest 只解析 active binding 指向的同 tenant published release；draft/retired/foreign tenant fail closed | postgres repository + real runtime smoke |
 | SYS-18 | publish/retire 后按 tenant 失效 cache，失效失败可用同 key replay 重试 | runtime-manifest + real runtime smoke |
 | SYS-19 | Manifest `config_version` 按 BIGINT 数值语义求最大值 | postgres repository + real runtime smoke |
-| SYS-20 | publish/retire 与 durable tenant generation 同事务；并发旧回填被 fence 删除并重读 | release repository + real PostgreSQL/Redis consistency tests |
+| SYS-20 | publish/retire 与 durable tenant generation 同事务；真实 Redis `SET` 在 cleanup 后完成且停于二次检查前时，旧回填被 fence 删除并重读 | release repository + real PostgreSQL/Redis consistency tests |
 | SYS-21 | 旧 deployment namespace/restart 不命中旧 generation；冒号 tenant 精确失效，null surface 与字符串 `default` 不碰撞 | Redis key unit + real consistency tests |
-| SYS-22 | Config release 以 tenant 锁行且仅 draft/validated 可写；published/retired/foreign tenant 使用稳定错误 | config repository/application/HTTP + real consistency tests |
+| SYS-22 | Config release 以 tenant 锁行且仅 draft/validated 可写；两个独立 PG backend 对 Config-first、publish-first、retire-first 均观测真实 row-lock wait | config repository/application/HTTP + real consistency tests |
 | SYS-23 | 所有 control-plane BIGINT 以十进制字符串穿过 DB/domain/receipt/HTTP，覆盖 9007199254740993 与递增顺序 | boundary/contract/repository + real consistency tests |
 
 ## 3. Contract acceptance
@@ -60,11 +60,13 @@ pnpm contract:check
   `config_version` 允许字符串 `0`；
 - 13 个 direct/reusable operation definition 的治理 metadata；
 - Buf lint；
-- proto source inventory/digest 与 `contract/provenance.json` 一致，且不声明 `kokoro.common.v1`；
-- `src/generated/proto/` 只由 generator 产生，并与隔离重生成结果逐字节一致。
+- Proto source、OpenAPI source 与 generated output inventory/digest 均与 `contract/provenance.json` 一致，且不声明
+  `kokoro.common.v1`；
+- `src/generated/proto/` 只由 generator 产生，并与隔离重生成结果逐字节一致；
+- `v1-fresh-cutover` 明确记录无 published baseline、integer-to-decimal-string 分类与消费者 disposition，不创建虚构 V2。
 
-**未自动证明**：OpenAPI semantic breaking diff、proto 对固定上一版本的 `buf breaking`、OpenAPI/generated digest、source
-commit provenance、发布后的 consumer compatibility。详见 [`../contract/README.md`](../contract/README.md)。
+**未自动证明**：OpenAPI semantic breaking diff、proto 对固定上一发布版本的 `buf breaking`、source commit/发布 artifact
+provenance，以及首次发布后的自动 consumer matrix。详见 [`../contract/README.md`](../contract/README.md)。
 
 ## 4. Real-infrastructure prerequisites
 
@@ -153,5 +155,5 @@ digest、scanner result、SBOM/attestation 和 smoke output。
 - Config product-reference/schema validation、不同 key 并发唯一性、Policy enforcement；
 - 生产 TLS/network policy/secret rotation、rate limit、capacity/load/failover/restore exercise；
 - metrics/traces/dashboard/alerts 与 30 天 SLI/SLO；
-- OpenAPI breaking/provenance/consumer artifact 自动化；
+- 首次发布后的 OpenAPI breaking baseline、artifact provenance 与 consumer matrix 自动化；
 - `server.ts` 400 行评审项与 SDK compatibility alias 清理。

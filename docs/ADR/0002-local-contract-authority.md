@@ -14,7 +14,8 @@ Root 只拥有拓扑与治理。如果 Root、System 和 consumer 各维护一�
 1. `contract/openapi/system.openapi.json` 是 System HTTP machine source；`contract/proto/` 是 System protobuf source。
 2. 每个 OpenAPI operation 声明 owner、visibility、stability、idempotency 与 permission metadata。
 3. `src/generated/proto/` 只由本仓 Buf/protoc generation 产生，禁止手改；application 不依赖 generated wire type。
-4. `contract/provenance.json` 验证本地 proto source digest；consumer 依赖版本固定的 artifact/commit/digest，不复制可编辑 source。
+4. `contract/provenance.json` 验证本地 Proto/OpenAPI source 与 generated output digest，并记录 release classification/consumer
+   disposition；consumer 依赖版本固定的 artifact/commit/digest，不复制可编辑 source。
 5. Root Developer API 门户不发布 System internal-owner contract，也不成为其字段事实源。
 6. Breaking change 必须先改 owner contract、执行 lint/breaking review/generation/provenance/tests，再更新实现与 consumer。
 
@@ -24,8 +25,9 @@ Root 只拥有拓扑与治理。如果 Root、System 和 consumer 各维护一�
 - OpenAPI 与 proto 有独立版本语义，但都由 System owner 发布。
 - System Proto 只保留运行时使用的 `kokoro.site.v1`；owner gate 拒绝重新声明 `kokoro.common.v1`，不复制 IAM、BFF
   或 Agent DTO。
-- 当前 provenance 只覆盖 proto source，OpenAPI breaking diff、generated digest/source commit 尚未自动化；这些是记录在
-  `../../contract/README.md` 的缺口，不被 ADR 文字视为已实现。
+- 当前 provenance 已覆盖 Proto/OpenAPI source、generated output 与 V1 fresh-cutover classification；首次发布后的 OpenAPI
+  semantic breaking baseline、source commit/published artifact provenance 与自动 consumer matrix 仍是
+  `../../contract/README.md` 记录的缺口，不被 ADR 文字视为已实现。
 - 手写 TypeScript Runtime Manifest SDK 是 consumer adapter，不是第二份 schema authority。
 
 ## Alternatives rejected
