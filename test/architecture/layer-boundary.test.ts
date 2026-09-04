@@ -164,6 +164,18 @@ describe("System layer architecture", () => {
     ).toBe(true);
   });
 
+  it("keeps one runtime manifest model and no obsolete public ConfigRecord", () => {
+    expect(
+      existsSync(
+        resolve(root, "src/domain/runtime-manifest/models/config-record.ts"),
+      ),
+    ).toBe(false);
+    expect(
+      source(resolve(root, "src/domain/runtime-manifest/models/index.ts")),
+    ).not.toContain("ConfigRecord");
+    expect(source(resolve(root, "src/index.ts"))).not.toContain("ConfigRecord");
+  });
+
   it("keeps one exact-case delivery documentation set and local contract provenance", () => {
     const missing = requiredDeliveryPaths.filter(
       (path) => !hasExactRelativePath(path),

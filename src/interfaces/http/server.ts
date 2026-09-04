@@ -11,6 +11,7 @@ import type {
   ConfigInput,
   ReleaseInput,
   SiteInput,
+  SitePolicyInput,
   WorkspaceInput,
 } from "../../application/system/dto/index.js";
 import type { SystemControlService } from "../../application/system/services/system-control.service.js";
@@ -411,9 +412,7 @@ export function createHttpServer(
           "allowed_products",
           "public_manifest",
         ]);
-        const value = {
-          version: "1",
-          status: "active" as const,
+        const value: SitePolicyInput = {
           defaultLocale: stringField(input, "default_locale"),
           allowedLocales: stringArray(input, "allowed_locales"),
           allowedProducts: stringArray(input, "allowed_products"),

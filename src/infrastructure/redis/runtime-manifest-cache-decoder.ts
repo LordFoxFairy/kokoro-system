@@ -17,6 +17,12 @@ function string(value: unknown): string {
   return value;
 }
 
+function unsignedDecimalString(value: unknown): string {
+  const result = string(value);
+  if (!/^(0|[1-9][0-9]*)$/u.test(result)) throw invalid();
+  return result;
+}
+
 function nullableString(value: unknown): string | null {
   if (value === null) return null;
   return string(value);
@@ -44,7 +50,7 @@ export function decodeRuntimeManifestCache(value: string): RuntimeManifest {
     theme: record(input.theme),
     featureFlags: array(input.featureFlags),
     references: array(input.references),
-    configVersion: string(input.configVersion),
+    configVersion: unsignedDecimalString(input.configVersion),
     releaseId: nullableString(input.releaseId),
     digest: string(input.digest),
   };

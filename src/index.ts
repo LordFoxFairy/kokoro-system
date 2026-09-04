@@ -2,7 +2,6 @@ export { RuntimeManifestService } from "./application/runtime-manifest/services/
 export type {
   RuntimeManifest,
   TenantRequestContext,
-  ConfigRecord,
 } from "./domain/runtime-manifest/models/index.js";
 export type {
   ManifestCache,
@@ -17,6 +16,7 @@ export type {
   PageRequest,
   ReleaseInput,
   SiteInput,
+  SitePolicyInput,
   WorkspaceInput,
 } from "./application/system/dto/index.js";
 export type {

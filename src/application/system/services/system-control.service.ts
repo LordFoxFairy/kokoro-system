@@ -14,6 +14,7 @@ import type {
   PageRequest,
   ReleaseInput,
   SiteInput,
+  SitePolicyInput,
   WorkspaceInput,
 } from "../dto/index.js";
 import type {
@@ -29,8 +30,22 @@ import {
   parseWorkspaceReceipt,
 } from "../mappers/receipt-result.js";
 
-function hash(value: unknown): string {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((entry) => canonicalize(entry));
+  if (typeof value !== "object" || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter((entry) => entry[1] !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => [key, canonicalize(entry)]),
+  );
+}
+
+function commandHash(operation: string, payload: unknown): string {
+  const command = canonicalize({ operation, payload });
+  return createHash("sha256")
+    .update(JSON.stringify(command))
+    .digest("hex");
 }
 function requirePermission(
   context: TenantRequestContext,
@@ -86,8 +101,13 @@ export class SystemControlService {
     validateText("site_key", input.siteKey);
     validateText("hostname", input.hostname);
     validateText("display_name", input.displayName);
-    return this.mutate(context, key, input, parseSiteReceipt, (repository) =>
-      repository.createSite(context, input),
+    return this.mutate(
+      context,
+      key,
+      "create_site",
+      input,
+      parseSiteReceipt,
+      (repository) => repository.createSite(context, input),
     );
   }
   public async listWorkspaces(
@@ -110,6 +130,7 @@ export class SystemControlService {
     return this.mutate(
       context,
       key,
+      "create_workspace",
       input,
       parseWorkspaceReceipt,
       (repository) => repository.createWorkspace(context, input),
@@ -128,13 +149,14 @@ export class SystemControlService {
   public async putPolicy(
     context: TenantRequestContext,
     siteId: string,
-    input: Omit<SitePolicy, "id" | "tenantId" | "siteId" | "updatedAt">,
+    input: SitePolicyInput,
     key: string,
   ): Promise<SitePolicy> {
     requirePermission(context, "system:write");
     return this.mutate(
       context,
       key,
+      "put_site_policy",
       { siteId, ...input },
       parsePolicyReceipt,
       (repository) => repository.putPolicy(context, siteId, input),
@@ -149,6 +171,7 @@ export class SystemControlService {
     return this.mutate(
       context,
       key,
+      "create_release",
       input,
       parseReleaseReceipt,
       (repository) => repository.createRelease(context, input),
@@ -181,6 +204,7 @@ export class SystemControlService {
     return this.mutate(
       context,
       key,
+      "upsert_config",
       input,
       parseConfigReceipt,
       (repository) => repository.upsertConfig(context, input),
@@ -221,6 +245,7 @@ export class SystemControlService {
     const release = await this.mutate(
       context,
       key,
+      "transition_release",
       command,
       parseReleaseReceipt,
       async (repository) => {
@@ -252,12 +277,13 @@ export class SystemControlService {
   private async mutate<T>(
     context: TenantRequestContext,
     key: string,
-    input: unknown,
+    commandName: string,
+    commandPayload: unknown,
     replay: (value: unknown) => T,
     operation: (repository: SystemControlDataRepository) => Promise<T>,
   ): Promise<T> {
     const idempotencyKey = requireKey(key);
-    const requestHash = hash(input);
+    const requestHash = commandHash(commandName, commandPayload);
     const result = await this.repository.executeIdempotent(
       context.tenantId,
       idempotencyKey,

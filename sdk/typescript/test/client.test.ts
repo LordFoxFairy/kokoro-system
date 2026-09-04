@@ -109,6 +109,50 @@ describe("System SDK client", () => {
     ).rejects.toThrow("runtime manifest response is invalid");
   });
 
+  it.each(["01", "-1", "1.0", "1e3", "not-a-decimal"])(
+    "rejects non-canonical config_version %s",
+    async (configVersion) => {
+      const client = createSystemClient({
+        baseUrl: "http://system.example.test",
+        tenantId: "tenant-1",
+        tenantHost: "tenant.example.test",
+        fetch: async () =>
+          new Response(
+            JSON.stringify({
+              data: { ...wireManifest, config_version: configVersion },
+            }),
+            { status: 200 },
+          ),
+      });
+
+      await expect(
+        client.getRuntimeManifest({ productId: "admin" }),
+      ).rejects.toThrow("runtime manifest response is invalid");
+    },
+  );
+
+  it.each(["0", "9007199254740993"])(
+    "preserves canonical config_version %s",
+    async (configVersion) => {
+      const client = createSystemClient({
+        baseUrl: "http://system.example.test",
+        tenantId: "tenant-1",
+        tenantHost: "tenant.example.test",
+        fetch: async () =>
+          new Response(
+            JSON.stringify({
+              data: { ...wireManifest, config_version: configVersion },
+            }),
+            { status: 200 },
+          ),
+      });
+
+      await expect(
+        client.getRuntimeManifest({ productId: "admin" }),
+      ).resolves.toMatchObject({ configVersion });
+    },
+  );
+
   it.each([
     [
       "malformed JSON",

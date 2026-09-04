@@ -7,6 +7,7 @@ import type {
   PageRequest,
   ReleaseInput,
   SiteInput,
+  SitePolicyInput,
   WorkspaceInput,
 } from "../../src/application/system/dto/index.js";
 import type {
@@ -174,7 +175,7 @@ export class InMemorySystemControlRepository implements SystemControlRepository 
   public async putPolicy(
     context: TenantRequestContext,
     siteId: string,
-    input: Omit<SitePolicy, "id" | "tenantId" | "siteId" | "updatedAt">,
+    input: SitePolicyInput,
   ): Promise<SitePolicy> {
     const site = this.sites.find(
       (item) => item.id === siteId && item.tenantId === tenant(context),
@@ -187,6 +188,7 @@ export class InMemorySystemControlRepository implements SystemControlRepository 
       tenantId: tenant(context),
       siteId,
       version: (BigInt(previous?.version ?? "0") + 1n).toString(),
+      status: "active",
       updatedAt: now(),
     };
     this.policies.set(siteId, value);

@@ -5,6 +5,7 @@ import type {
   PageRequest,
   ReleaseInput,
   SiteInput,
+  SitePolicyInput,
   WorkspaceInput,
 } from "../../../application/system/dto/index.js";
 import type {
@@ -81,7 +82,7 @@ class PostgresSystemControlDataRepository
   public putPolicy(
     context: TenantRequestContext,
     siteId: string,
-    input: Omit<SitePolicy, "id" | "tenantId" | "siteId" | "updatedAt">,
+    input: SitePolicyInput,
   ): Promise<SitePolicy> {
     return this.policies.put(context, siteId, input);
   }

@@ -226,6 +226,7 @@ function isRuntimeManifestEnvelope(
     Array.isArray(data.feature_flags) &&
     Array.isArray(data.references) &&
     typeof data.config_version === "string" &&
+    /^(0|[1-9][0-9]*)$/u.test(data.config_version) &&
     (data.release_id === null || typeof data.release_id === "string") &&
     typeof data.digest === "string"
   );

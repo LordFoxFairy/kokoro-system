@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { TenantRequestContext } from "../../../domain/runtime-manifest/models/index.js";
+import type { SitePolicyInput } from "../../../application/system/dto/index.js";
 import type { SitePolicy } from "../../../domain/system/models/index.js";
 import type { SqlClient, SqlPool } from "../../persistence/postgres/client.js";
 import { PostgresRepository, requireRow, utcTimestamp } from "./support.js";
@@ -29,7 +30,7 @@ export class PostgresPolicyRepository extends PostgresRepository {
   public async put(
     context: TenantRequestContext,
     siteId: string,
-    input: Omit<SitePolicy, "id" | "tenantId" | "siteId" | "updatedAt">,
+    input: SitePolicyInput,
   ): Promise<SitePolicy> {
     return this.withTransaction(async (client) => {
       const site = await client.query<Row>(
@@ -92,6 +93,7 @@ export class PostgresPolicyRepository extends PostgresRepository {
         tenantId: context.tenantId,
         siteId,
         version,
+        status: "active",
         updatedAt: time,
       };
     });

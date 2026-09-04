@@ -35,6 +35,52 @@ describe("boundary runtime decoders", () => {
     ).toThrow("runtime manifest cache entry is invalid");
   });
 
+  it.each(["01", "-1", "1.0", "1e3", "not-a-decimal"])(
+    "rejects non-canonical Redis config_version %s",
+    (configVersion) => {
+      expect(() =>
+        decodeRuntimeManifestCache(
+          JSON.stringify({
+            tenantId: "tenant-a",
+            productId: "product-a",
+            locale: "en-US",
+            navigation: [],
+            localeNamespaces: [],
+            theme: {},
+            featureFlags: [],
+            references: [],
+            configVersion,
+            releaseId: null,
+            digest: "digest",
+          }),
+        ),
+      ).toThrow("runtime manifest cache entry is invalid");
+    },
+  );
+
+  it.each(["0", "9007199254740993"])(
+    "accepts canonical Redis config_version %s without precision loss",
+    (configVersion) => {
+      expect(
+        decodeRuntimeManifestCache(
+          JSON.stringify({
+            tenantId: "tenant-a",
+            productId: "product-a",
+            locale: "en-US",
+            navigation: [],
+            localeNamespaces: [],
+            theme: {},
+            featureFlags: [],
+            references: [],
+            configVersion,
+            releaseId: null,
+            digest: "digest",
+          }),
+        ).configVersion,
+      ).toBe(configVersion);
+    },
+  );
+
   it("rejects malformed PostgreSQL enums and JSON records", () => {
     const row: Record<string, unknown> = {
       id: "site-a",

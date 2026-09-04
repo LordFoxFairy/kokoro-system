@@ -12,6 +12,7 @@ import type {
   PageRequest,
   ReleaseInput,
   SiteInput,
+  SitePolicyInput,
   WorkspaceInput,
 } from "../dto/index.js";
 import type { ReleaseStatus } from "../../../domain/system/enums/index.js";
@@ -37,7 +38,7 @@ export type SystemControlDataRepository = {
   putPolicy(
     context: TenantRequestContext,
     siteId: string,
-    input: Omit<SitePolicy, "id" | "tenantId" | "siteId" | "updatedAt">,
+    input: SitePolicyInput,
   ): Promise<SitePolicy>;
   createRelease(
     context: TenantRequestContext,

@@ -74,6 +74,40 @@ describe("SystemControlService", () => {
     ).rejects.toMatchObject({ code: "IDEMPOTENCY_KEY_REUSED" });
   });
 
+  it("treats reordered JSON object fields as the same stable wire command", async () => {
+    const service = createService();
+    const firstInput = {
+      moduleKey: "theme",
+      configKey: "stable-command",
+      scopeType: "tenant" as const,
+      scopeId: "tenant-a",
+      productId: null,
+      locale: "en-US",
+      value: { accent: "violet", contrast: "high" },
+      schemaVersion: 1,
+      releaseId: null,
+    };
+    const first = await service.upsertConfig(
+      context("tenant-a"),
+      firstInput,
+      "stable-config-command",
+    );
+
+    await service.upsertConfig(
+      context("tenant-a"),
+      { ...firstInput, value: { contrast: "high", accent: "violet" } },
+      "advance-config-state",
+    );
+
+    await expect(
+      service.upsertConfig(
+        context("tenant-a"),
+        { ...firstInput, value: { contrast: "high", accent: "violet" } },
+        "stable-config-command",
+      ),
+    ).resolves.toEqual(first);
+  });
+
   it("serializes concurrent calls with the same idempotency key into one mutation", async () => {
     const service = createService();
     const input = {
@@ -116,6 +150,9 @@ describe("SystemControlService", () => {
       service.publishRelease(context("tenant-a"), release.id, "cmd-publish"),
     ).resolves.toMatchObject({ status: "published" });
     await expect(
+      service.validateRelease(context("tenant-a"), release.id, "cmd-validate"),
+    ).resolves.toMatchObject({ status: "validated", version: "2" });
+    await expect(
       service.publishRelease(context("tenant-a"), release.id, "cmd-publish"),
     ).resolves.toMatchObject({ status: "published" });
     await expect(
@@ -138,8 +175,6 @@ describe("SystemControlService", () => {
       context("tenant-a"),
       site.id,
       {
-        version: "1",
-        status: "active",
         defaultLocale: "en-US",
         allowedLocales: ["en-US"],
         allowedProducts: ["admin"],
@@ -147,9 +182,36 @@ describe("SystemControlService", () => {
       },
       "policy",
     );
+    expect(policy).toMatchObject({ version: "1", status: "active" });
+    await expect(
+      service.putPolicy(
+        context("tenant-a"),
+        site.id,
+        {
+          defaultLocale: "en-US",
+          allowedLocales: ["en-US"],
+          allowedProducts: ["admin"],
+          publicManifest: false,
+        },
+        "advance-policy-state",
+      ),
+    ).resolves.toMatchObject({ version: "2", status: "active" });
+    await expect(
+      service.putPolicy(
+        context("tenant-a"),
+        site.id,
+        {
+          defaultLocale: "en-US",
+          allowedLocales: ["en-US"],
+          allowedProducts: ["admin"],
+          publicManifest: false,
+        },
+        "policy",
+      ),
+    ).resolves.toEqual(policy);
     await expect(
       service.getPolicy(context("tenant-a"), site.id),
-    ).resolves.toMatchObject({ version: "1", defaultLocale: "en-US" });
+    ).resolves.toMatchObject({ version: "2", defaultLocale: "en-US" });
     await expect(
       service.getPolicy(context("tenant-b"), site.id),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
