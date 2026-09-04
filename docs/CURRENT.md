@@ -15,7 +15,8 @@
 - 生产组合根只装配 PostgreSQL repository 与 Redis cache，不装配 InMemory/Fake。
 - canonical schema 只有 `database/schema.sql`，`db:apply-schema` 只接受空 database；不存在 migration 目录与外键。
 - HTTP wire 使用 snake_case 和统一 `data|error + meta.request_id` envelope。
-- Proto generated TypeScript 位于 `src/generated/proto/`，由本仓 `contract/proto/` 生成。
+- Proto 只声明 System 使用的 `kokoro.site.v1`；generated TypeScript 位于 `src/generated/proto/`，由本仓
+  `contract/proto/` 清理后重生成。
 
 **外部前置**
 
@@ -48,6 +49,8 @@
 - 增加 `contract/README.md`，明确 owner、visibility、version、generation、breaking、provenance 和 consumer workflow。
 - 为直接 OpenAPI operation 与 reusable Path Item operation 增加 owner/visibility/stability/idempotency/permission metadata。
 - 本地 verifier 和 Vitest 同时检查 metadata；顶层 tsconfig 显式启用 `useUnknownInCatchVariables`。
+- 删除未使用且跨 owner 的 `kokoro.common.v1` source/generated/provenance；owner test 禁止其回归，并核对完整
+  Proto provenance inventory/digest 与隔离重生成物。
 
 完成证据必须来自当前 committed tree 上重新执行 [`ACCEPTANCE.md`](ACCEPTANCE.md) 的命令；本文不固化会过期的
 “全绿”自报。
@@ -84,15 +87,14 @@
    `x-kokoro-request-id` 声明 UUID，但服务端接受任意非空字符串。
 2. OpenAPI breaking comparison、generated artifact digest/source commit、OpenAPI provenance 尚未自动化；
    `contract/provenance.json` 当前只验证 proto source digest。
-3. `contract/proto/kokoro/common/v1/common.proto` 未被 System runtime 引用，且包含 Identity、Magic Link、Conversation、
-   Agent 等其他 owner 的 declarations；应由 contract owner 评审删除或迁回真实 owner，本阶段不改 generated/wire source。
-4. TypeScript SDK 是手写且只覆盖 Runtime Manifest；`workloadToken` compatibility alias 仍在 SDK public options。
-5. `src/interfaces/http/server.ts` 超过 400 行评审线，需按 context/header/body/router/error mapping 职责拆分；
+3. TypeScript SDK 是手写且只覆盖 Runtime Manifest；`workloadToken` compatibility alias 仍在 SDK public options。
+4. `src/interfaces/http/server.ts` 超过 400 行评审线，需按 context/header/body/router/error mapping 职责拆分；
    本阶段不触碰 runtime。
-6. Schema 中 `system_product_profile` 与 release-binding lifecycle 尚无 production application writer；
+5. Schema 中 `system_product_profile` 与 release-binding lifecycle 尚无 production application writer；
    `system_audit_event` 也未接入且需和 IAM 的 Audit owner 边界重新确认。Retention/GC policy 未实现。
 
 ## 5. 非目标
 
-本阶段不修改业务运行时、数据库 Schema、跨仓 contract、generated 文件内容或部署拓扑；上述缺口不是在文档中
-宣称已解决，而是后续由 System owner 通过 contract-first、测试先行的独立变更闭环。
+本阶段删除 System 未使用的跨 owner Proto 与对应 generator output/provenance，只修改本仓 contract 治理；业务运行时、
+数据库 Schema、其他仓 contract 与部署拓扑不变。上述其余缺口不是在文档中宣称已解决，而是后续由 System owner
+通过 contract-first、测试先行的独立变更闭环。

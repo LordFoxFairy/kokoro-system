@@ -22,8 +22,8 @@ Root 只拥有拓扑与治理。如果 Root、System 和 consumer 各维护一�
 
 - Contract review 先于 consumer/runtime 更新；generated drift 可在 owner repository 内定位。
 - OpenAPI 与 proto 有独立版本语义，但都由 System owner 发布。
-- 当前 `kokoro/common/v1/common.proto` 含未被 System 使用的跨 owner declarations；本决策不认可复制这些事实，owner 必须
-  在独立 contract 变更中删除或迁回真实 owner。
+- System Proto 只保留运行时使用的 `kokoro.site.v1`；owner gate 拒绝重新声明 `kokoro.common.v1`，不复制 IAM、BFF
+  或 Agent DTO。
 - 当前 provenance 只覆盖 proto source，OpenAPI breaking diff、generated digest/source commit 尚未自动化；这些是记录在
   `../../contract/README.md` 的缺口，不被 ADR 文字视为已实现。
 - 手写 TypeScript Runtime Manifest SDK 是 consumer adapter，不是第二份 schema authority。

@@ -118,8 +118,8 @@ OpenAPI 3.1 描述 HTTP；proto 描述 SiteService。每个 OpenAPI operation �
 permission metadata。`src/generated/proto` 来自 Buf；server-only TypeScript SDK 是手写 transport，当前只实现
 Runtime Manifest，不等同于 OpenAPI generated client。
 
-当前 `kokoro/common/v1/common.proto` 未被 System runtime 使用，且包含跨 owner declarations；它是已登记的 contract
-ownership 缺口，不应被新 consumer 当作 System 新增事实源。
+System Protobuf 只声明本仓使用的 `kokoro.site.v1`。Contract gate 拒绝 `kokoro.common.v1` 等 foreign package，要求
+provenance inventory 完整覆盖 canonical source，并以隔离重生成结果校验 checked-in generated output。
 
 Contract generation、breaking 与 provenance 的当前能力/缺口见 [`../contract/README.md`](../contract/README.md)。
 

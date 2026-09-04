@@ -10,7 +10,7 @@ and consumers must not copy these files into another editable source of truth.
 | owner | `kokoro-system` |
 | visibility | `internal-owner` |
 | HTTP source | `openapi/system.openapi.json` |
-| protobuf source | `proto/kokoro/common/v1/common.proto`, `proto/kokoro/site/v1/site.proto` |
+| protobuf source | `proto/kokoro/site/v1/site.proto` (`kokoro.site.v1`) |
 | generated output | `../src/generated/proto/` (read-only) |
 | consumer adapter | `../sdk/typescript/` (handwritten, server-only Runtime Manifest client) |
 
@@ -43,9 +43,11 @@ pnpm contract:check
 git diff --check
 ```
 
-`contract:generate` invokes Buf with `buf.gen.yaml`, writes TypeScript protobuf declarations under `src/generated/proto/`, and normalizes
-their final newline. Never edit generated files by hand. OpenAPI currently has no generated server/client checked into this repository;
-the TypeScript SDK is a narrow handwritten adapter and must be validated against the owner contract by tests.
+`contract:generate` invokes Buf with `buf.gen.yaml`, cleans and rewrites TypeScript protobuf declarations under
+`src/generated/proto/`, and normalizes their final newline. Never edit generated files by hand. `test:contract-owner` rejects foreign
+protobuf packages, checks the exact provenance inventory/digests, regenerates into an isolated directory, and compares checked-in output
+byte for byte. OpenAPI currently has no generated server/client checked into this repository; the TypeScript SDK is a narrow handwritten
+adapter and must be validated against the owner contract by tests.
 
 When proto source changes, the owner must update `provenance.json` file digests and combined digest in the same reviewed change, regenerate,
 and inspect the generated diff. The repository currently has no `provenance:update` command; digest update remains an explicit owner step and
@@ -88,8 +90,6 @@ with immutable digest/provenance. A reviewer must reject a change whose baseline
 - No semantic OpenAPI breaking-diff tool is wired into CI.
 - No published contract artifact registry/version manifest is present in this repository.
 - No automated consumer matrix proves BFF compatibility before merge.
-- `proto/kokoro/common/v1/common.proto` is not imported by System runtime and contains Identity, Magic Link, Conversation, and Agent
-  declarations owned by other domains; new consumers must not treat it as a System-owned business API while ownership is corrected.
 
 The configured breaking rules are therefore policy plus partial gates, not complete automated breaking evidence.
 
@@ -103,7 +103,8 @@ The configured breaking rules are therefore policy plus partial gates, not compl
 - SHA-256 per proto source file;
 - SHA-256 over the ordered concatenated proto contents.
 
-`scripts/verify-contract-provenance.ts` recomputes these values and fails on source drift.
+`scripts/verify-contract-provenance.ts` recomputes these values and fails on source drift. `test:contract-owner` also requires the
+provenance inventory and digest keys to equal every canonical Proto source and verifies deterministic generated output.
 
 Current provenance does **not** record OpenAPI digest, generated-output digest, source commit, generator/tool digest, build environment, or
 published artifact digest. Those fields remain a release-governance gap; consumers must pin the current source commit/artifact digest through

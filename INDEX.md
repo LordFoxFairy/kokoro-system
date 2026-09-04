@@ -46,14 +46,13 @@ domain -> no HTTP, PostgreSQL, Redis, generated wire or Node runtime imports
 |---|---|
 | `contract/openapi/system.openapi.json` | HTTP OpenAPI 3.1 machine contract 与 operation governance metadata |
 | `contract/proto/kokoro/site/v1/site.proto` | SiteService Connect RPC source |
-| `contract/proto/kokoro/common/v1/common.proto` | 当前追踪但未被 System runtime 使用；含跨 owner declarations，已登记边界缺口 |
 | `contract/provenance.json` | Proto source file digest inventory；覆盖范围和缺口见 `contract/README.md` |
 | `database/schema.sql` | 唯一 V1 canonical schema；无 migration、无 foreign key |
 | `scripts/apply-schema.ts` | advisory-lock 下向空 database 安装 canonical schema |
 | `scripts/verify-openapi-contract.ts` | OpenAPI version/path/governance metadata gate |
 | `scripts/verify-contract-provenance.ts` | Proto source digest drift gate |
 | `sdk/typescript/src/` | 手写 server-only Runtime Manifest client；不是 OpenAPI generated SDK |
-| `test/architecture/` | 分层、文档拓扑、工具链、边界与 CI/release 架构门禁 |
+| `test/architecture/`、`test/contract/` | 分层、文档拓扑、contract owner/provenance/generated drift 与 CI/release 门禁 |
 | `scripts/test/` | PostgreSQL/Redis/runtime/production-image smoke 与幂等并发验证 |
 
 ## HTTP 与 RPC surface

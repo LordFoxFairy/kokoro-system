@@ -12,7 +12,7 @@
 | GOV-03 | `contract/README.md` 含 owner/visibility/version/generation/breaking/provenance/consumer workflow | architecture + Root slice | 通过 |
 | GOV-04 | 每个 direct/reusable OpenAPI operation 有 5 个 governance extensions | contract test + verifier + Root slice | 通过 |
 | GOV-05 | 顶层 tsconfig 显式 `useUnknownInCatchVariables=true` | architecture + Root slice + typecheck | 通过 |
-| GOV-06 | Generated、runtime、Schema 与跨仓文件未手改 | `git diff` scope review | 只含治理文件/test/verifier/config |
+| GOV-06 | Generated、runtime、Schema 与跨仓边界 | owner contract test + `git diff` scope review | 仅 `kokoro.site.v1`；generated 由隔离重生成逐字节验证；runtime/Schema/其他仓不变 |
 | GOV-07 | lint/typecheck/test/build/contract 均在 committed tree 重跑 | 第 5 节 | 全部 exit 0 |
 
 ## 2. Runtime behavior matrix
@@ -51,8 +51,8 @@ pnpm contract:check
 - OpenAPI 3.1、仅显式 V1/Probe path、snake_case、common envelope；
 - 13 个 direct/reusable operation definition 的治理 metadata；
 - Buf lint；
-- proto source digest 与 `contract/provenance.json` 一致；
-- `src/generated/proto/` 只由 generator 产生，无手工修改。
+- proto source inventory/digest 与 `contract/provenance.json` 一致，且不声明 `kokoro.common.v1`；
+- `src/generated/proto/` 只由 generator 产生，并与隔离重生成结果逐字节一致。
 
 **未自动证明**：OpenAPI semantic breaking diff、proto 对固定上一版本的 `buf breaking`、OpenAPI/generated digest、source
 commit provenance、发布后的 consumer compatibility。详见 [`../contract/README.md`](../contract/README.md)。
@@ -90,14 +90,14 @@ git diff --check
 git status --short --branch
 ```
 
-Phase 1 因未修改 proto，`pnpm contract:check` 后还要求：
+在 contract 变更提交后的 committed tree，`pnpm contract:check` 后还要求：
 
 ```bash
-git diff --exit-code HEAD -- src/generated/proto
+git diff --exit-code HEAD -- contract/proto contract/provenance.json src/generated/proto
 git diff --exit-code HEAD -- database/schema.sql src/application src/domain src/infrastructure src/interfaces src/bootstrap src/config src/main.ts src/index.ts
 ```
 
-第二条允许 `tsconfig.json`、tests、contract/verifier 与 docs 改动，但不允许 runtime/Schema diff。
+第一条证明 committed owner source、provenance 与 generated 在重生成后无 drift；第二条不允许 runtime/Schema diff。
 
 ## 6. Root 十仓静态审计的本仓切片
 
