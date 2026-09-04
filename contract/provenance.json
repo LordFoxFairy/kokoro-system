@@ -3,12 +3,10 @@
   "source": "contract/proto",
   "version": 1,
   "files": [
-    "kokoro/common/v1/common.proto",
     "kokoro/site/v1/site.proto"
   ],
   "protoSha256": {
-    "kokoro/common/v1/common.proto": "cb8808c6584d9ad96bd5d21e6a69e454d5685512ce408eddfc9d3571b4021d23",
     "kokoro/site/v1/site.proto": "e0a4c42cbf5403eddee62af2c40dfb1c055fa1153a0f3f2db79d5f591ad0cc2a"
   },
-  "combinedSha256": "d2186d65d6a716422666a2c8a0e19cfd9fe3ea15b43bc9e663d1383de196006c"
+  "combinedSha256": "e0a4c42cbf5403eddee62af2c40dfb1c055fa1153a0f3f2db79d5f591ad0cc2a"
 }
