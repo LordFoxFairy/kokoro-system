@@ -104,8 +104,8 @@ async function seedSystem(databaseUrl: string): Promise<void> {
     );
     await execute(
       connection,
-      "INSERT INTO system_config_release (id, release_key, status, digest, published_at, created_at, updated_at) VALUES ($1, 'system-smoke', 'published', $2, $3, $4, $5)",
-      [releaseId, "1".repeat(64), now, now, now],
+      "INSERT INTO system_config_release (id, tenant_id, release_key, status, digest, published_at, created_at, updated_at) VALUES ($1, $2, 'system-smoke', 'published', $3, $4, $5, $6)",
+      [releaseId, tenantId, "1".repeat(64), now, now, now],
     );
     await execute(
       connection,

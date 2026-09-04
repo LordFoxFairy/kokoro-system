@@ -16,8 +16,11 @@ import type {
   SiteInput,
   WorkspaceInput,
 } from "../dto/index.js";
-import type { SystemControlRepository } from "../ports/system-control-repository.js";
-import type { SystemControlDataRepository } from "../ports/system-control-repository.js";
+import type {
+  SystemControlDataRepository,
+  SystemControlRepository,
+} from "../ports/system-control-repository.js";
+import type { RuntimeManifestCacheInvalidator } from "../ports/runtime-manifest-cache-invalidator.js";
 import {
   parseConfigReceipt,
   parsePolicyReceipt,
@@ -61,7 +64,10 @@ function validateText(name: string, value: string): void {
 
 /** Application orchestration for System control-plane commands and queries. */
 export class SystemControlService {
-  public constructor(private readonly repository: SystemControlRepository) {}
+  public constructor(
+    private readonly repository: SystemControlRepository,
+    private readonly manifestCache: RuntimeManifestCacheInvalidator,
+  ) {}
 
   public async listSites(
     context: TenantRequestContext,
@@ -212,7 +218,7 @@ export class SystemControlService {
     key: string,
   ): Promise<ConfigRelease> {
     const command = { id, next };
-    return this.mutate(
+    const release = await this.mutate(
       context,
       key,
       command,
@@ -238,6 +244,9 @@ export class SystemControlService {
         );
       },
     );
+    if (next === "published" || next === "retired")
+      await this.manifestCache.invalidateTenant(context.tenantId);
+    return release;
   }
 
   private async mutate<T>(

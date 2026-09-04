@@ -1,8 +1,11 @@
 import { createClient, type RedisClientType } from "redis";
 import type { ManifestCache } from "../../application/runtime-manifest/ports/index.js";
+import type { RuntimeManifestCacheInvalidator } from "../../application/system/ports/runtime-manifest-cache-invalidator.js";
 import type { RuntimeManifest } from "../../domain/runtime-manifest/models/index.js";
 import { decodeRuntimeManifestCache } from "./runtime-manifest-cache-decoder.js";
-export class RedisCoordinator implements ManifestCache {
+export class RedisCoordinator
+  implements ManifestCache, RuntimeManifestCacheInvalidator
+{
   private readonly client: RedisClientType;
   private open = false;
   public constructor(
@@ -48,6 +51,17 @@ export class RedisCoordinator implements ManifestCache {
     await this.client.set(this.key(key), JSON.stringify(value), {
       EX: ttlSeconds,
     });
+  }
+  public async invalidateTenant(tenantId: string): Promise<void> {
+    await this.assertReady();
+    const tenantPrefix = this.key(`manifest:${tenantId}:`);
+    for await (const keys of this.client.scanIterator({
+      MATCH: this.key("manifest:*"),
+      COUNT: 100,
+    })) {
+      const tenantKeys = keys.filter((key) => key.startsWith(tenantPrefix));
+      if (tenantKeys.length > 0) await this.client.del(tenantKeys);
+    }
   }
   public async close(): Promise<void> {
     if (this.open) await this.client.quit();

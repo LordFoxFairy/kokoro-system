@@ -1,6 +1,6 @@
 # kokoro-system 验收矩阵
 
-状态：Phase 1 工程治理与当前 runtime 的可执行验收，2026-09-03。每次结论必须绑定当前 commit、命令、exit code 和
+状态：Phase 1 工程治理与当前 runtime 的可执行验收，2026-09-04。每次结论必须绑定当前 commit、命令、exit code 和
 依赖环境；本文件中的“预期”不是历史或生产通过证明。
 
 ## 1. Phase 1 完成条件
@@ -12,7 +12,7 @@
 | GOV-03 | `contract/README.md` 含 owner/visibility/version/generation/breaking/provenance/consumer workflow | architecture + Root slice | 通过 |
 | GOV-04 | 每个 direct/reusable OpenAPI operation 有 5 个 governance extensions | contract test + verifier + Root slice | 通过 |
 | GOV-05 | 顶层 tsconfig 显式 `useUnknownInCatchVariables=true` | architecture + Root slice + typecheck | 通过 |
-| GOV-06 | Generated、runtime、Schema 与跨仓边界 | owner contract test + `git diff` scope review | 仅 `kokoro.site.v1`；generated 由隔离重生成逐字节验证；runtime/Schema/其他仓不变 |
+| GOV-06 | Generated、runtime、Schema 与跨仓边界 | owner contract test + `git diff` scope review | 仅 `kokoro.site.v1`；generated 由隔离重生成逐字节验证；runtime 只含本 P1 release/manifest/cache 闭环；Schema/contract/其他仓不变 |
 | GOV-07 | lint/typecheck/test/build/contract 均在 committed tree 重跑 | 第 5 节 | 全部 exit 0 |
 
 ## 2. Runtime behavior matrix
@@ -35,6 +35,9 @@
 | SYS-14 | Connect handler 来自 generated SiteService descriptor | Site Connect + real smoke |
 | SYS-15 | shutdown 总 deadline 与正常关闭 | shutdown tests |
 | SYS-16 | canonical schema 使用 UTC、CHECK/UNIQUE 命名、无 FK/migration | schema + architecture + Root slice |
+| SYS-17 | Manifest 只解析 active binding 指向的同 tenant published release；draft/retired/foreign tenant fail closed | postgres repository + real runtime smoke |
+| SYS-18 | publish/retire 后按 tenant 失效 cache，失效失败可用同 key replay 重试 | runtime-manifest + real runtime smoke |
+| SYS-19 | Manifest `config_version` 按 BIGINT 数值语义求最大值 | postgres repository + real runtime smoke |
 
 ## 3. Contract acceptance
 
@@ -139,7 +142,7 @@ digest、scanner result、SBOM/attestation 和 smoke output。
 
 以下项目仍是缺口，不因本阶段通过而改变：
 
-- Product/Profile/Release Binding 的完整 application/API 生命周期与发布后 cache invalidation；
+- Product/Profile/Release Binding 的完整 application/API 生命周期，以及 Config/Policy/未来 Binding mutation cache invalidation；
 - Config foreign-reference/schema validation、不同 key 并发唯一性、Policy enforcement；
 - 生产 TLS/network policy/secret rotation、rate limit、capacity/load/failover/restore exercise；
 - metrics/traces/dashboard/alerts 与 30 天 SLI/SLO；

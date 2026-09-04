@@ -1,6 +1,6 @@
 # kokoro-system 当前状态
 
-状态日期：2026-09-03。本文区分当前实现、生产目标和已知缺口；本地 test/smoke 不能替代生产遥测、安全评估、
+状态日期：2026-09-04。本文区分当前实现、生产目标和已知缺口；本地 test/smoke 不能替代生产遥测、安全评估、
 容量验证或恢复演练。
 
 ## 1. Owner 与当前 surface
@@ -32,7 +32,7 @@
 | Tenant/Host | Manifest 和 SiteService 在本仓按 active `tenant_id + normalized hostname` 解析 Site | `postgres-site-host-resolver.ts`、tenant/Connect tests |
 | Permission | Control reads=`system:read`；普通 mutation=`system:write`；release transition=`system:publish`；global config 还要求 publish | `system-control.service.ts` |
 | Idempotency | tenant + key receipt、request hash、row lock、mutation 与 response completion 同事务 | `receipt-repository.ts`、PostgreSQL concurrency script |
-| Release state | `draft -> validated -> published -> retired`，基于 version 更新 | application/repository tests |
+| Release state | `draft -> validated -> published -> retired`，基于 version 更新；Manifest 只解析 active binding 指向的同 tenant published release；publish/retire 后按 tenant 失效缓存 | application/repository/real runtime tests |
 | Boundary decoding | Redis cache 与 PostgreSQL rows 从 `unknown` 做运行时 shape/enum/time 解码 | value/cache decoder tests |
 | Availability gate | `/readyz` 同时 ping PostgreSQL/Redis；镜像 HEALTHCHECK 使用 readiness | bootstrap、Dockerfile、smoke tests |
 | Shutdown | SIGINT/SIGTERM 并发关闭 HTTP/PostgreSQL/Redis，默认总 deadline 10 秒 | `shutdown.ts`、tests |
@@ -51,6 +51,11 @@
 - 本地 verifier 和 Vitest 同时检查 metadata；顶层 tsconfig 显式启用 `useUnknownInCatchVariables`。
 - 删除未使用且跨 owner 的 `kokoro.common.v1` source/generated/provenance；owner test 禁止其回归，并核对完整
   Proto provenance inventory/digest 与隔离重生成物。
+- Runtime Manifest 的 active binding 联查 Config Release，只有 `release.tenant_id` 与请求 tenant 一致且状态为
+  `published` 才解析 release；draft、validated、retired 和 foreign-tenant binding 都按无可见 release 处理。
+- Release publish/retire 在 PostgreSQL idempotent transaction 完成后失效该 tenant 的全部 Runtime Manifest cache；若
+  Redis 失效失败，请求失败，同一 idempotency key replay 会重试失效。
+- Manifest `config_version` 使用 `BigInt` 求数值最大值，不再对 PostgreSQL BIGINT 字符串做字典序排序。
 
 完成证据必须来自当前 committed tree 上重新执行 [`ACCEPTANCE.md`](ACCEPTANCE.md) 的命令；本文不固化会过期的
 “全绿”自报。
@@ -59,8 +64,9 @@
 
 ### 发布前优先收敛
 
-1. **Release 闭环不完整**：HTTP 可创建并转换 Config Release，但没有 Product、Release Binding 管理 surface；
-   publish 不建立 active binding，也不失效相关 Redis manifest。当前真实 smoke 通过 fixture 直接写 binding。
+1. **Release 管理 surface 不完整**：HTTP 可创建并转换 Config Release，但没有 Product、Release Binding 管理 surface；
+   publish 不自动创建 binding。当前真实 smoke 通过 fixture 写 active binding，再验证只有同 tenant published release 可见，
+   且 publish/retire 会失效 tenant cache。
 2. **Config 关系校验不足**：`POST /v1/system/config` 接收 `product_id`、`release_id`，repository 未验证它们存在、
    tenant/状态一致；不同 idempotency key 的同一 config identity 并发写也没有数据库唯一约束兜底。
 3. **Schema validation 未实现**：`schema_version` 被保存，但 `value` 没有按 module/schema 注册表做运行时校验。
@@ -77,9 +83,9 @@
 3. 1 MB body 限制在 body 全部读入内存后检查，不是 streaming early-reject；SDK 读取响应也没有 byte 上限。
 4. Runtime Manifest 依赖 Redis 并 fail closed；没有经批准的 stale snapshot/degraded mode。该行为是当前取舍，
    生产容量与依赖预算尚未用数据验证。
-5. Cache 只有 30 秒 TTL，没有 mutation-driven invalidation；cache identity 复核 tenant/product/locale，surface 只靠 key 隔离。
-6. `configVersion` 从数据库 bigint string 集合用字符串排序选最大值；两位数后可能不符合数值顺序。
-7. Manifest digest 基于 `JSON.stringify`，没有跨语言 canonical JSON 规范或签名。
+5. Cache 只有 release publish/retire 的 tenant-scoped mutation invalidation；Config/Policy 尚未主动失效，binding 也没有
+   application writer。Cache identity 复核 tenant/product/locale，surface 只靠 key 隔离。
+6. Manifest digest 基于 `JSON.stringify`，没有跨语言 canonical JSON 规范或签名。
 
 ### Contract 与代码健康缺口
 
@@ -95,6 +101,6 @@
 
 ## 5. 非目标
 
-本阶段删除 System 未使用的跨 owner Proto 与对应 generator output/provenance，只修改本仓 contract 治理；业务运行时、
-数据库 Schema、其他仓 contract 与部署拓扑不变。上述其余缺口不是在文档中宣称已解决，而是后续由 System owner
+本阶段不新增 Product/Profile/Release Binding API，不修改 canonical Schema、wire contract、SDK compatibility alias、
+Audit owner、readyz、其他仓 contract 或部署拓扑。上述其余缺口不是在文档中宣称已解决，而是后续由 System owner
 通过 contract-first、测试先行的独立变更闭环。

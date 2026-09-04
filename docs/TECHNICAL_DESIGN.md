@@ -1,6 +1,6 @@
 # kokoro-system 技术设计
 
-状态：当前实现设计，2026-09-03。带“目标/缺口”的段落不是现有能力声明。Machine-readable wire source 位于
+状态：当前实现设计，2026-09-04。带“目标/缺口”的段落不是现有能力声明。Machine-readable wire source 位于
 [`../contract/`](../contract/README.md)，数据定义位于 [`../database/schema.sql`](../database/schema.sql)。
 
 ## 1. 业务边界
@@ -45,17 +45,18 @@ infrastructure -> application/domain ports
 4. PostgreSQL `SiteHostResolver` 以 tenant + active Site + active Host 查询，且在 cache/database manifest 读取前执行。
 5. Redis key 为 `<namespace>:manifest:<tenant>:<product>:<locale>:<surface-or-default>`；hit 后复核
    tenant/product/locale identity。
-6. Cache miss 时，repository 将 product key/UUID 解析成 active Product，读取 active tenant+product release binding 和
-   active Config records。
+6. Cache miss 时，repository 将 product key/UUID 解析成 active Product；active tenant+product binding 必须联查到
+   `release.tenant_id = request tenant` 且 release 状态为 `published`，否则按无可见 release 处理，再读取 active Config records。
 7. 对相同 `module_key + config_key` 按 `surface > tenant > product > global`、精确 locale、绑定 release、
    config version、ID 决定优先级，投影 navigation/localization/theme/feature flags/references。
-8. 使用 SHA-256(`JSON.stringify(manifest-with-empty-digest)`) 生成 digest，写 Redis 30 秒后返回 snake_case wire。
+8. `config_version` 以 PostgreSQL BIGINT 对应的 `BigInt` 数值顺序求最大值；使用
+   SHA-256(`JSON.stringify(manifest-with-empty-digest)`) 生成 digest，写 Redis 30 秒后返回 snake_case wire。
 
 Product 不存在时当前返回 identity-preserving empty manifest（`config_version="0"`、`release_id=null`），不是 404。
 Redis、PostgreSQL、cache decode/identity 任一失败都映射为 `503 SYSTEM_UNAVAILABLE`；不存在进程内或 stale snapshot 降级。
 
-**缺口**：active binding 未联查 Config Release 状态；publish 不创建 binding/清 cache；Site Policy allow-list 尚未进入
-assembly；version 最大值使用 string order；digest 尚无 canonical JSON/signature 规范。
+**缺口**：publish 不创建 binding，Product/Profile/Binding 尚无管理 surface；Site Policy allow-list 尚未进入 assembly；
+digest 尚无 canonical JSON/signature 规范。
 
 ## 4. Control-plane query 与 mutation
 
@@ -87,6 +88,10 @@ hash 返回 409。Operation 抛错时整个事务回滚，不留下成功 respon
 普通 mutation 需要 `system:write`；release transition 需要 `system:publish`；global config upsert 先要求 write，再额外要求
 publish。Site 创建把 Site 与初始 Host 放在同一事务；Workspace/Policy 先按 tenant 检查 Site。Config/Release 的关系缺口
 见 [`CURRENT.md`](CURRENT.md)。
+
+Publish/retire 的 PostgreSQL mutation 与 receipt 先提交，再由 application 通过 cache invalidation port 删除该 tenant 的
+Runtime Manifest keys。Redis 失效失败时 command 返回 dependency failure；相同 idempotency key replay 不重复状态转换，
+但会再次执行失效，使 committed release 状态最终与 cache 可见性收敛。Validate 不改变 release 可见性，因此不失效 cache。
 
 ## 5. 状态与并发
 
@@ -128,7 +133,8 @@ Contract generation、breaking 与 provenance 的当前能力/缺口见 [`../con
 - Vitest 覆盖 domain/application、HTTP/Connect、tenant isolation、boundary decoder、failure recovery、shutdown、
   architecture 与 contract source。
 - PostgreSQL concurrency script 覆盖真实 row lock/receipt；runtime smoke 创建隔离 database、复用共享 Redis namespace，
-  验证 listener/SDK/Site Host/precedence/cache isolation。
+  验证 listener/SDK/Site Host/precedence/cache isolation、draft/retired/foreign-tenant release fail-closed、publish/retire
+  cache invalidation 与 BIGINT version 顺序。
 - CI 安装空 schema 后运行 contract/check/unit/real integration、阻断式 fs scan，并构建镜像。
 - Tag release 在 push 前 build/smoke/scan 本地 production candidate，再请求 SBOM/provenance/attestation。
 
@@ -136,7 +142,7 @@ Contract generation、breaking 与 provenance 的当前能力/缺口见 [`../con
 
 ## 9. 后续目标（未实现）
 
-1. Contract-first 补 Product/Profile/Release Binding 生命周期与 cache invalidation。
+1. Contract-first 补 Product/Profile/Release Binding 管理生命周期及 Config/Policy/Binding mutation cache invalidation。
 2. 为 Config relationship/schema validation 写失败测试并补事务不变量。
 3. 拆分超过 400 行的 HTTP server，同时保持 wire 行为不变。
 4. 增加 bounded inbound timeout/streaming size guard、Redis command deadline、metrics/tracing 与 production alert artifacts。

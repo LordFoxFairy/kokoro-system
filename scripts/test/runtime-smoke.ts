@@ -81,6 +81,26 @@ async function requestStatus(
   return { status: response.status, body };
 }
 
+async function transitionRelease(
+  baseUrl: string,
+  transition: "validate" | "publish" | "retire",
+): Promise<void> {
+  const response = await requestStatus(
+    `${baseUrl}/v1/system/releases/${releaseId}/${transition}`,
+    {
+      method: "POST",
+      headers: {
+        "x-kokoro-tenant-id": tenantA,
+        "x-kokoro-service": "web-bff",
+        "x-kokoro-internal-secret": bffServiceToken,
+        "x-kokoro-iam-permissions": "system:publish",
+        "idempotency-key": `${transition}-release`,
+      },
+    },
+  );
+  assert(response.status === 200, `${transition} release returned ${response.status}`);
+}
+
 function client(baseUrl: string, tenantId: string, tenantHost: string) {
   return createSystemClient({
     baseUrl,
@@ -164,8 +184,8 @@ async function seed(databaseUrl: string): Promise<void> {
     );
     await execute(
       connection,
-      `INSERT INTO system_config_release (id, release_key, status, digest, published_at, created_at, updated_at) VALUES ($1, $2, 'published', $3, $4, $5, $6)`,
-      [releaseId, "smoke-release", "1".repeat(64), now, now, now],
+      `INSERT INTO system_config_release (id, tenant_id, release_key, status, digest, published_at, created_at, updated_at) VALUES ($1, $2, $3, 'draft', $4, NULL, $5, $6)`,
+      [releaseId, tenantA, "smoke-release", "1".repeat(64), now, now],
     );
     await execute(
       connection,
@@ -201,6 +221,32 @@ async function seed(databaseUrl: string): Promise<void> {
       configKey: "default",
       value: { source: "tenant-a" },
       version: 2,
+      releaseId: null,
+    });
+    await insertRecord({
+      id: randomUUID(),
+      tenantId: tenantA,
+      moduleKey: "feature-flags",
+      scopeType: "tenant",
+      scopeId: tenantA,
+      productId: null,
+      locale: "en-US",
+      configKey: "version-nine",
+      value: { enabled: true },
+      version: 9,
+      releaseId: null,
+    });
+    await insertRecord({
+      id: randomUUID(),
+      tenantId: tenantA,
+      moduleKey: "feature-flags",
+      scopeType: "tenant",
+      scopeId: tenantA,
+      productId: null,
+      locale: "en-US",
+      configKey: "version-ten",
+      value: { enabled: true },
+      version: 10,
       releaseId: null,
     });
     await insertRecord({
@@ -315,13 +361,61 @@ async function main(): Promise<void> {
       await runtime.redis.assertReady();
       return true;
     },
-    { bffServiceToken, siteQuery: runtime.siteQuery },
+    {
+      bffServiceToken,
+      siteQuery: runtime.siteQuery,
+      control: runtime.control,
+    },
   );
   const system = await listen(systemServer);
   try {
     await seed(database.databaseUrl);
     const a = client(system.url, tenantA, "tenant-a.example.test");
     const b = client(system.url, tenantB, "tenant-b.example.test");
+    const draftSurface = await a.getRuntimeManifest({
+      productId: productKey,
+      locale: "en-US",
+      surfaceId: surfaceA,
+    });
+    const draftCached = await a.getRuntimeManifest({
+      productId: productKey,
+      locale: "en-US",
+      surfaceId: surfaceA,
+    });
+    const draftTenant = await a.getRuntimeManifest({
+      productId: productKey,
+      locale: "en-US",
+    });
+    await b.getRuntimeManifest({
+      productId: productKey,
+      locale: "en-US",
+    });
+    assert(
+      draftSurface.releaseId === null &&
+        themeSource(draftSurface.theme) === "tenant-a",
+      "draft release binding did not fail closed",
+    );
+    assert(draftCached.digest === draftSurface.digest, "draft cache changed");
+    assert(draftTenant.configVersion === "10", "BIGINT version order failed");
+
+    await transitionRelease(system.url, "validate");
+    const validatedCached = await a.getRuntimeManifest({
+      productId: productKey,
+      locale: "en-US",
+      surfaceId: surfaceA,
+    });
+    assert(
+      validatedCached.releaseId === null,
+      "validated release became visible before publication",
+    );
+    await transitionRelease(system.url, "publish");
+    const tenantBCacheKey = `${redisNamespace}:manifest:${tenantB}:${productKey}:en-US:default`;
+    assert(
+      (await redis.exists(tenantBCacheKey)) === 1,
+      "tenant publication invalidated another tenant cache",
+    );
+    await redis.del(tenantBCacheKey);
+
     const surface = await a.getRuntimeManifest({
       productId: productKey,
       locale: "en-US",
@@ -341,6 +435,7 @@ async function main(): Promise<void> {
       locale: "en-US",
     });
     assert(themeSource(surface.theme) === "surface-a", "surface precedence failed");
+    assert(surface.releaseId === releaseId, "published release was not visible");
     assert(
       surface.productId === productKey,
       "product key response identity failed",
@@ -349,8 +444,22 @@ async function main(): Promise<void> {
     assert(themeSource(tenantOnly.theme) === "tenant-a", "tenant precedence failed");
     assert(themeSource(otherTenant.theme) === "tenant-b", "tenant cache isolation failed");
     assert(
+      otherTenant.releaseId === null,
+      "foreign-tenant published release binding did not fail closed",
+    );
+    assert(
       tenantOnly.tenantId === tenantA && otherTenant.tenantId === tenantB,
       "tenant response identity failed",
+    );
+    await transitionRelease(system.url, "retire");
+    const retired = await a.getRuntimeManifest({
+      productId: productKey,
+      locale: "en-US",
+      surfaceId: surfaceA,
+    });
+    assert(
+      retired.releaseId === null && themeSource(retired.theme) === "tenant-a",
+      "retired release binding did not fail closed",
     );
 
     const missingServiceAuth = await requestStatus(
@@ -412,6 +521,9 @@ async function main(): Promise<void> {
         sdk: true,
         tenantIsolation: true,
         precedence: true,
+        releaseVisibility: true,
+        cacheInvalidation: true,
+        numericVersion: true,
         cacheIdentity: true,
         httpErrors: true,
       }),
@@ -423,6 +535,7 @@ async function main(): Promise<void> {
     await redis.del(
       `${redisNamespace}:manifest:${tenantA}:${productKey}:en-US:surface-a`,
       `${redisNamespace}:manifest:${tenantA}:${productKey}:en-US:default`,
+      `${redisNamespace}:manifest:${tenantB}:${productKey}:en-US:default`,
     );
     await redis.quit();
     await database.drop();

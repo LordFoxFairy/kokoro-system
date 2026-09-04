@@ -6,6 +6,8 @@ import type {
   SystemRepository,
 } from "../src/application/runtime-manifest/ports/index.js";
 import type { RuntimeManifest } from "../src/domain/runtime-manifest/models/index.js";
+import { SystemControlService } from "../src/application/system/services/system-control.service.js";
+import { InMemorySystemControlRepository } from "./doubles/in-memory-system-control-repository.js";
 const manifest: RuntimeManifest = {
   tenantId: "tenant-a",
   productId: "product-a",
@@ -187,4 +189,89 @@ it("keeps surface-specific manifests separate from the default manifest cache en
     "get:manifest:tenant-a:product-a:en-US:default",
     "set:manifest:tenant-a:product-a:en-US:default",
   ]);
+});
+
+describe("release cache visibility", () => {
+  const publishingContext = {
+    tenantId: "tenant-a",
+    actorId: "actor-a",
+    organizationId: null,
+    surfaceId: null,
+    permissions: ["system:read", "system:write", "system:publish"],
+    correlationId: "request-a",
+  } as const;
+
+  it("invalidates all manifests for the tenant when publish or retire changes release visibility", async () => {
+    const invalidatedTenants: string[] = [];
+    const service = new SystemControlService(
+      new InMemorySystemControlRepository(),
+      {
+        invalidateTenant: async (tenantId: string) => {
+          invalidatedTenants.push(tenantId);
+        },
+      },
+    );
+    const release = await service.createRelease(
+      publishingContext,
+      { releaseKey: "r1", digest: "a".repeat(64) },
+      "create-release",
+    );
+
+    await service.validateRelease(
+      publishingContext,
+      release.id,
+      "validate-release",
+    );
+    await service.publishRelease(
+      publishingContext,
+      release.id,
+      "publish-release",
+    );
+    await service.retireRelease(
+      publishingContext,
+      release.id,
+      "retire-release",
+    );
+
+    expect(invalidatedTenants).toEqual(["tenant-a", "tenant-a"]);
+  });
+
+  it("retries post-commit invalidation when a published release command is replayed", async () => {
+    let attempts = 0;
+    const service = new SystemControlService(
+      new InMemorySystemControlRepository(),
+      {
+        invalidateTenant: async () => {
+          attempts += 1;
+          if (attempts === 1) throw new Error("cache unavailable");
+        },
+      },
+    );
+    const release = await service.createRelease(
+      publishingContext,
+      { releaseKey: "r1", digest: "a".repeat(64) },
+      "create-release",
+    );
+    await service.validateRelease(
+      publishingContext,
+      release.id,
+      "validate-release",
+    );
+
+    await expect(
+      service.publishRelease(
+        publishingContext,
+        release.id,
+        "publish-release",
+      ),
+    ).rejects.toThrow("cache unavailable");
+    await expect(
+      service.publishRelease(
+        publishingContext,
+        release.id,
+        "publish-release",
+      ),
+    ).resolves.toMatchObject({ status: "published" });
+    expect(attempts).toBe(2);
+  });
 });

@@ -84,7 +84,7 @@ export class PostgresSystemRepository implements SystemRepository {
       const productUuid = await resolveProductId(client, input.productId);
       if (productUuid === null) return emptyManifest(input);
       const bindings = await client.query<Row>(
-        `SELECT release_id FROM system_release_binding WHERE scope_type = 'tenant' AND scope_id = $1 AND product_id = $2 AND status = 'active' ORDER BY updated_at DESC, id DESC LIMIT 1`,
+        `SELECT binding.release_id FROM system_release_binding AS binding JOIN system_config_release AS release ON release.id = binding.release_id WHERE binding.scope_type = 'tenant' AND binding.scope_id = $1 AND binding.product_id = $2 AND binding.status = 'active' AND release.tenant_id = $1 AND release.status = 'published' ORDER BY binding.updated_at DESC, binding.id DESC LIMIT 1`,
         [input.context.tenantId, productUuid],
       );
       const binding = bindings.rows[0];
@@ -194,11 +194,12 @@ export class PostgresSystemRepository implements SystemRepository {
             ].includes(value.moduleKey),
           )
           .map((value) => value.value),
-        configVersion:
-          values
-            .map((value) => value.configVersion)
-            .sort()
-            .at(-1) ?? "0",
+        configVersion: values
+          .reduce((maximum, value) => {
+            const candidate = BigInt(value.configVersion);
+            return candidate > maximum ? candidate : maximum;
+          }, 0n)
+          .toString(),
         releaseId,
         digest: "",
       };

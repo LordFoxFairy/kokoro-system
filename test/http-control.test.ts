@@ -20,6 +20,11 @@ const manifestService: Pick<RuntimeManifestService, "get"> = {
     digest: "d",
   }),
 };
+function createControlService(): SystemControlService {
+  return new SystemControlService(new InMemorySystemControlRepository(), {
+    invalidateTenant: async () => undefined,
+  });
+}
 async function request(
   server: Server,
   path: string,
@@ -74,7 +79,7 @@ async function request(
 describe("System control HTTP contract", () => {
   it("exposes request_id, permission, pagination and idempotency semantics", async () => {
     const server = createHttpServer(manifestService, async () => true, {
-      control: new SystemControlService(new InMemorySystemControlRepository()),
+      control: createControlService(),
       bffServiceToken: "service-token",
     });
     const headers = {
@@ -129,7 +134,7 @@ describe("System control HTTP contract", () => {
 
   it("does not let a tenant without the IAM permission write a site", async () => {
     const server = createHttpServer(manifestService, async () => true, {
-      control: new SystemControlService(new InMemorySystemControlRepository()),
+      control: createControlService(),
       bffServiceToken: "service-token",
     });
     const result = await request(server, "/v1/system/sites", {
@@ -156,7 +161,7 @@ describe("System control HTTP contract", () => {
 
   it("rejects undeclared and wrongly typed wire fields", async () => {
     const server = createHttpServer(manifestService, async () => true, {
-      control: new SystemControlService(new InMemorySystemControlRepository()),
+      control: createControlService(),
       bffServiceToken: "service-token",
     });
     const headers = {
@@ -218,7 +223,7 @@ describe("System control HTTP contract", () => {
 
   it("requires configured BFF auth for control-plane routes", async () => {
     const server = createHttpServer(manifestService, async () => true, {
-      control: new SystemControlService(new InMemorySystemControlRepository()),
+      control: createControlService(),
       bffServiceToken: "service-token",
     });
     const baseHeaders = {
@@ -241,7 +246,7 @@ describe("System control HTTP contract", () => {
 
   it("fails closed when BFF service auth is not configured", async () => {
     const server = createHttpServer(manifestService, async () => true, {
-      control: new SystemControlService(new InMemorySystemControlRepository()),
+      control: createControlService(),
     });
     const result = await request(server, "/v1/system/sites", {
       headers: {
@@ -263,7 +268,7 @@ describe("System control HTTP contract", () => {
 
   it("rejects malformed query, path and trusted-header values at the HTTP boundary", async () => {
     const server = createHttpServer(manifestService, async () => true, {
-      control: new SystemControlService(new InMemorySystemControlRepository()),
+      control: createControlService(),
       bffServiceToken: "service-token",
     });
     const baseHeaders = {
@@ -310,7 +315,7 @@ describe("System control HTTP contract", () => {
 
   it("rejects an oversized Content-Length before reading the request body", async () => {
     const server = createHttpServer(manifestService, async () => true, {
-      control: new SystemControlService(new InMemorySystemControlRepository()),
+      control: createControlService(),
       bffServiceToken: "service-token",
     });
     await expect(
@@ -338,7 +343,7 @@ describe("System control HTTP contract", () => {
 
   it("rejects a release body that does not satisfy the wire digest schema", async () => {
     const server = createHttpServer(manifestService, async () => true, {
-      control: new SystemControlService(new InMemorySystemControlRepository()),
+      control: createControlService(),
       bffServiceToken: "service-token",
     });
     await expect(

@@ -28,6 +28,7 @@ export async function createSystemRuntime(
     siteQuery: new SiteQueryService(siteHostResolver),
     control: new SystemControlService(
       new PostgresSystemControlRepository(pool),
+      redis,
     ),
   };
 }

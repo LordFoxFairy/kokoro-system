@@ -1,6 +1,6 @@
 # kokoro-system 数据模型
 
-状态：当前 canonical schema 说明，2026-09-03。唯一可执行事实源是
+状态：当前 canonical schema 说明，2026-09-04。唯一可执行事实源是
 [`../database/schema.sql`](../database/schema.sql)；本文记录 owner、不变量、查询依据和缺口，不替代 SQL。
 
 ## 1. 存储策略
@@ -21,8 +21,8 @@
 |---|---|---|---|
 | `system_product` | Product catalog key/name/status | global | Manifest read；无 HTTP writer |
 | `system_product_profile` | Product profile/version | global | Schema only；当前 source 无 reader/writer |
-| `system_config_release` | Config release/digest/state/version | nullable column；HTTP writer 为 tenant | HTTP create/transition；Manifest 不校验 release 状态 |
-| `system_release_binding` | scope/product 到 release 的 active binding | `scope_type/scope_id` 表达 | Manifest read；无 application writer |
+| `system_config_release` | Config release/digest/state/version | nullable column；HTTP writer 为 tenant | HTTP create/transition；Manifest 只读取同 tenant published release |
+| `system_release_binding` | scope/product 到 release 的 active binding | `scope_type/scope_id` 表达 | Manifest 将 active tenant binding 与同 tenant published release 联查；无 application writer |
 | `system_config_record` | module/config/scope/locale/value/version/release | global 可 null，其余 tenant | HTTP list/upsert；Manifest assembly |
 | `system_audit_event` | 未接入的 audit-shaped schema artifact | nullable | Schema only；当前 source 无 writer/reader，需与 IAM Audit owner 重新确认 |
 | `system_site` | Tenant Site identity/display/timezone/state | required | HTTP create/list；Host resolution |
@@ -61,11 +61,13 @@ system_config_release.id
 - Policy put 先查同 tenant Site，锁当前 active policy，原位 version + 1。
 - Site Host resolve 同时约束 tenant、active Site、active Host，并用 tenant+site LEFT JOIN active policy。
 - Release transition 锁 release，检查顺序状态，并按 expected version update。
+- Manifest 的 tenant binding 与 Config Release 按 `release_id` 联查，并同时要求 binding active、release tenant 与请求 tenant
+  一致、release status=`published`；不满足时 release-specific Config 不进入结果。
 
 **缺口**
 
 - Config upsert 未验证 `product_id`、`release_id` 的存在、tenant、状态或 scope 一致性。
-- Release Binding 没有 application writer；active binding 也未和 published release 做事务/查询校验。
+- Release Binding 没有 application writer，publish 也不自动创建 binding。
 - Product/Profile 没有 application management surface。
 - 不同 idempotency key 并发创建同一 Config identity 时，当前“先查再写”没有 UNIQUE 兜底，可能产生重复 active rows。
 - Policy 查询只看 active policy；Site archive/suspend lifecycle surface 尚不存在，关系回收没有实现。
@@ -105,7 +107,8 @@ transition 已实现。
 
 ## 6. 查询、索引与 cursor
 
-- Manifest lookup 使用 product status/key、tenant+product active binding、tenant/locale/module/scope/product/status config indexes。
+- Manifest lookup 使用 product status/key、tenant+product active binding、release tenant/status 与
+  tenant/locale/module/scope/product/status config indexes；输出 version 使用 BIGINT 数值最大值。
 - Site/Host、Workspace、Policy query 的索引以 tenant 作为前导或显式过滤条件。
 - Audit Event 索引支持 tenant+time 与 command 查找，但当前没有 runtime query。
 - Command Receipt 唯一索引支持 claim conflict，created index为未来 retention/inspection 提供顺序。

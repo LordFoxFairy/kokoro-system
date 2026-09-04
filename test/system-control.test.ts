@@ -19,11 +19,15 @@ const context = (
   correlationId: "00000000-0000-4000-8000-000000000001",
 });
 
+function createService(): SystemControlService {
+  return new SystemControlService(new InMemorySystemControlRepository(), {
+    invalidateTenant: async () => undefined,
+  });
+}
+
 describe("SystemControlService", () => {
   it("keeps sites and workspaces tenant isolated", async () => {
-    const service = new SystemControlService(
-      new InMemorySystemControlRepository(),
-    );
+    const service = createService();
     const site = await service.createSite(
       context("tenant-a"),
       { siteKey: "main", hostname: "a.example.test", displayName: "A" },
@@ -44,9 +48,7 @@ describe("SystemControlService", () => {
   });
 
   it("returns the same result for a repeated idempotency key and rejects a changed command", async () => {
-    const service = new SystemControlService(
-      new InMemorySystemControlRepository(),
-    );
+    const service = createService();
     const first = await service.createSite(
       context("tenant-a"),
       { siteKey: "main", hostname: "a.example.test", displayName: "A" },
@@ -73,9 +75,7 @@ describe("SystemControlService", () => {
   });
 
   it("serializes concurrent calls with the same idempotency key into one mutation", async () => {
-    const service = new SystemControlService(
-      new InMemorySystemControlRepository(),
-    );
+    const service = createService();
     const input = {
       siteKey: "concurrent",
       hostname: "concurrent.example.test",
@@ -94,9 +94,7 @@ describe("SystemControlService", () => {
   });
 
   it("enforces write permissions and release transitions", async () => {
-    const service = new SystemControlService(
-      new InMemorySystemControlRepository(),
-    );
+    const service = createService();
     await expect(
       service.createSite(
         context("tenant-a", ["system:read"]),
@@ -130,9 +128,7 @@ describe("SystemControlService", () => {
   });
 
   it("versions site policy and scopes configuration to the caller tenant", async () => {
-    const service = new SystemControlService(
-      new InMemorySystemControlRepository(),
-    );
+    const service = createService();
     const site = await service.createSite(
       context("tenant-a"),
       { siteKey: "main", hostname: "a.example.test", displayName: "A" },

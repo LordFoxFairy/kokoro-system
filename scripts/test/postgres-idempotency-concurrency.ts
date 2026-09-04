@@ -25,6 +25,7 @@ const context: TenantRequestContext = {
 const pool = new PostgresPool(databaseUrl);
 const service = new SystemControlService(
   new PostgresSystemControlRepository(pool),
+  { invalidateTenant: async () => undefined },
 );
 const inspection = new Client({ connectionString: databaseUrl });
 let inspectionConnected = false;
