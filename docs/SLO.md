@@ -1,115 +1,105 @@
 # kokoro-system SLO
 
-本文定义 `kokoro-system` 的生产服务等级目标（SLO）、测量口径、错误预算和告警阈值。这里的百分比与延迟均为
-**目标值**，不是当前实测值。仓库尚未保存生产期 SLI 时间序列或基线报告；release smoke 只证明发布时点的可用性，
-不得当作滚动窗口实测值。
+状态：**目标**，2026-09-03。仓库没有生产期 SLI 时间序列、完整窗口报告、dashboard 或告警执行记录；下列百分比、
+延迟和错误预算不是当前实测值。Release/local smoke 只证明执行时点的路径可用，不能替代滚动窗口数据。
 
-故障处置、依赖排查和回滚步骤见 [`runbook.md`](./runbook.md)。Wire contract 见
-[`api-contract.md`](./api-contract.md)。
+故障处置见 [`RUNBOOK.md`](RUNBOOK.md)，可靠性机制/缺口见 [`RELIABILITY.md`](RELIABILITY.md)，surface 见
+[`API_CONTRACT.md`](API_CONTRACT.md)。
 
-## 1. Surface 分组
+## 1. Owner 与窗口
 
-| 分组 | 实际 surface | 用途 |
-|---|---|---|
-| Runtime data plane | `GET /v1/system/runtime-manifest` | 读取租户、产品、locale、surface 对应的运行时配置 |
-| Site resolution RPC | Connect `kokoro.site.v1.SiteService/ResolveSiteByHost` | 按受信 tenant context 与 host 解析 Site |
-| Control plane reads | `GET /v1/system/sites`、`GET /v1/system/workspaces`、`GET /v1/system/sites/{site_id}/policy`、`GET /v1/system/config` | 读取 System-owned 资源 |
-| Control plane commands | `POST /v1/system/sites`、`POST /v1/system/workspaces`、`PUT /v1/system/sites/{site_id}/policy`、`POST /v1/system/config`、`POST /v1/system/releases`、三个 release transition endpoint | 幂等创建、更新和状态迁移 |
-| Probes | `GET /healthz`、`GET /readyz` | liveness 与依赖 readiness，不计入业务 availability |
+- Service owner：System team（具体 on-call roster 由部署平台登记，仓库当前未保存个人信息）。
+- 统计窗口：rolling 30 days。
+- Eligible traffic：经 service auth 并进入业务 handler 的生产请求；probe 单独监控，不进入业务 availability SLI。
+- 维度：`surface_group`、`operation`、`result`、`dependency`；禁止把 tenant/request/trace/token 作为 metrics label。
 
-旧 `/system/*` 与伪 `/rpc/*` JSON 路径不是 surface，不进入 SLI。
+## 2. Surface groups
 
-## 2. SLI 口径与目标
+| Group | Operations |
+|---|---|
+| Runtime data plane | `GET /v1/system/runtime-manifest` |
+| Site resolution RPC | Connect `kokoro.site.v1.SiteService/ResolveSiteByHost` |
+| Control-plane reads | Site/Workspace/Policy/Config GET |
+| Control-plane commands | Site/Workspace/Policy/Config/Release mutation 与 transition |
+| Probes | `/healthz`、`/readyz`；单独告警，不计业务 SLO |
 
-### 2.1 Availability
-
-采用滚动 30 天请求口径：
+## 3. Availability target
 
 ```text
 availability = good eligible requests / all eligible requests
 ```
 
-| 分组 | Availability SLO | Good request |
+| Group | 30-day target | Good request |
 |---|---:|---|
-| Runtime data plane | 99.90% | HTTP 2xx 且响应满足 `data/meta` contract |
-| Site resolution RPC | 99.90% | Connect success 且响应可由生成协议解析 |
-| Control plane reads | 99.90% | HTTP 2xx 且响应满足 `data/meta` contract |
-| Control plane commands | 99.50% | 契约允许的 2xx；重放返回同一业务结果也计 good |
+| Runtime data plane | 99.90% | 2xx 且 response 满足 contract |
+| Site resolution RPC | 99.90% | Connect success 且 generated type 可解析 |
+| Control-plane reads | 99.90% | 2xx 且 response 满足 contract |
+| Control-plane commands | 99.50% | Contract 允许的 2xx；idempotent replay 返回首次结果也计 good |
 
-以下请求从 availability 分母排除：调用方主动取消、已验证的客户端网络中断、`INVALID_ARGUMENT`/HTTP 400、
-认证授权失败、资源不存在、幂等 key digest 冲突和业务状态冲突。服务端 `5xx`、Connect `Internal`/`Unavailable`、
-超时、畸形成功响应以及 readiness 期间仍被送入的失败业务请求计 bad。排除规则必须由稳定 error code 实现，
-不得按错误消息文本分类。
+排除：caller 主动取消、确认的 caller network failure、400 validation/cursor/state、403 auth/permission、404 resource、409
+business/idempotency conflict。计 bad：服务端 5xx、Connect Internal/Unavailable、deadline、malformed success、ready instance
+仍接收并失败的业务流量。分类只能使用稳定 status/code，不按 message 文本。
 
-### 2.2 Latency
+**目标缺口**：当前没有 metrics exporter，因而还不能按上述规则生成生产分子/分母。
 
-Latency 只统计 eligible requests，从服务收到请求到响应完成；超时同时计入 availability bad request。目标按滚动
-30 天分别计算 p95/p99，不把 release smoke 延迟当作生产分位数。
+## 4. Latency target
 
-| 分组 | p95 目标 | p99 目标 |
+Latency 从服务收到 request 到 response 完成，按 eligible request 的 rolling 30-day p95/p99；deadline 同时计 availability bad。
+
+| Group | p95 | p99 |
 |---|---:|---:|
-| Runtime data plane | ≤ 250 ms | ≤ 750 ms |
-| Site resolution RPC | ≤ 150 ms | ≤ 500 ms |
-| Control plane reads | ≤ 300 ms | ≤ 1,000 ms |
-| Control plane commands | ≤ 500 ms | ≤ 1,500 ms |
+| Runtime data plane | <= 250 ms | <= 750 ms |
+| Site resolution RPC | <= 150 ms | <= 500 ms |
+| Control-plane reads | <= 300 ms | <= 1,000 ms |
+| Control-plane commands | <= 500 ms | <= 1,500 ms |
 
-Runtime Manifest 的 Redis hit/miss 应另设维度观测，但统一 SLO 不因 cache miss 放宽。命令的 PostgreSQL receipt lock
-等待时间包含在端到端 latency 中。
+Manifest 应按 Redis hit/miss 分维度，但 cache miss 不放宽整体目标；command lock wait 包含在端到端 latency。当前 structured
+log 有 `duration_ms`，但没有 histogram/exporter 或生产分位数聚合。
 
-## 3. Readiness 与依赖
+## 5. Dependency/readiness objective
 
-- `/healthz` 是进程 liveness，只验证 HTTP 进程能响应，不访问 PostgreSQL 或 Redis。
-- `/readyz` 每次真实执行 PostgreSQL ping 与 Redis `PING`；两者都成功才返回 200/`ready`。
-- PostgreSQL 或 Redis 任一失败、超时或连接不可建立时，`/readyz` 返回 503，实例应从流量入口摘除。
-- Runtime Manifest 依赖 PostgreSQL Site/Host 事实与 Redis cache；不使用进程内或旧快照降级。
-- Control plane mutation 依赖 PostgreSQL；receipt claim、digest 比较、业务 mutation 和结果保存位于同一事务/锁边界。
-- 生产镜像 `HEALTHCHECK` 调用 `/readyz`；release-image 还必须对生产镜像执行 `/healthz` 与 `/readyz` smoke。
+- `/healthz` 只检查 process liveness。
+- `/readyz` 每次真实 ping PostgreSQL 与 Redis；任一失败实例应从流量入口移除。
+- Runtime Manifest 不使用 stale/in-process fallback；依赖失败按 503 计入 availability。
+- 目标：可用实例数为 0 的持续时间不得被 probe 正常掩盖；deployment 必须以 `/readyz` 做 admission。
 
-依赖客户端指标至少按 `dependency=postgres|redis`、`operation`、`result` 统计请求数、错误数和延迟；连接串、token、
-SQL 原文和 payload 不得进入标签或日志。
+生产监控应至少采集 dependency operation count/error/latency、pool saturation、Redis reconnect、cache hit/miss/decode mismatch、
+receipt lock wait/idempotency conflict、release transition 和 process restart。当前这些 metrics 未实现。
 
-## 4. 错误预算
+## 6. Error budget
 
-30 天按连续 43,200 分钟计算：
+30 天按 43,200 分钟仅作直观换算；请求型 SLI 的正式预算按 bad request 数消耗。
 
-| Availability SLO | 最大 bad request 比例 | 等价连续不可用时间上限（仅用于直观换算） |
+| Target | 最大 bad ratio | 等价连续不可用时间 |
 |---|---:|---:|
 | 99.90% | 0.10% | 43 分 12 秒 |
 | 99.50% | 0.50% | 3 小时 36 分 |
 
-请求型 SLI 的正式预算按 bad request 数量消耗，不能只按探针停机时间计算。预算策略：
+目标政策：
 
-1. 30 天预算消耗达到 50%：暂停非必要可靠性风险变更，完成 owner 复盘。
-2. 达到 75%：冻结非紧急发布，优先修复主要错误来源并验证 runbook。
-3. 达到 100%：停止功能发布；只允许恢复、可靠性和安全修复，直到滚动窗口恢复或 owner 明确接受风险。
+1. 消耗 50%：暂停非必要可靠性风险变更，owner 复盘主要错误来源。
+2. 消耗 75%：冻结非紧急发布，执行 runbook/failure drill。
+3. 消耗 100%：只允许恢复、可靠性和安全变更，直到 rolling window 恢复或风险被书面接受。
 
-## 5. 告警阈值
+该政策尚无自动 enforcement 或生产预算数据。
 
-告警按 surface 分组，低流量时使用事件数下限，避免单个请求产生无意义分页；具体流量下限在接入监控平台后按生产
-基线配置并记录，不在本文件伪造。
+## 7. Alert objectives
 
-| 级别 | 条件 | 动作 |
+| Severity | Target condition | Action |
 |---|---|---|
-| Page | 99.90% SLO 的 1 小时 burn rate ≥ 14.4，且 5 分钟窗口同样超阈值 | 立即按 runbook 检查依赖、最近发布和错误 code |
-| Page | 99.90% SLO 的 6 小时 burn rate ≥ 6，且 30 分钟窗口同样超阈值 | 当班响应并限制发布 |
-| Ticket | 3 天 burn rate ≥ 1 | owner 在下一个工作日内分析预算消耗 |
-| Page | 任一生产实例 `/readyz` 连续失败 5 分钟，或可用实例为 0 | 检查 PostgreSQL、Redis、连接池与部署 |
-| Warning | 任一业务分组 p95 连续两个 10 分钟窗口超目标 | 检查 DB/Redis latency、lock wait 与 cache miss |
-| Page | 任一业务分组 p99 连续 10 分钟超目标且达到生产流量下限 | 检查尾延迟、事务锁和依赖饱和 |
-| Page | `service_auth_not_configured` 在生产出现 | 检查 secret 注入；该错误表示业务 surface fail closed |
+| Page | 99.90% SLO：1h burn >=14.4 且 5m 同时超阈值 | 立即查依赖、发布、error code |
+| Page | 99.90% SLO：6h burn >=6 且 30m 同时超阈值 | 当班响应并限制发布 |
+| Ticket | 3d burn >=1 | 下一个工作日分析预算 |
+| Page | ready instance 为 0，或单实例 `/readyz` 连续失败 5m | 查 PostgreSQL/Redis/pool/deploy |
+| Warning | 任一业务组 p95 连续两个 10m window 超目标 | 查 DB/Redis/cache/lock |
+| Page | 任一业务组 p99 连续 10m 超目标且达到流量下限 | 查 tail latency/saturation |
+| Page | 生产出现 `service_auth_not_configured` | 查 secret 注入/部署配置 |
+| Page | cross-tenant/cache identity mismatch > 0 | 隔离实例并按安全事件处理 |
 
-Control plane 99.50% SLO 的 burn rate 使用其自身 0.50% 预算计算，不与 99.90% 分组共用分母。
+低流量事件数下限、具体 query、dashboard 和 routing 尚未配置，不能把本表视为已部署告警。
 
-## 6. 遥测字段与当前基线状态
+## 8. Evidence required after launch
 
-每个请求和生命周期事件输出结构化 JSON，至少包含：
-
-```text
-service, operation, request_id, trace_id, result, duration_ms
-```
-
-监控后端应从同一稳定 operation 维度生成请求计数、错误计数和延迟 histogram，并从 `/readyz` 与容器 health 状态生成
-依赖 readiness 信号。`request_id` 用于单次请求排查，`trace_id` 用于跨服务关联，两者不得成为指标 label。
-
-当前状态：仓库内没有生产滚动 30 天 availability、p95、p99、错误预算消耗或告警历史，因而本文件不声明任何“当前
-达到值”。上线后首个完整窗口应生成独立基线报告，并保持目标与实测值分离。
+每个完整窗口应保存：commit/image digest、deployment interval、eligible/bad counts、p50/p95/p99、budget burn、dependency/cache
+breakdown、incident/release annotations、missing-data rate 和 query/version。首次完整窗口建立 baseline，但不修改本文件的目标
+来掩盖不足；实测报告应独立保存并链接到受控 observability system。
