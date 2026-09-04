@@ -38,7 +38,7 @@ async function request(server: Server): Promise<void> {
           port: address.port,
           path: "/healthz",
           headers: {
-            "x-kokoro-request-id": "request-a",
+            "x-kokoro-request-id": "00000000-0000-4000-8000-000000000011",
             "x-kokoro-trace-id": "trace-a",
           },
         },
@@ -70,7 +70,7 @@ describe("structured request logging", () => {
     expect(entries[0]).toEqual({
       service: "kokoro-system",
       operation: "http.GET.healthz",
-      request_id: "request-a",
+      request_id: "00000000-0000-4000-8000-000000000011",
       trace_id: "trace-a",
       result: "success",
       duration_ms: expect.any(Number),

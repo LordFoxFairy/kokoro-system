@@ -6,11 +6,9 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { RuntimeManifestService } from "../../application/runtime-manifest/services/runtime-manifest.service.js";
-import type { TenantRequestContext } from "../../domain/runtime-manifest/models/index.js";
 import { SystemDomainError } from "../../domain/system/errors/system-domain.error.js";
 import type {
   ConfigInput,
-  PageRequest,
   ReleaseInput,
   SiteInput,
   WorkspaceInput,
@@ -33,9 +31,19 @@ import {
 } from "./wire-mappers.js";
 import { createSiteServiceHandler } from "../rpc/site-service.js";
 import type { StructuredLogger } from "../observability/structured-logger.js";
-
-class RequestValidationError extends Error {}
-type JsonRecord = Readonly<Record<string, unknown>>;
+import {
+  parseContext,
+  parsePageQuery,
+  parseHost,
+  parsePathUuid,
+  parseRequestId,
+  parseRuntimeManifestQuery,
+  parseTraceId,
+  requiredHeader,
+  readJsonObject,
+  RequestValidationError,
+  type JsonObject,
+} from "./request-schemas.js";
 type HttpOptions = Readonly<{
   control?: SystemControlService;
   siteQuery?: Pick<SiteQueryService, "resolveSiteByHost">;
@@ -98,101 +106,66 @@ function sendError(
     requestId,
   );
 }
-function requiredHeader(request: IncomingMessage, name: string): string {
-  const value = request.headers[name];
-  if (typeof value !== "string" || value.trim() === "")
-    throw new RequestValidationError(`${name} is required`);
-  return value.trim();
-}
-function optionalHeader(request: IncomingMessage, name: string): string | null {
-  const value = request.headers[name];
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
 function forwardedHost(request: IncomingMessage): string {
-  const forwarded = optionalHeader(request, "forwarded");
+  const forwarded = request.headers.forwarded;
   if (forwarded) {
+    if (Array.isArray(forwarded))
+      throw new RequestValidationError("forwarded is invalid");
     const first = forwarded.split(",", 1)[0] ?? "";
     const match =
       /(?:^|;)\s*host=(?:"([^"\\]*(?:\\.[^"\\]*)*)"|([^;\s]+))/iu.exec(first);
     const host = match?.[1] ?? match?.[2];
-    if (host) return host;
+    if (host?.trim()) return parseHost(host);
+    throw new RequestValidationError("forwarded is invalid");
   }
-  return optionalHeader(request, "host") ?? "";
+  const host = request.headers.host;
+  if (Array.isArray(host))
+    throw new RequestValidationError("host is invalid");
+  if (typeof host !== "string" || !host.trim())
+    throw new RequestValidationError("host is required");
+  return parseHost(host);
 }
-function requiredQuery(url: URL, name: string): string {
-  const value = url.searchParams.get(name);
-  if (!value?.trim()) throw new RequestValidationError(`${name} is required`);
-  return value.trim();
-}
-function context(
-  request: IncomingMessage,
-  requestId: string,
-  surfaceId: string | null = null,
-): TenantRequestContext {
-  const permissionHeader = optionalHeader(request, "x-kokoro-iam-permissions");
-  return {
-    tenantId: requiredHeader(request, "x-kokoro-tenant-id"),
-    actorId: optionalHeader(request, "x-kokoro-actor-id"),
-    organizationId: optionalHeader(request, "x-kokoro-organization-id"),
-    surfaceId,
-    permissions: permissionHeader
-      ? permissionHeader
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean)
-      : [],
-    correlationId: requestId,
-  };
-}
-function idempotencyKey(request: IncomingMessage): string {
-  return requiredHeader(request, "idempotency-key");
-}
-function jsonRecord(value: unknown): JsonRecord {
-  if (typeof value !== "object" || value === null || Array.isArray(value))
-    throw new RequestValidationError("JSON body must be an object");
-  return Object.fromEntries(Object.entries(value));
-}
-async function body(request: IncomingMessage): Promise<JsonRecord> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of request)
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
-  const raw = Buffer.concat(chunks);
-  if (raw.length > 1_000_000)
-    throw new RequestValidationError("request body is too large");
-  try {
-    return jsonRecord(JSON.parse(raw.toString("utf8")));
-  } catch (error) {
-    if (error instanceof RequestValidationError) throw error;
-    throw new RequestValidationError("request body must be valid JSON");
-  }
-}
-function stringField(input: JsonRecord, name: string): string {
+function stringField(
+  input: JsonObject,
+  name: string,
+  maxLength = 160,
+): string {
   const value = input[name];
   if (typeof value !== "string" || !value.trim())
     throw new RequestValidationError(`${name} is required`);
+  if (value.trim().length > maxLength)
+    throw new RequestValidationError(`${name} is invalid`);
   return value.trim();
 }
-function nullableStringField(input: JsonRecord, name: string): string | null {
+function idempotencyKey(request: IncomingMessage): string {
+  return requiredHeader(request.headers, "idempotency-key", 128);
+}
+function nullableStringField(input: JsonObject, name: string): string | null {
   if (!Object.hasOwn(input, name))
     throw new RequestValidationError(`${name} is required`);
   const value = input[name];
   if (value === null) return null;
   if (typeof value !== "string")
     throw new RequestValidationError(`${name} must be a string or null`);
+  if (value.length > 160)
+    throw new RequestValidationError(`${name} is invalid`);
   return value;
 }
-function unknownField(input: JsonRecord, name: string): unknown {
+function jsonValueField(input: JsonObject, name: string): JsonObject[string] {
   if (!Object.hasOwn(input, name))
     throw new RequestValidationError(`${name} is required`);
-  return input[name];
+  const value = input[name];
+  if (value === undefined)
+    throw new RequestValidationError(`${name} is required`);
+  return value;
 }
-function onlyFields(input: JsonRecord, allowed: readonly string[]): void {
+function onlyFields(input: JsonObject, allowed: readonly string[]): void {
   const allowedFields = new Set(allowed);
   const unexpected = Object.keys(input).find((name) => !allowedFields.has(name));
   if (unexpected !== undefined)
     throw new RequestValidationError(`${unexpected} is not allowed`);
 }
-function stringArray(input: JsonRecord, name: string): string[] {
+function stringArray(input: JsonObject, name: string): string[] {
   const value = input[name];
   if (
     !Array.isArray(value) ||
@@ -201,13 +174,13 @@ function stringArray(input: JsonRecord, name: string): string[] {
     throw new RequestValidationError(`${name} must be a string array`);
   return value.map((item) => String(item).trim());
 }
-function booleanField(input: JsonRecord, name: string): boolean {
+function booleanField(input: JsonObject, name: string): boolean {
   const value = input[name];
   if (typeof value !== "boolean")
     throw new RequestValidationError(`${name} is required`);
   return value;
 }
-function scopeTypeField(input: JsonRecord): ConfigInput["scopeType"] {
+function scopeTypeField(input: JsonObject): ConfigInput["scopeType"] {
   const value = stringField(input, "scope_type");
   switch (value) {
     case "global":
@@ -218,14 +191,6 @@ function scopeTypeField(input: JsonRecord): ConfigInput["scopeType"] {
     default:
       throw new RequestValidationError("scope_type is invalid");
   }
-}
-function pageQuery(url: URL): PageRequest {
-  const cursor = url.searchParams.get("cursor");
-  const limit = url.searchParams.get("limit");
-  return {
-    ...(cursor === null ? {} : { cursor }),
-    ...(limit === null ? {} : { limit: Number(limit) }),
-  };
 }
 function controlRequired(
   control: SystemControlService | undefined,
@@ -253,9 +218,8 @@ export function createHttpServer(
     : null;
   return createServer(async (request, response) => {
     const requestPath = new URL(request.url ?? "/", "http://localhost").pathname;
-    const requestId =
-      optionalHeader(request, "x-kokoro-request-id") ?? randomUUID();
-    const traceId = optionalHeader(request, "x-kokoro-trace-id") ?? requestId;
+    let requestId: string = randomUUID();
+    let traceId = requestId;
     const startedAt = process.hrtime.bigint();
     response.once("finish", () => {
       if (!options.logger) return;
@@ -283,6 +247,8 @@ export function createHttpServer(
       return siteServiceHandler(request, response);
     try {
       const url = new URL(request.url ?? "/", "http://localhost");
+      requestId = parseRequestId(request.headers["x-kokoro-request-id"], requestId);
+      traceId = parseTraceId(request.headers, requestId);
       if (request.method === "GET" && url.pathname === "/healthz")
         return sendSuccess(
           response,
@@ -313,12 +279,10 @@ export function createHttpServer(
       if (url.pathname.startsWith("/v1/system/"))
         requireBffServiceAuth(request, options.bffServiceToken);
       if (request.method === "GET" && manifestRoute) {
-        const productId = requiredQuery(url, "product_id");
-        const locale = url.searchParams.get("locale") ?? "en-US";
-        const surfaceId = url.searchParams.get("surface_id") ?? null;
+        const { productId, locale, surfaceId } = parseRuntimeManifestQuery(url);
         const host = forwardedHost(request);
         const manifest = await service.get({
-          context: context(request, requestId, surfaceId),
+          context: parseContext(request.headers, requestId, surfaceId),
           productId,
           locale,
           host,
@@ -336,7 +300,7 @@ export function createHttpServer(
         url.pathname.startsWith("/v1/system/") &&
         url.pathname !== "/v1/system/runtime-manifest"
       ) {
-        context(request, requestId);
+        parseContext(request.headers, requestId);
       }
       if (request.method === "GET" && url.pathname === "/v1/system/sites")
         return sendSuccess(
@@ -344,15 +308,19 @@ export function createHttpServer(
           200,
           pageToWire(
             await controlRequired(control).listSites(
-              context(request, requestId),
-              pageQuery(url),
+              parseContext(request.headers, requestId),
+              parsePageQuery(url),
             ),
             siteToWire,
           ),
           requestId,
         );
       if (request.method === "POST" && url.pathname === "/v1/system/sites") {
-        const input = await body(request);
+        const input = await readJsonObject(
+          request,
+          request.headers["content-length"],
+          () => request.resume(),
+        );
         onlyFields(input, ["site_key", "hostname", "display_name"]);
         const value: SiteInput = {
           siteKey: stringField(input, "site_key"),
@@ -364,7 +332,7 @@ export function createHttpServer(
           201,
           siteToWire(
             await controlRequired(control).createSite(
-              context(request, requestId),
+              parseContext(request.headers, requestId),
               value,
               idempotencyKey(request),
             ),
@@ -381,8 +349,8 @@ export function createHttpServer(
           200,
           pageToWire(
             await controlRequired(control).listWorkspaces(
-              context(request, requestId),
-              pageQuery(url),
+              parseContext(request.headers, requestId),
+              parsePageQuery(url),
             ),
             workspaceToWire,
           ),
@@ -392,7 +360,11 @@ export function createHttpServer(
         request.method === "POST" &&
         url.pathname === "/v1/system/workspaces"
       ) {
-        const input = await body(request);
+        const input = await readJsonObject(
+          request,
+          request.headers["content-length"],
+          () => request.resume(),
+        );
         onlyFields(input, ["site_id", "workspace_key", "name"]);
         const value: WorkspaceInput = {
           siteId: stringField(input, "site_id"),
@@ -404,7 +376,7 @@ export function createHttpServer(
           201,
           workspaceToWire(
             await controlRequired(control).createWorkspace(
-              context(request, requestId),
+              parseContext(request.headers, requestId),
               value,
               idempotencyKey(request),
             ),
@@ -421,14 +393,18 @@ export function createHttpServer(
           200,
           sitePolicyToWire(
             await controlRequired(control).getPolicy(
-              context(request, requestId),
-              policy[1] ?? "",
+              parseContext(request.headers, requestId),
+              parsePathUuid(policy[1] ?? "", "site_id"),
             ),
           ),
           requestId,
         );
       if (policy && request.method === "PUT") {
-        const input = await body(request);
+        const input = await readJsonObject(
+          request,
+          request.headers["content-length"],
+          () => request.resume(),
+        );
         onlyFields(input, [
           "default_locale",
           "allowed_locales",
@@ -448,8 +424,8 @@ export function createHttpServer(
           200,
           sitePolicyToWire(
             await controlRequired(control).putPolicy(
-              context(request, requestId),
-              policy[1] ?? "",
+              parseContext(request.headers, requestId),
+              parsePathUuid(policy[1] ?? "", "site_id"),
               value,
               idempotencyKey(request),
             ),
@@ -461,18 +437,25 @@ export function createHttpServer(
         request.method === "POST" &&
         url.pathname === "/v1/system/releases"
       ) {
-        const input = await body(request);
+        const input = await readJsonObject(
+          request,
+          request.headers["content-length"],
+          () => request.resume(),
+        );
         onlyFields(input, ["release_key", "digest"]);
+        const digest = stringField(input, "digest", 64);
+        if (!/^[0-9a-f]{64}$/u.test(digest))
+          throw new RequestValidationError("digest is invalid");
         const value: ReleaseInput = {
-          releaseKey: stringField(input, "release_key"),
-          digest: stringField(input, "digest"),
+          releaseKey: stringField(input, "release_key", 128),
+          digest,
         };
         return sendSuccess(
           response,
           201,
           releaseToWire(
             await controlRequired(control).createRelease(
-              context(request, requestId),
+              parseContext(request.headers, requestId),
               value,
               idempotencyKey(request),
             ),
@@ -486,15 +469,19 @@ export function createHttpServer(
           200,
           pageToWire(
             await controlRequired(control).listConfigs(
-              context(request, requestId),
-              pageQuery(url),
+              parseContext(request.headers, requestId),
+              parsePageQuery(url),
             ),
             configToWire,
           ),
           requestId,
         );
       if (request.method === "POST" && url.pathname === "/v1/system/config") {
-        const input = await body(request);
+        const input = await readJsonObject(
+          request,
+          request.headers["content-length"],
+          () => request.resume(),
+        );
         onlyFields(input, [
           "module_key",
           "config_key",
@@ -521,7 +508,7 @@ export function createHttpServer(
           scopeId: nullableStringField(input, "scope_id"),
           productId: nullableStringField(input, "product_id"),
           locale: nullableStringField(input, "locale"),
-          value: unknownField(input, "value"),
+          value: jsonValueField(input, "value"),
           schemaVersion,
           releaseId: nullableStringField(input, "release_id"),
         };
@@ -530,7 +517,7 @@ export function createHttpServer(
           201,
           configToWire(
             await controlRequired(control).upsertConfig(
-              context(request, requestId),
+              parseContext(request.headers, requestId),
               value,
               idempotencyKey(request),
             ),
@@ -543,24 +530,24 @@ export function createHttpServer(
           url.pathname,
         );
       if (release && request.method === "POST") {
-        const id = release[1] ?? "";
+        const id = parsePathUuid(release[1] ?? "", "release_id");
         const key = idempotencyKey(request);
         const target = release[2];
         const value =
           target === "validate"
             ? await controlRequired(control).validateRelease(
-                context(request, requestId),
+                parseContext(request.headers, requestId),
                 id,
                 key,
               )
             : target === "publish"
               ? await controlRequired(control).publishRelease(
-                  context(request, requestId),
+                parseContext(request.headers, requestId),
                   id,
                   key,
                 )
               : await controlRequired(control).retireRelease(
-                  context(request, requestId),
+                parseContext(request.headers, requestId),
                   id,
                   key,
                 );

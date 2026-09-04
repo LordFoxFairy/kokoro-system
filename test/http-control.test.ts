@@ -260,4 +260,107 @@ describe("System control HTTP contract", () => {
       meta: { request_id: expect.any(String) },
     });
   });
+
+  it("rejects malformed query, path and trusted-header values at the HTTP boundary", async () => {
+    const server = createHttpServer(manifestService, async () => true, {
+      control: new SystemControlService(new InMemorySystemControlRepository()),
+      bffServiceToken: "service-token",
+    });
+    const baseHeaders = {
+      "x-kokoro-tenant-id": "tenant-a",
+      "x-kokoro-service": "web-bff",
+      "x-kokoro-internal-secret": "service-token",
+      "x-kokoro-iam-permissions": "system:read",
+    };
+
+    await expect(
+      request(server, "/v1/system/sites?limit=not-a-number", {
+        headers: baseHeaders,
+      }),
+    ).resolves.toMatchObject({
+      status: 400,
+      body: {
+        error: { code: "INVALID_ARGUMENT", message: "limit is invalid" },
+      },
+    });
+    await expect(
+      request(server, "/v1/system/sites/not-a-uuid/policy", {
+        headers: baseHeaders,
+      }),
+    ).resolves.toMatchObject({
+      status: 400,
+      body: {
+        error: { code: "INVALID_ARGUMENT", message: "site_id is invalid" },
+      },
+    });
+    await expect(
+      request(server, "/v1/system/sites", {
+        headers: { ...baseHeaders, "x-kokoro-request-id": "not-a-uuid" },
+      }),
+    ).resolves.toMatchObject({
+      status: 400,
+      body: {
+        error: {
+          code: "INVALID_ARGUMENT",
+          message: "x-kokoro-request-id is invalid",
+        },
+      },
+    });
+  });
+
+  it("rejects an oversized Content-Length before reading the request body", async () => {
+    const server = createHttpServer(manifestService, async () => true, {
+      control: new SystemControlService(new InMemorySystemControlRepository()),
+      bffServiceToken: "service-token",
+    });
+    await expect(
+      request(server, "/v1/system/sites", {
+        method: "POST",
+        headers: {
+          "x-kokoro-tenant-id": "tenant-a",
+          "x-kokoro-service": "web-bff",
+          "x-kokoro-internal-secret": "service-token",
+          "x-kokoro-iam-permissions": "system:write",
+          "idempotency-key": "oversized-body",
+          "content-length": "1000001",
+        },
+      }),
+    ).resolves.toMatchObject({
+      status: 400,
+      body: {
+        error: {
+          code: "INVALID_ARGUMENT",
+          message: "request body is too large",
+        },
+      },
+    });
+  });
+
+  it("rejects a release body that does not satisfy the wire digest schema", async () => {
+    const server = createHttpServer(manifestService, async () => true, {
+      control: new SystemControlService(new InMemorySystemControlRepository()),
+      bffServiceToken: "service-token",
+    });
+    await expect(
+      request(server, "/v1/system/releases", {
+        method: "POST",
+        headers: {
+          "x-kokoro-tenant-id": "tenant-a",
+          "x-kokoro-service": "web-bff",
+          "x-kokoro-internal-secret": "service-token",
+          "x-kokoro-iam-permissions": "system:write",
+          "idempotency-key": "invalid-release-digest",
+        },
+        body: JSON.stringify({ release_key: "release", digest: "not-hex" }),
+      }),
+    ).resolves.toMatchObject({
+      status: 400,
+      body: {
+        error: {
+          code: "INVALID_ARGUMENT",
+          message: "digest is invalid",
+        },
+      },
+    });
+  });
 });
