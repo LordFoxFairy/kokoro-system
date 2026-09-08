@@ -1,5 +1,23 @@
 # kokoro-system 当前状态
 
+## G0：当前推进状态（2026-09-07）
+
+当前工作从 System 源码基线 966cabef49e69c871186cb9de464854fc5c18087 开始。
+**本轮为设计与实施准备，不是 NestJS 改造完成或目标文档门通过。**
+统一任务表：[IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md)；下方既有章节继续记录该源码基线的实现与缺口。
+
+- 已讨论方向：业务能力聚合、Nest 原生模块/DI、Products 承接产品配置；不预设独立 releases 或 generated/proto。
+- 当前代码仍是 Node HTTP + 全局四层 + pg/Redis + Site Connect；Model 仍在独立仓，未发生 owner cutover。
+- SQL-first/pg 是推荐而非已冻结的新技术栈；精确版本、协议去留、发布生效需求及 Workspace/Runtime 用例仍在设计门内。
+- IAM 当前已验收切片不等于完整 IAM；System 的身份接入以已交付契约为准，未交付 internal API/SDK 单独记录依赖。
+- 本轮不修改业务源码、测试、依赖、lockfile、machine contract、schema、部署或其他仓；不启动共享服务、不清理数据。
+- 文档准备与只读审查完成证据记录在同一任务表；后续先 G1 设计门，再授权单一实现负责人。
+- 只读盘点发现 BFF 调用 System/Model 的 HTTP 路径均缺 /v1；已记录 API_CONTRACT，未改消费者、未执行 E2E。
+- G0 工作树验证：13 个聚焦测试、lint/typecheck/contract lint 与本地文件链接检查通过；Root System 治理有 10 项未达标，
+  具体字段和真实命令见任务表。没有把旧实现门禁结果当作目标架构验收。
+
+
+
 状态日期：2026-09-04。本文区分当前实现、生产目标和已知缺口；本地 test/smoke 不能替代生产遥测、安全评估、
 容量验证或恢复演练。
 

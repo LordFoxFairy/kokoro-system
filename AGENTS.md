@@ -2,16 +2,18 @@
 
 @../AGENTS.md
 
-本仓是 System owner，负责 site、workspace、runtime manifest、system policy 和配置发布事实。规则已经明确时直接执行，不重复向用户确认。
+本仓是 System owner。当前行为与目标设计分别见 docs/CURRENT.md 和 docs/TECHNICAL_DESIGN.md；
+唯一有效推进任务表是 docs/IMPLEMENTATION_PLAN.md。G0 只授权设计准备，不授权业务重写。
 
-- 目录按 `bootstrap/config/domain/application/infrastructure/interfaces` 分层，删除无 owner 的 `modules`/`common` 收纳层。
-- 生产路径禁止默认装配 InMemory；内存替身只放 `test/fixtures/` 或 `test/doubles/`。
-- 只保留唯一 canonical `database/schema.sql`；删除 migration runner、历史迁移目录和旧兼容入口。
-- SQL 使用 PostgreSQL `$1, $2, ...` 参数绑定；禁止 `FOREIGN KEY`、`REFERENCES`；JOIN 只在本仓同 owner 数据库内执行并显式带 tenant 条件。
-- 时间使用 `TIMESTAMPTZ(3)` 和 RFC 3339 UTC；纯日期使用 `DATE`，周期规则保存 IANA timezone。
-- `contract/` 是 System owner 的 wire source；`src/generated/` 只保存可重生成的只读产物，契约检查必须验证本地 source 与 provenance。
+- Owner：Site/域名/站点策略、产品配置、Runtime Manifest、System Workspace；Model 按 Root ADR-029 合入，尚未执行 cutover。
+- 语言、目录、SQL、测试规则只引用 Root 三份专项手册，不复制或覆盖；旧全局四层仅是当前实现，不是目标模板。
+- 目标采用 Nest 原生业务模块/DI；独立 releases、执行 runtimes 和 generated/proto 均非预建要求。
+- 当前源码入口为 src/main.ts；当前机器事实源为 contract/openapi/system.openapi.json、contract/proto 与 database/schema.sql。
+- 协议去留、数据库技术栈与生成 client 位置须先过本仓设计门；当前生成物禁止手改，也不提前删除。
+- 本仓业务实现只写自己的事实；IAM 身份/权限、BFF Project、Agent 执行、Billing 账务不迁入 System。
+- 后续实现遵守任务卡单 writer、主控提交/集成与独立审查；保护其他仓及 Root 已有未提交变更。
 
-完成前执行：
+当前实现完整验收命令如下；G0 文档准备的较小验证范围及未运行原因见任务表：
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm build

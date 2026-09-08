@@ -1,6 +1,6 @@
 # kokoro-system 文档索引
 
-状态：当前文档入口，2026-09-03。
+状态：2026-09-07，G0 设计准备。当前源码仍为旧实现，目标门尚未通过。
 
 ## 状态语义
 
@@ -14,7 +14,7 @@
 ## 推荐阅读顺序
 
 1. [`CURRENT.md`](CURRENT.md)：当前边界、已实现能力、阶段完成条件和未闭环项。
-2. [`TECHNICAL_DESIGN.md`](TECHNICAL_DESIGN.md)：分层、执行流、事务、cache 与失败语义。
+2. [`TECHNICAL_DESIGN.md`](TECHNICAL_DESIGN.md)：G0 能力/选型/目录候选；后续章节记录当前执行流与失败语义。
 3. [`API_CONTRACT.md`](API_CONTRACT.md)：HTTP/Connect、header、权限、幂等、分页和错误策略。
 4. [`DATA_MODEL.md`](DATA_MODEL.md)：表 owner、自然键、无外键关系、状态机、索引和 retention。
 5. [`SECURITY.md`](SECURITY.md)：trust boundary、service auth、tenant isolation、secret 与供应链控制。
@@ -23,8 +23,9 @@
 8. [`SLO.md`](SLO.md)：目标 SLI/SLO、错误预算和告警；不包含虚构实测值。
 9. [`RUNBOOK.md`](RUNBOOK.md)：本地启动、诊断、恢复、回滚和 evidence 采集。
 10. [`ADR/INDEX.md`](ADR/INDEX.md)：仍有效的架构决策。
+11. [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)：唯一有效推进任务表、阶段门与本轮证据。
 
-## 规范性事实源
+## 当前实现的规范性事实源
 
 | 事实 | 唯一来源 | 说明 |
 |---|---|---|
@@ -43,6 +44,6 @@
 ## 过程材料
 
 - [`superpowers/plans/2026-09-03-production-closure-docs.md`](superpowers/plans/2026-09-03-production-closure-docs.md)：
-  本阶段实施计划，不是长期产品 contract。
+  已完成的历史文档阶段计划；不再授权新四层/Proto 实施，后续使用 IMPLEMENTATION_PLAN。
 
 旧的大小写混合入口和重复 BFF contract 文档已合并到上述 canonical 文件；V1 clean-slate 不保留 alias 或重复事实源。

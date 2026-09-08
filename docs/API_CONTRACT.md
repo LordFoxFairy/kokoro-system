@@ -1,5 +1,47 @@
 # kokoro-system API Contract
 
+## G0：目标协议设计准备（2026-09-07）
+
+**下方第 1 节起仍描述当前 HTTP/Connect 实现，不是已批准的新协议。**
+目标模块和任务表见 [技术设计](TECHNICAL_DESIGN.md#g0nestjs-与业务能力设计准备2026-09-07) 与
+[IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md)。本轮不修改 machine contract、generated output 或 consumer。
+
+| 决策 | 当前事实 | 目标/未决 |
+|---|---|---|
+| HTTP 来源 | 手写 OpenAPI 与手写 parser | 推荐运行时 Zod schema 单向生成 OpenAPI；切换时替换可编辑旧源，先修订 ADR-0002 |
+| Site RPC | 当前实现挂载 SiteService；Proto/source/generated 都存在 | 必须用生产消费者盘点决定；不因目录存在保留，不因 IAM 已删除而直接删除 |
+| Model RPC | 独立 Model 拥有 kokoro.model.v1 | ADR-029 要求保留协议语义；终止 transport 需明确新 ADR/消费者切换，非本轮授权 |
+| 生成 client | 现存 Proto descriptor 与手写 Manifest SDK | 生成目录按最终协议/工具决定，不预设 generated/proto；不混同 Prisma/Redis client |
+| 身份 | 共享 service token + BFF header snapshot | 对齐 IAM 已发布/已验收身份契约；IAM-2B/SDK 未交付部分为依赖，不伪造已接通 |
+| 产品能力 | 当前没有 Product/App/Feature exposure API | G1 定义资源、生命周期、global/tenant scope、权限、分页、幂等、错误与 breaking 断言 |
+| 配置生效 | release transition 存在，binding writer 缺失 | 先裁决直接生效或 Products 内发布用例；不默认建立独立 releases 模块 |
+
+G1 逐资源必须记录 owner、visibility、version、唯一 writer、受信 actor/tenant、body/query/response、
+稳定错误、分页、ETag/CAS、幂等 scope/digest、replay、删除/引用失效及消费者验收。
+内部协议保持 internal-owner，BFF public API 不迁入 System。未交付的 IAM 授权接口不以假成功或复制权限表替代。
+
+消费者清单必须分为生产调用、测试 fixture、运维脚本、生成但未使用代码和历史文档。
+HTTP/RPC 选型完成前，不删现有 Site/Model RPC；本轮也不将其列为必须保留的目标目录。
+
+### G0 生产消费者盘点结果
+
+2026-09-07 静态核查，未执行端到端请求：
+
+| 调用方/分类 | 当前证据 | 结论 |
+|---|---|---|
+| BFF → System / 生产 HTTP | /Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-bff/src/http/routes/owner.ts:69 请求 /system/runtime-manifest；/Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-system/src/interfaces/http/server.ts:279 只接受 /v1/system/runtime-manifest | 路径缺 /v1；consumer 存在，但不是已通过集成的证据 |
+| BFF → Model / 生产 HTTP | /Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-bff/src/http/routes/owner.ts:149 请求 /bff/model-catalog；/Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-model/src/interfaces/http/routes.ts:203 为 /v1/bff/model-catalog | 同类路径漂移；后续由 BFF 独立切片修复并对 owner contract 测试 |
+| Site Connect / owner 自用 | src/interfaces/rpc/site-service.ts 与 test/site-connect.test.ts、scripts/test/runtime-real-system-smoke.ts | 正式仓生产源码中未发现外部调用；handler/generated/test 不算外部消费者 |
+| Agent → Model / 缺少接线 | /Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-agent/src/kokoro_agent/clients 当前只有 MCP/Skills/Storage clients；未找到实际 Model HTTP/RPC client | Model 文档中的 Agent RPC caller 不是当前已接通事实 |
+| Root 编排/历史文档 | 启动脚本与设计材料出现 System/Model URL 或 Proto 名称 | 不作为真实生产协议依赖证明 |
+
+候选方向：System HTTP/OpenAPI 与当前 BFF 调用方式一致。删除 Site RPC 须同步 source/handler/test/provenance；
+删除 Model RPC 则须先由 Root 更新或补充 ADR-029 的协议决定，再完成消费者与 owner cutover。
+仓外消费者/已发布 artifact 尚缺证据，不用代码搜索零命中声称不存在外部依赖。
+本轮未改 BFF、Agent、Model；后续跨仓任务按 owner contract → consumer → 真实集成顺序推进。
+
+
+
 状态：当前 HTTP/Connect 行为说明，2026-09-03。字段级事实源是
 [`../contract/openapi/system.openapi.json`](../contract/openapi/system.openapi.json) 与
 [`../contract/proto/`](../contract/proto/)；本文解释 trust、permission、idempotency 和已知差异，不另建 DTO 事实源。

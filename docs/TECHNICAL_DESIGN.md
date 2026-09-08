@@ -1,5 +1,115 @@
 # kokoro-system 技术设计
 
+## G0：NestJS 与业务能力设计准备（2026-09-07）
+
+**状态：设计准备，尚未通过目标实现文档门。** 下方第 1–9 节记录当前源码行为，旧全局四层不是后续实现模板。
+当前有效任务表见 [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md)。本轮只改文档，不改代码、机器契约或 schema。
+
+### G0.1 已确定的业务边界
+
+System 是站点、产品与运行配置控制面；ADR-029 已决定将 Model Catalog 合入 System，但物理 cutover 尚未执行。
+
+| 能力 | 当前事实 | 目标归属与约束 |
+|---|---|---|
+| Site/Host/Policy | 创建/列表/域名解析与 Policy 读写；Policy 尚未完整参与 Manifest 准入 | sites；域名与站点策略属于内部子能力，Host 不是执行机器 |
+| Product/App/Feature exposure | Product 仅被读取，Profile 仅表；FeatureDefinition/AppFeatureExposure 未实现 | products；产品注册、应用入口、全局 FeatureKey/产品结果契约、tenant/App exposure、展示配置 |
+| 配置发布 | 已有 release 状态转换、receipt、generation；binding 依赖外部预置 | 先作为 products 内部发布用例；独立 releases 一级模块未获需求裁决，不预建 |
+| Runtime Manifest | 已有读取/缓存 fence；未用解析所得 Site 身份装配站点差异 | runtime-manifests；只读投影，不拥有配置编辑或 Agent 执行事实 |
+| Workspace | tenant/site 下身份、名称、状态与 create/list；真实消费者尚未确认 | workspaces 保留当前 owner；扩展用例待定，不复制 IAM 成员或 BFF Project |
+| Model Catalog | 仍位于独立 kokoro-model | model-catalog；模型定义/标签、供应方、revision、选用规则；不执行推理 |
+| Runtime profile | 当前只有 Manifest，没有独立 profile/执行环境管理实现 | 待消费者、生命周期和契约明确后设计；不预建 runtimes/机器/调度目录 |
+
+IAM 最新映射是 Better Auth Organization.id == tenant_id；System 不新增 Tenant 下第二层 Organization。
+IAM 拥有身份/权限/Audit；BFF 拥有 Project/Conversation/ScheduledTask；Agent 拥有 Run/Lease/Checkpoint/执行编排；
+Billing 拥有价格/额度/账本；Platform 拥有 Skill/MCP；Storage 拥有对象生命周期。System 只保存必要的 owner reference。
+
+产品结果契约里的成本/权限配置仅表达引用和产品展示约束，不复制 Billing 价格或 IAM 权限事实。
+模型配置只输出 route decision metadata；调用 provider、推理流和执行恢复不在 System。
+产品配置发布与模型 revision 发布是不同生命周期，产品发布不得修改、发布或回滚模型 revision。
+
+### G0.2 技术栈候选与决定状态
+
+| 项目 | 当前 | 推荐目标 | 状态/证据门 |
+|---|---|---|---|
+| 运行时/框架 | Node 22 范围、原生 HTTP、手动装配 | Node 24 LTS、NestJS 12、Express adapter | 方向已讨论；精确版本、peer、ESM/装饰器/测试编译组合待核验 |
+| HTTP schema | 手写 OpenAPI + 手写 parser | Zod + Nest Standard Schema；运行时 schema 单向生成 OpenAPI | 推荐；须更新本仓 ADR-0002 并验证错误/序列化/响应 parity |
+| RPC | Site Connect + Proto；Model 也有 RPC | 依真实消费者作去留裁决 | 未定；IAM 删除 Proto 不等于全仓删除；不预设 generated/proto |
+| 数据访问 | System pg；Model 生产路径 Prisma，pg 仅用于 schema 安装 | 推荐 SQL-first + pg，保留显式锁/索引语义 | 未锁定；需比较 Prisma-first、记录 adapter 重写成本与 ADR |
+| Redis | System redis；Model ioredis | 合入后同一客户端与连接生命周期 | 精确包/版本待定；业务 namespace/fence 各归所属模块 |
+| 工程门禁 | tsc/ESLint/Vitest/Buf | strict TS、typed lint、format、Nest Testing、真实 PG/Redis | 不复制 IAM 未验证的依赖组合 |
+
+候选比较：SQL-first + pg 直接承接 System 的锁、部分/表达式索引与 canonical SQL，但要重写 Model adapter/测试；
+Prisma-first 可统一 IAM 的 ORM 经验，但须重新验证全部约束/锁并切换唯一 schema 事实源。
+NestJS 并不强制 Prisma。G0 不安装任一候选，不引入双生产数据访问栈。
+
+官方语义核验入口（2026-09-07 查阅，非本仓兼容性验收）：
+[Nest Modules](https://docs.nestjs.com/modules)、
+[Standard Schema validation](https://docs.nestjs.com/techniques/validation)、
+[Nest HTTP adapter](https://docs.nestjs.com/techniques/performance)、
+[Node releases](https://nodejs.org/en/about/previous-releases)、
+[pg transactions](https://node-postgres.com/features/transactions)。
+
+### G0.3 目标目录与放置设计
+
+下面是职责地图，不是批准创建的空目录清单。新文件在实现任务卡中逐项列出。
+
+~~~text
+src/
+  main.ts
+  app.module.ts
+  config/                 已校验启动配置
+  database/               唯一数据库连接/事务生命周期
+  cache/                  Redis 连接，不放业务 cache 规则
+  access/                 服务身份验证、IAM client、受信上下文
+  http/                   全局传输边界、错误/envelope 映射
+  health/                 probes
+  observability/          日志/指标/trace 接线
+  modules/
+    sites/                域名、站点 policy 随真实文件聚合
+    products/             applications/features/exposures/presentation 按切片建立
+    runtime-manifests/    只读装配与本模块缓存
+    model-catalog/        catalog/providers/revisions/routing 按合入切片建立
+    workspaces/           先承接当前最小用例，不扩张未知语义
+~~~
+
+不预建顶层 generated、独立 releases、configs、policies、执行 runtimes 或 availability 空目录。
+availability 的业务边界继续服从 ADR-029；当前只有 provider health projection，G0 不创建空目录。
+Root ARCHITECTURE_STANDARD §2.2 将模块树说明为候选能力地图，不机械全建；本草案中的 providers 收纳方案只是待评审的物理粒度，
+不是取消 availability 能力。G1-B 须明确与 ADR-029 一致的最终放置；若改变其已接受边界，先修订 ADR 后采用。
+若协议或 ORM 最终需要生成 client，再按生成器和消费边界决定输出位置；Prisma Client、RPC client 与 Redis client 不是同一概念。
+
+| 设计项 | 结论 |
+|---|---|
+| Owner/writer | System 各业务模块拥有自己的写入口；本轮 Root 仅写文档，其他 Agent 只读 |
+| 当前事实 | 966cabe；旧四层/Node HTTP/pg/Redis/Site Proto/SQL，当前完整入口见 INDEX 与 API/DATA 文档 |
+| 目标职责 | sites/products/runtime-manifests/model-catalog/workspaces；公开 provider 明确，禁止万能 SystemService |
+| 目录比较 | src/<feature> 可行；采用 src/modules/<feature>，因为已有稳定技术目录和多个业务域；不再保留双业务根 |
+| 粒度 | Module/Controller/Service 起步；Repository、Model、Mapper 按实际事务/规则需要引入 |
+| 依赖 | 模块通过 Nest imports/exports 交互；不 deep-import 对方 Repository，不跨模块查询 model_* 表 |
+| 数据/API | 每个 owner 唯一 schema/contract；具体版本、字段、状态、事务与消费者切换需 G1 文档门 |
+| 删除项 | 实施时删除被承接的旧路径、失效 Config/Profile/Audit/alias；先证明无用途或已有承接，不按名字删功能 |
+| 验证 | G0 文档链接/范围/现有门禁；G1 契约/schema 验证；实现阶段 unit/integration/contract/architecture/build/smoke |
+
+### G0.4 必须保留或补齐的业务不变量
+
+- 保留当前 receipt + mutation 同事务、release/config 共锁、BIGINT 十进制字符串、PG generation cache fence 的行为测试。
+- 产品编辑与生效读取分离；发布需求先裁决。若保留发布，用服务端内容 digest 绑定校验结果，编辑后失效旧校验，
+  原子切换 binding + generation + receipt，不依赖手工 fixture 使配置生效。
+- Manifest 使用受信 tenant 与解析所得 Site；先做当前站点/产品准入，再读取生效配置。cache identity 纳入所有影响结果的维度；
+  Site/Policy/配置/绑定变更的 revision 与失效路径须逐项定义，缓存命中不跳过必要 admission。
+- 全局目录管理与 tenant-owned 操作的身份、权限、幂等 scope 分开；body 不自报受信主体。
+- 跨 owner 验证在事务外完成并绑定明确版本/证据；提交时校验本仓 CAS/版本，不承诺跨库原子性。
+- Model provider/resolve 故障不阻断 Site/Workspace 基础读；模块级 timeout、readiness 与缓存故障策略需测试。
+- 审计若需可靠投递，由本仓业务事务保存投递事实，IAM 保存 Audit 权威事实；不恢复未接入的第二套 System Audit。
+
+### G0.5 实现放行条件
+
+TECHNICAL_DESIGN、API_CONTRACT、DATA_MODEL 的 G0 未决项全部有结论并与唯一机器 contract/schema 一致后，
+才形成 G1 文档门通过报告。通过报告必须包含绝对文档路径、实际验证、当前 commit 和未决项；
+本轮设计准备提交不代表 G1 通过，不授权批量移动目录或重写业务。
+
+
+
 状态：当前实现设计，2026-09-04。带“目标/缺口”的段落不是现有能力声明。Machine-readable wire source 位于
 [`../contract/`](../contract/README.md)，数据定义位于 [`../database/schema.sql`](../database/schema.sql)。
 

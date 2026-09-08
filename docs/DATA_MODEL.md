@@ -1,5 +1,33 @@
 # kokoro-system 数据模型
 
+## G0：目标数据设计准备（2026-09-07）
+
+**当前唯一 canonical schema 仍是现有 database/schema.sql；本轮没有改表。**
+下方第 1 节起是当前实现说明，不是新目录/ORM 的安装授权。
+目标技术选型见 [TECHNICAL_DESIGN](TECHNICAL_DESIGN.md)，任务表见 [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md)。
+
+| 数据面 | 当前事实 | G1 必须完成的设计 |
+|---|---|---|
+| System vs Model 数据栈 | System pg；Model Prisma runtime + SQL-first 安装 | 一次选择合入后的唯一 schema/访问栈；推荐 pg 尚待 ADR，不保留双轨 |
+| tenant 身份 | System tenant_id TEXT，旧 context 含 organization | 对齐 IAM Organization.id == tenant_id；无第二套 Organization；ID 类型依据真实 contract，不能只靠类型转换 |
+| Product/Profile | Product 只读，Profile schema-only | 建立 Product/App/Feature/exposure 用例；无用途 Profile 删除，有用途则明确 writer，非直接按旧表造模块 |
+| Site/Host/Workspace | 当前身份关系与部分 CRUD | 明确生命周期、引用校验、删除锁协议；Workspace 新职责需消费者依据 |
+| Config/Release/Binding | 任意 JSON、validation 缺失、binding writer 缺失 | typed 业务配置归 owner；生效策略定稿后设计快照/版本/绑定与原子事务，补 Config 并发唯一性 |
+| Manifest generation | 当前 tenant generation + Redis fence | 站点差异化后完整 identity、策略/配置变更失效与一致读取，防止站点串配置 |
+| Audit | system_audit_event 没有 reader/writer | 不创建第二个 Audit owner；确认无用途后随 schema 切片删除，可靠投递另按业务用例设计 |
+| Model | 仍独立 model_* schema/database/Redis DB3 | 保留模块边界，合入唯一 System schema；退出旧实例身份/DB3 不等于本轮删除共享数据 |
+
+Model 合入还需解决：provider health 冗余存储、删除/restore/orphan、global 与 tenant mutation 的 receipt scope、
+ID 策略、不可变 revision、advisory lock、generation fence。模型发布与产品配置发布不共用状态机。
+Model adapter 若从 Prisma 改为 pg，必须连同真实 PG fixture/断言单独成片验证，不能只替换 import。
+
+每张新增或改造表必须给出字段/NULL/时间精度/删除策略、实际查询、索引理由、唯一性不变量、事务与锁顺序、
+tenant 隔离、retention/orphan/reconciliation、fresh install 与 drift 证据。无消费者的候选模块不先生成表。
+
+文档门待验：目标 schema/contract 尚未产生，因此现有 schema 检查通过只能证明当前实现，不能证明目标数据设计通过。
+
+
+
 状态：当前 canonical schema 说明，2026-09-04。唯一可执行事实源是
 [`../database/schema.sql`](../database/schema.sql)；本文记录 owner、不变量、查询依据和缺口，不替代 SQL。
 
