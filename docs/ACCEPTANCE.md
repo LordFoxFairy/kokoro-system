@@ -48,3 +48,7 @@ Root最终脚本窄修已复跑完整pnpm verify：13files86pass0skip+fresh23/22
 → format/lint/typecheck/build/contract 全通过；13 files / 86 tests passed / 0 skipped；fresh 23 断言、22 表。
 日志 `/tmp/kokoro-system-g5-root-final-verify.log`；没有将测试删除前的 legacy 结果混入此数。
 Root `pnpm audit --prod --audit-level=high` 与 `pnpm audit --audit-level=high` 均无已知漏洞；OS/secret/image扫描不在此结论内。
+
+## 已提交源码复验
+
+Root已在 `d7257aa56632627fe0ba8ec4576c32c550a25c3d` clean HEAD 重跑同一 `pnpm verify`，86pass/0skip、fresh23/22、所有质量/contract门通过。随后真实 System/BFF source HTTP 与 Agent resolve/factory跨仓smoke PASS，全部owned资源清理。证据日志 `/tmp/kokoro-system-g5-committed-verify.log`、`/tmp/kokoro-system-g6-committed-live.log`；此后本提交仅回填三份验收文档，不修改源码。Docker/未跑CI项如上保留，不作发布全绿声明。

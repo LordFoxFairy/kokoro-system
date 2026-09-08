@@ -1,6 +1,6 @@
 # System 完整交付唯一实施计划
 
-当前：G1–G4已由Root提交验收；G5完整源码/测试/运行闭环及最后脚本窄修收尾，基线51bc22dac4b32da86984e7147caaae5e4db6a34a，等待Root最终提交/committed验证。system_owner唯一System writer，Root独占Git index/提交。完整五模块业务均已实现，非仅Site交付。
+当前：G1–G5完整源码与G6消费者HTTP已由Root验收；System代码提交 `d7257aa56632627fe0ba8ec4576c32c550a25c3d`，committed clean HEAD全量86pass/0skip+fresh23断言22表，跨仓live PASS。Root负责最终文档/拓扑提交；Docker RC、CI扫描/attestation与部署环境证据单独待验，不把它们标为通过。完整五模块83业务操作，非仅Site交付。
 第0–1节及G1–G4早期卡是历史授权/证据，不覆盖末尾G5稳定交付状态。最新本仓门、Root跨仓live、Docker环境未验项以末尾G5记录及CURRENT/ACCEPTANCE为准。
 
 ## 0. G0历史基线与范围
@@ -164,12 +164,12 @@ git diff --check 均通过；本地文件链接 33 个、0 缺失；Root System 
 
 | 任务 | 归属/执行/审查 | 基线/范围 | 依赖/验证 | 状态/交付 |
 |---|---|---|---|---|
-| G1 P0 完整设计与机器门 | System / system_owner 唯一writer / Root | /Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-system；codex/production-closure-docs；7dde8e7683ad4c9a3a35bc3681bf44b523eea574，初始干净；docs、AGENTS/README/INDEX、canonicalSQL、contract、模块schema、scripts/contract测试、必要package工具链 | ADR031；三文档一致；schema生成/typecheck/freshPG | 待Root审查；Root串行暂存提交，worker禁止index/commit |
-| G2 P0 Nest内核与Sites/Workspace | 同一负责人 / Root | 批准后src模块/进程/测试/CI；准确文件集开工前补 | G1 Root放行；保留旧行为及测试、Auth/CAS/真实PG | 待G1；不是最终缩减交付 |
-| G3 P0 Products/Manifest完整闭环 | 同一负责人 / Root | Product/App/Feature/exposure/presentation/config/release/binding与Manifest | G2；tenant/site隔离、policy、global+tenantfence、CRUD/生命周期/恢复 | 待实施 |
-| G4 P0 Model完整合入 | 同一负责人 / Root | model-catalog所有子能力与测试 | G3；immutable revision/routing/health/真实PG-Redis | 待实施；不写旧Model仓 |
-| G5 P0 System全门禁 | 同一负责人 / Root+独立只读审查 | System lint/format/typecheck/test/build/schema/smoke/CI/docs | G2–4；主仓重新验证 | 待实施 |
-| G6 P0 consumer与拓扑cutover | Root派BFF/Agent/拓扑各owner | 排除System writer写入范围 | System artifact提交后串行；真实catalog/resolve调用、旧Model/RPC/身份退出 | 待Root |
+| G1 P0 完整设计与机器门 | System / system_owner 唯一writer / Root | /Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-system；codex/production-closure-docs；7dde8e7683ad4c9a3a35bc3681bf44b523eea574，初始干净；docs、AGENTS/README/INDEX、canonicalSQL、contract、模块schema、scripts/contract测试、必要package工具链 | ADR031；三文档一致；schema生成/typecheck/freshPG | 已验收；f5702068 |
+| G2 P0 Nest内核与Sites/Workspace | 同一负责人 / Root | 批准后src模块/进程/测试/CI；准确文件集开工前补 | G1 Root放行；保留旧行为及测试、Auth/CAS/真实PG | 已验收；d057deb7 |
+| G3 P0 Products/Manifest完整闭环 | 同一负责人 / Root | Product/App/Feature/exposure/presentation/config/release/binding与Manifest | G2；tenant/site隔离、policy、global+tenantfence、CRUD/生命周期/恢复 | 已验收；f13bb73d |
+| G4 P0 Model完整合入 | 同一负责人 / Root | model-catalog所有子能力与测试 | G3；immutable revision/routing/health/真实PG-Redis | 已验收；51bc22da |
+| G5 P0 System全门禁 | 同一负责人 / Root+独立只读审查 | System lint/format/typecheck/test/build/schema/smoke/CI/docs | G2–4；主仓重新验证 | 源码全门已验收 d7257aa；RC/CI执行环境待验 |
+| G6 P0 consumer与拓扑cutover | Root派BFF/Agent/拓扑各owner | 排除System writer写入范围 | System artifact提交后串行；真实catalog/resolve调用、旧Model/RPC/身份退出 | HTTP消费者已验收；Root活动拓扑门PASS，最终Root提交见Root CURRENT |
 
 最终范围是G1–G6完整System，内部切片仅为审查提交粒度。G1交付后暂停业务实现，Root快速审核放行，同负责人继续。
 G0旧“协议/ORM未定”“仅文档不改schema”是当时事实，已由ADR031与本任务卡替代，不再作为当前阻断。
@@ -397,3 +397,8 @@ Root 接管提交，system_owner 已停止所有写入。最终190文件；Root 
 Root稳定源码跨仓隔离HTTP已PASS，独立PG/prefix/process全部清理；最终提交后复验及G6 Root提交由Root CURRENT绑定SHA。完整源代码能力不是只有Site CRUD，五模块83业务operation+2probes均接正式Nest入口。Docker daemon环境阻断RC实跑、CI未执行扫描/attestation、生产SLO/灾备与推理不冒称已验。
 
 独立最终review：system_capability_review已确认PGID/cleanup/同镜像推广三P2闭环，无新增相关阻断；actions/attest v4.2.2 SHA `1e69f48acb82d1966a394da916b4c1698aa569d6`已核官方commit/action.yml。Root治理最后55tests、focused81pass；System Root静态预检0违规（全9仓仍200条其他仓未收敛项）。
+
+### Root committed HEAD 最终验收
+
+System `d7257aa56632627fe0ba8ec4576c32c550a25c3d` clean；Node24 `pnpm verify`完整86pass/0skip，fresh23断言22表，全质量/契约门pass。Root隔离 `run_system_owner_smoke.py` 在该commit真实运行System+BFF、发布绑定与配置覆盖、目录/default/manifest、tenant隔离和Agent默认/显式resolve/factory全部PASS，owned resources removed。日志 `/tmp/kokoro-system-g5-committed-verify.log`、`/tmp/kokoro-system-g6-committed-live.log`。
+BFF26eec011实际152pass，Agent e24b4aa实际611pass/6skip/77deselected；BFF两个任务外dirty保留不暂存。Root focused81pass、全tests82pass/2手册基线fail，System静态0违规/其他仓200条，topology九active与manifest-only通过。Root仅后续提交本计划/CURRENT/ACCEPTANCE验收记录，不改上述已验业务源码；Docker引擎500的RC、未运行CI扫描/attestation和生产SLO/灾备保留后续owner System/Root。
