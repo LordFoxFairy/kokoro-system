@@ -45,10 +45,10 @@
 
 | ID/优先级 | 业务目标与完成条件 | Agent/审查/权限 | 范围与依赖 | 状态/提交责任 |
 |---|---|---|---|---|
-| G0-01 / P0 | 固定事实、文档门未决项、候选目录，不把推荐当已实现 | Root / system_g0_review / 唯一文档 writer | 上述七文件；依赖已读规范及源码盘点 | 待集成验证；Root 串行提交 |
+| G0-01 / P0 | 固定事实、文档门未决项、候选目录，不把推荐当已实现 | Root / system_g0_review / 唯一文档 writer | 上述七文件；依赖已读规范及源码盘点 | 已验收（准备文档）；Root 提交 b4dbff6 |
 | G0-RPC / P0 | 列出现存 Site/Model 协议的生产/测试/历史消费者，识别 ADR 约束 | system_protocol_inventory，gpt-5.6-sol / Root / 只读 | System/Model/BFF/Agent contract 与 src，禁止更改 | 已验收（静态盘点）；无写入/提交 |
 | G0-REVIEW / P0 | 复核 G0 文档对用户纠正、当前事实和目标的表达一致性 | system_g0_review，gpt-5.6-sol / Root / 只读 | G0-01 七文件；依赖 draft 完成 | 已验收；无写入/提交 |
-| G0-VERIFY / P0 | 主仓重跑差异/链接/现有门禁，记录通过与未跑原因 | Root / 独立审查建议 / 验证 | 文档工作树；不跑 schema 安装或共享数据测试 | 待集成验证；Root 提交后复验 |
+| G0-VERIFY / P0 | 主仓重跑差异/链接/现有门禁，记录通过与未跑原因 | Root / 独立审查建议 / 验证 | 文档工作树；不跑 schema 安装或共享数据测试 | 已验收（证据记录）；b4dbff6 提交后已复验 |
 
 任务状态：待派工 → 进行中 → 待审查 → 待集成验证 → 已验收。
 G0 的“已验收”仅指准备文档与证据，不表示 G1 文档门或业务功能完成。
@@ -108,8 +108,8 @@ pnpm contract:lint
 ~~~
 
 - [x] 从 Root 执行治理脚本的 System slice，实际 10 项未达标，见下表；不放宽门禁。
-- [ ] 按七个明确路径暂存、检查 staged diff，提交一个自洽文档准备切片。
-- [ ] 在 committed HEAD 重跑相关检查，验证 System 工作树干净，更新本表证据。
+- [x] 按七个明确路径暂存、检查 staged diff，提交一个自洽文档准备切片。
+- [x] 在 committed HEAD 重跑相关检查，验证 System 工作树干净，更新本表证据。
 
 本轮不运行 db:apply-schema/integration/runtime smoke：没有数据变更，也未申请隔离数据库；
 不执行 contract:generate：本轮不改生成代码；
@@ -155,6 +155,15 @@ PY
 
 G0 文档准备可在上述未达标项显式交接后单独验收；System 工程/业务与 G1 目标设计门仍未通过。
 提交后的 SHA 与重跑结果由交付报告给出；文档不自引用无法预知的 SHA。
+
+### 已提交设计基线的复验
+
+交付 commit：b4dbff67f703af247f43fb79de835fbc0e50633a。
+Root 在该 commit、System 干净工作树上重跑：聚焦 2 files / 13 tests、lint、typecheck、contract:lint、
+git diff --check 均通过；本地文件链接 33 个、0 缺失；Root System slice 仍是上述 10 项未达标。
+提交后首次临时链接扫描误将 fenced Python 代码里的下标函数调用当成 Markdown 链接；
+排除 fenced code 后重新扫描通过。这是检查器误识别，不是改链接掩盖缺失；仓库检查脚本未更改。
+本节证据更新形成独立文档记录提交，最终 HEAD 由会话交付报告给出。
 
 ## 2. G1 设计门任务队列（尚未授权源码实施）
 

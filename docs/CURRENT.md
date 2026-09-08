@@ -15,6 +15,8 @@
 - 只读盘点发现 BFF 调用 System/Model 的 HTTP 路径均缺 /v1；已记录 API_CONTRACT，未改消费者、未执行 E2E。
 - G0 工作树验证：13 个聚焦测试、lint/typecheck/contract lint 与本地文件链接检查通过；Root System 治理有 10 项未达标，
   具体字段和真实命令见任务表。没有把旧实现门禁结果当作目标架构验收。
+- G0 准备文档交付 b4dbff67f703af247f43fb79de835fbc0e50633a；独立审查无本轮阻断，
+  Root 在该提交干净工作树重跑上述检查，结果一致。此处仅验收设计准备，G1 未决项继续留在同一任务表。
 
 
 
