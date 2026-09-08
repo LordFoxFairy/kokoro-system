@@ -441,3 +441,11 @@ R6-guard最终交付：`/tmp/r6-guard-red.log`1fail6pass、`/tmp/r6-guard-probe-
 | 验证/交付 | 静态顺序/清理断言RED→GREEN；Node24完整pnpm verify真实隔离PG/Redis；本机Docker故障不宣称镜像通过，Root提交并推v0.1.1由CI复验扫描/发布 |
 
 R7最终本仓验证：RED1fail3pass→GREEN4pass；Node24完整verify16files98pass0skip+fresh23断言22表，质量/契约全部通过，`/tmp/r7-verify.log`。7文件精确清单`/tmp/r7-file-manifest.txt`；Root拥有Git/tag/push与远端CI验收，system_owner停写；本机Docker未运行，Trivy未放宽。SQL/OpenAPI/lock无diff。
+
+## R8 — private repository attestation capability gate（进行中）
+
+Owner：kokoro-system/system_owner唯一writer；Root提交/tag/push。基线clean1f91325d0b0df2403cb2fca0078e35f9dbb3382a，目录/分支沿R7。
+事实：Root确认v0.1.1 Actions34221703911验证/fresh/build/image smoke/Trivy/SBOM/GHCR push成功；0.1.1/0.1/latest已发布，digest sha256:827bb91720fbd1bbe0fe2dab1efaae98b3905b7830c491535c5de5f0e2bf34b4。provenance随后因user-owned private repository平台能力不可用失败，SBOM attest被跳过。
+放置：仅既有release-image.yml两个attestation step增加github.event.repository.private条件；对比continue-on-error或全job跳过，选择精确能力门，不降低其它门。现有smoke-cleanup静态测试RED→GREEN；package0.1.2及CURRENT/ACCEPTANCE/TECH/本计划。禁止Dockerfile/业务/SQL/OpenAPI/lock修改，不新建目录。
+验证：两个attest均非private才执行，verify/smoke/scan/SBOM/push仍无条件强制；Node24完整verify与隔离PG/Redis。交付精确manifest后停写，v0.1.2待Root tag远端闭环，不宣称已执行attestation。
+R8本仓最终：RED1fail4pass→GREEN5pass，完整`/tmp/r8-final-verify.log`16files99pass0skip+fresh23/22，质量/契约全部通过。7精确文件`/tmp/r8-file-manifest.txt`，仅workflow两个if、package0.1.2、既有静态测试和四文档；Dockerfile/src/SQL/contract/lock均无diff。writer停写，不操作Git/index/tag/push；Root后续发布v0.1.2并判断远端整体状态。

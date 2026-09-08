@@ -84,3 +84,33 @@ it("refreshes runtime OS packages before installing dependencies without weakeni
   expect(release).toMatch(/exit-code:\s*['"]?1/u);
   expect(release).not.toMatch(/trivyignores:|ignore-policy:|vex:/u);
 });
+
+it("gates only attestations on repository visibility while keeping release gates mandatory", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(".github/workflows/release-image.yml", "utf8");
+  const steps = source.split(/^ {6}- /mu).slice(1);
+  const attestations = steps.filter((step) =>
+    /uses: actions\/attest/u.test(step),
+  );
+  expect(attestations).toHaveLength(2);
+  for (const step of attestations)
+    expect(step).toContain(
+      "if: ${{ github.event.repository.private == false }}",
+    );
+  for (const step of steps.filter((step) => !attestations.includes(step))) {
+    expect(step).not.toMatch(/^\s*if:/mu);
+    expect(step).not.toContain("continue-on-error");
+  }
+  expect(source).not.toContain("continue-on-error");
+  for (const marker of [
+    "pnpm check",
+    "pnpm contract:check",
+    "pnpm test",
+    "pnpm test:schema:fresh",
+    "Smoke local production candidate",
+    "Scan production image",
+    "Generate tested image SBOM",
+    "docker push",
+  ])
+    expect(source).toContain(marker);
+});

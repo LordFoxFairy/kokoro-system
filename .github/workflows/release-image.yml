@@ -111,12 +111,14 @@ jobs:
           echo "digest=${reference##*@}" >> "$GITHUB_OUTPUT"
           echo "repository=${reference%@*}" >> "$GITHUB_OUTPUT"
       - name: Attest published image digest
+        if: ${{ github.event.repository.private == false }}
         uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
         with:
           subject-name: ${{ steps.push.outputs.repository }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
       - name: Attest tested image SBOM
+        if: ${{ github.event.repository.private == false }}
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ steps.push.outputs.repository }}
