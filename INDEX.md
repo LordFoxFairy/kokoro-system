@@ -1,5 +1,7 @@
 # kokoro-system 代码与边界地图
 
+G1新增目标入口：src/modules/{sites,workspaces,products,runtime-manifests,model-catalog}/schemas；scripts/generate-system-openapi.ts、system-openapi-operations.ts、verify-system-fresh-schema.ts；test/contract/system-target-contract.test.ts。下面旧目录是仍在运行的当前实现，目标设计见docs/TECHNICAL_DESIGN.md，不作为新目录模板。
+
 状态：当前实现地图，2026-09-04。规范性机器事实源优先级为 `contract/` 与 `database/schema.sql`；本文只解释入口，
 不复制字段定义。
 

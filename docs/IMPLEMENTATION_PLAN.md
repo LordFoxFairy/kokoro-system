@@ -1,14 +1,9 @@
-# System G0 设计定稿与实施准备计划
+# System 完整交付唯一实施计划
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development or superpowers:executing-plans for authorized tasks. 本计划只授权 G0 文档准备；G1 及业务实施必须先满足阶段门。步骤用 checkbox 跟踪。
+当前：G1目标设计/机器契约/SQL门；Root ADR031已批准完整System，system_owner唯一writer，Root提交审查。
+第0–1节是G0历史证据，旧“仅文档/未冻结”只说明当时授权，不覆盖第2节当前任务卡。业务实施待G1放行。
 
-**Goal:** 将已讨论的 System 能力边界、选型未决项与验证依赖落为唯一可交接任务表，不抢跑源码重构。
-
-**Architecture:** 主控拥有整体架构与跨仓裁决；System 单一 writer，独立 Agent 只读审查。使用本仓现有技术/API/数据文档，不建立另一份 System spec 真源。旧实现与推荐目标明确分开。
-
-**Tech Stack:** 本轮 Markdown、Git、Python 标准库链接检查及现有 pnpm/Vitest 门禁；业务候选见 TECHNICAL_DESIGN G0，尚未安装或冻结。
-
-## 0. 基线与范围
+## 0. G0历史基线与范围
 
 | 项目 | 记录 |
 |---|---|
@@ -165,37 +160,69 @@ git diff --check 均通过；本地文件链接 33 个、0 缺失；Root System 
 排除 fenced code 后重新扫描通过。这是检查器误识别，不是改链接掩盖缺失；仓库检查脚本未更改。
 本节证据更新形成独立文档记录提交，最终 HEAD 由会话交付报告给出。
 
-## 2. G1 设计门任务队列（尚未授权源码实施）
+## 2. 完整 System 任务卡（Root ADR-031 已批准）
 
-| 顺序 | 必须形成的决定/证据 | 后续 owner |
+| 任务 | 归属/执行/审查 | 基线/范围 | 依赖/验证 | 状态/交付 |
+|---|---|---|---|---|
+| G1 P0 完整设计与机器门 | System / system_owner 唯一writer / Root | /Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-system；codex/production-closure-docs；7dde8e7683ad4c9a3a35bc3681bf44b523eea574，初始干净；docs、AGENTS/README/INDEX、canonicalSQL、contract、模块schema、scripts/contract测试、必要package工具链 | ADR031；三文档一致；schema生成/typecheck/freshPG | 待Root审查；Root串行暂存提交，worker禁止index/commit |
+| G2 P0 Nest内核与Sites/Workspace | 同一负责人 / Root | 批准后src模块/进程/测试/CI；准确文件集开工前补 | G1 Root放行；保留旧行为及测试、Auth/CAS/真实PG | 待G1；不是最终缩减交付 |
+| G3 P0 Products/Manifest完整闭环 | 同一负责人 / Root | Product/App/Feature/exposure/presentation/config/release/binding与Manifest | G2；tenant/site隔离、policy、global+tenantfence、CRUD/生命周期/恢复 | 待实施 |
+| G4 P0 Model完整合入 | 同一负责人 / Root | model-catalog所有子能力与测试 | G3；immutable revision/routing/health/真实PG-Redis | 待实施；不写旧Model仓 |
+| G5 P0 System全门禁 | 同一负责人 / Root+独立只读审查 | System lint/format/typecheck/test/build/schema/smoke/CI/docs | G2–4；主仓重新验证 | 待实施 |
+| G6 P0 consumer与拓扑cutover | Root派BFF/Agent/拓扑各owner | 排除System writer写入范围 | System artifact提交后串行；真实catalog/resolve调用、旧Model/RPC/身份退出 | 待Root |
+
+最终范围是G1–G6完整System，内部切片仅为审查提交粒度。G1交付后暂停业务实现，Root快速审核放行，同负责人继续。
+G0旧“协议/ORM未定”“仅文档不改schema”是当时事实，已由ADR031与本任务卡替代，不再作为当前阻断。
+三份权威路径：
+- /Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-system/docs/TECHNICAL_DESIGN.md
+- /Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-system/docs/API_CONTRACT.md
+- /Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-system/docs/DATA_MODEL.md
+
+### G1证据
+
+基线测试由baseline审查员：22files/111pass，3files/8真实integration skip，非完整integration通过。
+目标依赖与验证结果如下。PG localhost5432/Redis localhost6379复用；仅清理自己创建system_g1数据库。
+业务Service/Controller/Repository/main尚未获本阶段写入许可，不将G1 artifact或schema安装称作完整System完成。
+
+### ROOT-GATE 并行只读依赖
+Root唯一writer；基线Root 7aaf211f（并行提交可变）；仅scripts/governance/{ten_repository_standard.py,typescript_checks.py}和scripts/tests/test_ten_repository_standard.py。修复将当前TS允许的src/database、src/http误判retired，以及pnpm旧11.25.0硬锁；先失败测试后修复并pytest。不得改active topology、放宽业务检查或触碰Root现有dirty文件。System writer不改这些Root文件。
+
+
+### G1 精确依赖与兼容证据（2026-09-07核验）
+
+| 依赖 | 锁定 | 证据/取舍 |
 |---|---|---|
-| G1-A | Site/Product/App/Feature/Workspace 用例与身份边界；配置直接生效还是需发布快照；不为旧表保留无用能力 | Root + System 负责人 |
-| G1-B | HTTP/RPC 消费者清单；Zod/OpenAPI 来源选择；availability 概念边界与物理粒度对齐 ADR-029；若改变已接受边界先修订 ADR-0002/ADR-029，发布 immutable artifact 清单 | Root 跨仓裁决，System owner |
-| G1-C | Node/Nest/adapter/schema/ORM/Redis 精确版本、官方维护/许可/peer/安全证据；编译/装配 spike 必须单独批准文件集 | System 负责人 |
-| G1-D | 确定唯一 schema、资源字段/状态/事务/锁/索引/retention；目标 machine contract 与 schema 一致性验证 | System 负责人 |
-| G1-E | 更新技术/API/数据文档为同一目标版本，列绝对路径、当前 commit、未决项和验证输出；Root 放行 | Root |
+| Node / pnpm |24.13.0 /12.3.4|本地node --version、pnpm --version；Node24 LTS按Root ADR031 |
+| Nest common/core/platform-express |12.0.1|npm registry元数据MIT；core Node>=20，common/core/adapter peer ^12.0.0；实际安装无peer冲突，StandardSchemaValidationPipe实际接受/拒绝Zod输入 |
+| reflect-metadata / rxjs |0.2.2 /7.8.2|满足Nest ^0.1.12或^0.2.0 / ^7.1.0 peers；不安装可选class-validator/transformer重复DTO |
+| Zod |4.5.4|MIT；实际runtime parse、toJSONSchema、Nest Pipe、tsc/build验证；退出可用Standard Schema但需重新生成contract |
+| pg / redis |8.23.0 /6.2.1|MIT；npm engines分别>=16/>=20；实际freshPG23断言；Redis新client运行连接/fence在G2真实集成待验，退出通过模块cache API不泄露驱动类型 |
+| TS / @types/node |6.0.3 /24.13.3|TS Apache-2.0；strict+ES2024+noEmitOnError/noFallthrough+skipLibCheck=false；当前Connect2声明依赖HeadersInit，暂保留lib DOM，仅G1过渡，G2删除RPC后必须移除DOM，不创建类型alias |
+| Redocly CLI |2.46.1|MIT；Node>=22.12.0或20.19，固定已在BFF核验的版本；独立OpenAPI3.1规范lint通过0warning，不以自身generator比较代替规范验证；工具提示2.51.2升级留独立审查，不改变当前锁 |
+| Prettier |3.9.6|MIT；仅格式化本G1新增/修改TS，不批量改旧业务；全仓format门留G2清除旧树时闭环 |
 
-在 G1 中只有设计已确定的机器契约/schema 才可进入独立明确授权任务；
-本表不授权 worker 自行改表、删除旧库、安装依赖或批量重写源码。
+其他现有工具依赖固定安装实际版本，唯一pnpm-lock；strictDepBuilds=true。官方元数据来源npm registry对应版本（npm view … version engines peerDependencies license --json），实际运行结果而非IAM候选经验作为兼容证据。未执行完整供应链漏洞/镜像扫描，不声称生产安全已验。
 
-## 3. 实现顺序草案（不是可直接执行的任务卡）
+### G1实跑结果与交付边界
 
-1. Nest 进程内核与技术组件；先建立旧行为基线和架构断言，再替换装配。
-2. Sites 纵向切片：API/规则/持久化/测试一起交付。
-3. Products 与配置生效用例；Manifest 同步承接身份、策略、缓存一致性。
-4. Workspace 仅按已批准消费者用例实施，不复制组织/Project。
-5. Model 独立 cutover：owner contract → System 模块/唯一数据栈 → 消费者 → 删除旧运行身份与路径 → 集成验收。
+- RED：新增target suite起初因schema不存在失败；实现后目标9tests全部通过（BIGINT、scope、metadata/module数量、默认路由、协议与Nest Pipe）；旧Proto owner5tests通过。
+- contract:generate:openapi：83业务+2probes；独立数量sites11/workspaces6/products35/runtime-manifests1/model-catalog30，method-path去重与CAS/permission/scope组合断言。
+- contract:lint：Buf旧Proto+Redocly2.46.1 OpenAPI3.1规范校验0warning+drift/metadata通过；verify:contract-provenance校验runtime source/OpenAPI及仍保留旧Proto digest。
+- typecheck/build/lint：当前G1全部通过；这只证明schema/旧进程编译，不证明Nest业务已实现。
+- TEST_ADMIN_DATABASE_URL=postgresql://nako@localhost/postgres pnpm test:schema:fresh：PG18.4 fresh安装+非空重装拒绝+23项断言，22张表；最近隔离库system_g1_1804aa10dff54a99a7fdbca895f53ee2已清理。首次脚本发现管理员search_path非public，显式设public,pg_catalog与UTC后重跑通过；不是修改共享PG参数。
+- 最终全量test：26files，21pass/2fail/3skip；128tests，115pass/5fail/8skip。5fail为如下旧契约/目录代际断言，业务保留测试未见额外失败；不称全绿。G1新增目标artifact与保留的旧runtime测试有明确代际冲突；test/http-contract-source.test.ts旧固定13 operation/旧meta/旧schema名字断言，以及test/architecture/layer-boundary.test.ts禁modules/http仍待G2替换，未放宽或删除这些测试。
+- 当前HTTP业务源码未写，canonicalSQL receipt/scope/表与旧Service不兼容；禁止部署G1或在旧业务上冒称fresh smoke。真实CRUD/父删除竞态/retention/Redisfence/consumer/CI均G2–G6待验。
+- Root审查前保持工作树，不git add/commit/checkout；交付SHA由Root串行提交后记录。Root追加准许src/http/protocol.schema.ts仅HTTP wire schema及生成器共用，无I/O。
 
-每片开工前补充准确文件集、RED/GREEN 测试命令、提交责任和隔离资源。
-同仓单 writer；跨仓 owner/consumer 串行，独立只读审查并行。通用 lint/typecheck/test/build、
-fresh schema、真实 integration、contract/architecture/smoke 都必须在实现交付主仓重跑。
+### ROOT-GATE 验收
+Root commit36c9e7790980f39f97895cdd0b211887dd2897bf；3文件，RED4fail8pass→GREEN36pass，Root committed HEAD复跑36pass，Ruff format/check通过；独立审查无阻断。全scripts/tests另2项旧基线失败（示例预期18实际11、旧章节名），Root用git archive复现，非本切片引入。
 
-## 4. 当前未决与交接
+G1最终检查：2026-09-08；pnpm verify:contract-provenance（18source）及本切片Prettier check通过；git diff --check通过。G1状态待Root审查，writer停止写入等待放行G2–G5。
 
-- 业务配置发布需求尚未定稿，独立 releases 不预建。
-- Site/Model RPC 去留与外部消费者待证据裁决，生成路径随最终协议确定。
-- BFF 当前两个 owner HTTP 路径缺 /v1；需 BFF 负责人后续修复并与 owner 做真实 integration，当前不宣称链路已通。
-- 数据访问栈/精确版本未冻结；现有 pg/Prisma 正确性保障不得因统一目录而丢失。
-- Workspace 扩展与 execution Runtime profile 尚无明确消费者用例。
-- IAM 未交付内部 AuthZ/SDK 不作为当前可用依赖。
-- SQL 手册基于 Root 已有未提交版本，规范归档由 Root 后续处理，本轮不夹带提交。
+### G1 Root 放行证据（2026-09-08）
+
+Root在7dde8e7+交接40文件的稳定工作树重跑：target 9pass、旧Proto owner 5pass、Redocly规范lint/drift/18source provenance、typecheck/build/lint、diff check全部通过。
+独立fresh PG验证22表/23断言通过，Root创建的system_g1_68ad6bcc12e84e40b71293246d892dda已清理并查询确认不存在。
+Root全量test复现115pass/5fail/8skip；5项为已声明旧契约/旧目录断言，日志/tmp/kokoro-system-g1-root-tests.log。它们必须在源码切换时用目标行为测试替换，未标记完整验收。
+system_consumer_plan只读最终复核无阻断：conditional Config、tenant-only Release、全局Config禁止release、83操作分布、错误状态、receipt作用域与跨module只读完整性规则一致。
+G1设计/机器门通过；本提交为不可部署的设计先行过渡点。Root提交后同负责人获准连续实施G2–G5全部业务与门禁；G6消费者以此已提交owner契约为依赖，最终验收仍包括完整cutover。

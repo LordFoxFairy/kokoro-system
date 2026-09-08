@@ -23,16 +23,23 @@ function posixRelative(base: string, path: string): string {
 
 async function files(directory: string, suffix: string): Promise<string[]> {
   const entries = await readdir(directory);
-  const nested = await Promise.all(entries.map(async (entry) => {
-    const path = resolve(directory, entry);
-    return (await stat(path)).isDirectory()
-      ? files(path, suffix)
-      : path.endsWith(suffix) ? [path] : [];
-  }));
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const path = resolve(directory, entry);
+      return (await stat(path)).isDirectory()
+        ? files(path, suffix)
+        : path.endsWith(suffix)
+          ? [path]
+          : [];
+    }),
+  );
   return nested.flat().sort();
 }
 
-function record(value: unknown, name: string): Readonly<Record<string, unknown>> {
+function record(
+  value: unknown,
+  name: string,
+): Readonly<Record<string, unknown>> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new TypeError(`${name} must be an object`);
   }
@@ -40,12 +47,16 @@ function record(value: unknown, name: string): Readonly<Record<string, unknown>>
 }
 
 function stringValue(value: unknown, name: string): string {
-  if (typeof value !== "string") throw new TypeError(`${name} must be a string`);
+  if (typeof value !== "string")
+    throw new TypeError(`${name} must be a string`);
   return value;
 }
 
 function stringArray(value: unknown, name: string): readonly string[] {
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
+  if (
+    !Array.isArray(value) ||
+    value.some((entry) => typeof entry !== "string")
+  ) {
     throw new TypeError(`${name} must be a string array`);
   }
   return value.filter((entry): entry is string => typeof entry === "string");
@@ -59,17 +70,20 @@ async function generatedFromCanonicalSource(): Promise<Map<string, string>> {
   const templatePath = resolve(temporaryRoot, "buf.gen.yaml");
   const output = posixRelative(root, outputRoot);
 
-  await writeFile(templatePath, [
-    "version: v2",
-    "clean: true",
-    "plugins:",
-    "  - local: protoc-gen-es",
-    `    out: ${output}`,
-    "    opt:",
-    "      - target=ts",
-    "      - import_extension=js",
-    "",
-  ].join("\n"));
+  await writeFile(
+    templatePath,
+    [
+      "version: v2",
+      "clean: true",
+      "plugins:",
+      "  - local: protoc-gen-es",
+      `    out: ${output}`,
+      "    opt:",
+      "      - target=ts",
+      "      - import_extension=js",
+      "",
+    ].join("\n"),
+  );
 
   try {
     const generated = spawnSync(
@@ -78,12 +92,17 @@ async function generatedFromCanonicalSource(): Promise<Map<string, string>> {
       { cwd: root, encoding: "utf8" },
     );
     if (generated.status !== 0) {
-      throw new Error(`temporary contract generation failed:\n${generated.stdout}${generated.stderr}`);
+      throw new Error(
+        `temporary contract generation failed:\n${generated.stdout}${generated.stderr}`,
+      );
     }
 
     const result = new Map<string, string>();
     for (const path of await files(outputRoot, ".ts")) {
-      result.set(posixRelative(outputRoot, path), `${(await readFile(path, "utf8")).trimEnd()}\n`);
+      result.set(
+        posixRelative(outputRoot, path),
+        `${(await readFile(path, "utf8")).trimEnd()}\n`,
+      );
     }
     return result;
   } finally {
@@ -96,15 +115,18 @@ describe("System protobuf owner boundary", () => {
     const sources = await files(protoRoot, ".proto");
     for (const path of sources) {
       const source = await readFile(path, "utf8");
-      expect(source.match(/^package\s+([a-z0-9_.]+);$/mu)?.[1], posixRelative(protoRoot, path))
-        .toBe("kokoro.site.v1");
+      expect(
+        source.match(/^package\s+([a-z0-9_.]+);$/mu)?.[1],
+        posixRelative(protoRoot, path),
+      ).toBe("kokoro.site.v1");
       expect(source).not.toContain("kokoro.common.v1");
     }
   });
 
   it("tracks every canonical proto source and no foreign source in provenance", async () => {
-    const sourcePaths = (await files(protoRoot, ".proto"))
-      .map((path) => posixRelative(protoRoot, path));
+    const sourcePaths = (await files(protoRoot, ".proto")).map((path) =>
+      posixRelative(protoRoot, path),
+    );
     const parsed: unknown = JSON.parse(
       await readFile(resolve(root, "contract/provenance.json"), "utf8"),
     );
@@ -119,8 +141,9 @@ describe("System protobuf owner boundary", () => {
     const combined = createHash("sha256");
     for (const path of sourcePaths) {
       const content = await readFile(resolve(protoRoot, path));
-      expect(stringValue(digests[path], `provenance.protoSha256.${path}`))
-        .toBe(createHash("sha256").update(content).digest("hex"));
+      expect(stringValue(digests[path], `provenance.protoSha256.${path}`)).toBe(
+        createHash("sha256").update(content).digest("hex"),
+      );
       combined.update(content);
     }
     expect(provenance.combinedSha256).toBe(combined.digest("hex"));
@@ -137,7 +160,9 @@ describe("System protobuf owner boundary", () => {
     const openapi = record(provenance.openapi, "provenance.openapi");
     expect(openapi.file).toBe("openapi/system.openapi.json");
     expect(openapi.sha256).toBe(
-      createHash("sha256").update(await readFile(openapiPath)).digest("hex"),
+      createHash("sha256")
+        .update(await readFile(openapiPath))
+        .digest("hex"),
     );
 
     const generated = record(provenance.generated, "provenance.generated");
@@ -172,11 +197,11 @@ describe("System protobuf owner boundary", () => {
       "provenance.releaseClassification",
     );
     expect(classification).toEqual({
-      contractVersion: "1.0.0",
+      contractVersion: "2.0.0",
       httpRouteGeneration: "v1",
       baseline: "none-unpublished",
       classification: "v1-fresh-cutover",
-      change: "http-bigint-integer-to-canonical-decimal-string",
+      change: "complete-system-http-zod-envelope-cas-model-owner",
       publishedCompatibilityRequired: false,
     });
     const openapiDocument = record(
@@ -189,14 +214,14 @@ describe("System protobuf owner boundary", () => {
 
     expect(provenance.consumers).toEqual([
       {
-        consumer: "kokoro-system-typescript-sdk",
-        surface: "runtime-manifest",
-        disposition: "updated-and-tested",
+        consumer: "kokoro-bff",
+        surface: "runtime-manifest/model-catalog",
+        disposition: "pending-owner-cutover-and-live-verification",
       },
       {
-        consumer: "kokoro-bff",
-        surface: "runtime-manifest",
-        disposition: "current-decimal-string-path-compatible",
+        consumer: "kokoro-agent",
+        surface: "model-catalog/resolve",
+        disposition: "pending-executable-route-wiring-and-live-verification",
       },
       {
         consumer: "control-plane-service-callers",
@@ -206,7 +231,7 @@ describe("System protobuf owner boundary", () => {
       {
         consumer: "site-service-callers",
         surface: "kokoro.site.v1",
-        disposition: "protobuf-wire-unchanged",
+        disposition: "legacy-owner-tests-only-pending-removal",
       },
     ]);
   });
@@ -215,7 +240,10 @@ describe("System protobuf owner boundary", () => {
     const expected = await generatedFromCanonicalSource();
     const checkedIn = new Map<string, string>();
     for (const path of await files(generatedRoot, ".ts")) {
-      checkedIn.set(posixRelative(generatedRoot, path), await readFile(path, "utf8"));
+      checkedIn.set(
+        posixRelative(generatedRoot, path),
+        await readFile(path, "utf8"),
+      );
     }
 
     expect([...checkedIn.keys()].sort()).toEqual([...expected.keys()].sort());
@@ -225,12 +253,21 @@ describe("System protobuf owner boundary", () => {
   }, 30_000);
 
   it("runs the owner boundary gate from contract:check", async () => {
-    const parsed: unknown = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
-    const scripts = record(record(parsed, "package.json").scripts, "package.json.scripts");
+    const parsed: unknown = JSON.parse(
+      await readFile(resolve(root, "package.json"), "utf8"),
+    );
+    const scripts = record(
+      record(parsed, "package.json").scripts,
+      "package.json.scripts",
+    );
     expect(scripts["test:contract-owner"]).toBe(
       "vitest run test/contract/proto-owner-boundary.test.ts",
     );
-    expect(stringValue(scripts["contract:check"], "package.json.scripts.contract:check"))
-      .toContain("pnpm test:contract-owner");
+    expect(
+      stringValue(
+        scripts["contract:check"],
+        "package.json.scripts.contract:check",
+      ),
+    ).toContain("pnpm test:contract-owner");
   });
 });

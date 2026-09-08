@@ -1,21 +1,15 @@
-# kokoro-system 子仓 Agent 规范
+# kokoro-system Agent 规范
 
 @../AGENTS.md
 
-本仓是 System owner。当前行为与目标设计分别见 docs/CURRENT.md 和 docs/TECHNICAL_DESIGN.md；
-唯一有效推进任务表是 docs/IMPLEMENTATION_PLAN.md。G0 只授权设计准备，不授权业务重写。
+唯一任务表docs/IMPLEMENTATION_PLAN.md；完整System范围按Root ADR-031、TECHNICAL_DESIGN/API_CONTRACT/DATA_MODEL执行。
+G1仅设计+runtime schema+生成器+canonicalSQL，业务Service/Controller/Repository/进程组合根等待Root审查放行。
 
-- Owner：Site/域名/站点策略、产品配置、Runtime Manifest、System Workspace；Model 按 Root ADR-029 合入，尚未执行 cutover。
-- 语言、目录、SQL、测试规则只引用 Root 三份专项手册，不复制或覆盖；旧全局四层仅是当前实现，不是目标模板。
-- 目标采用 Nest 原生业务模块/DI；独立 releases、执行 runtimes 和 generated/proto 均非预建要求。
-- 当前源码入口为 src/main.ts；当前机器事实源为 contract/openapi/system.openapi.json、contract/proto 与 database/schema.sql。
-- 协议去留、数据库技术栈与生成 client 位置须先过本仓设计门；当前生成物禁止手改，也不提前删除。
-- 本仓业务实现只写自己的事实；IAM 身份/权限、BFF Project、Agent 执行、Billing 账务不迁入 System。
-- 后续实现遵守任务卡单 writer、主控提交/集成与独立审查；保护其他仓及 Root 已有未提交变更。
-
-当前实现完整验收命令如下；G0 文档准备的较小验证范围及未运行原因见任务表：
-
-```bash
-pnpm lint && pnpm typecheck && pnpm test && pnpm build
-pnpm db:apply-schema
-```
+- 五个业务模块sites/workspaces/products/runtime-manifests/model-catalog；System唯一数据库owner，各模块唯一writer。
+- Nest12/Node24/Express、Zod运行时schema单向生成OpenAPI、pg SQL-first database/schema.sql、node-redis。
+- 语言/SQL规则只引用Root手册；schema/type与业务class分开，不建立模板空层、通用configs/coordinator。
+- 同事务具名只读完整性SQL可查其他System模块父/反向引用，只返回ID/bool；禁止跨模块写表与Repository/Row deep-import。
+- G1旧全局四层/Connect仍是当前业务代码，不是目标模板；新增schema尚未接Controller，不能宣称目标端点上线。
+- 本轮system_owner唯一writer，Root串行Git暂存提交；不操作其他仓、不清共享数据库/Redis。
+- G1验证：pnpm contract:generate:openapi、pnpm test:contract:target、pnpm typecheck、TEST_ADMIN_DATABASE_URL=... pnpm test:schema:fresh。
+- 完整放行仍需format/lint/typecheck/unit/integration/contract/architecture/build/fresh-schema/smoke以及Root跨仓consumer/topology验收。

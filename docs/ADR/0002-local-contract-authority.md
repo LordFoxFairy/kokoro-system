@@ -1,43 +1,14 @@
-# ADR-0002: 本仓 contract authority 与 generated provenance
+# ADR-0002：运行时 schema authority 与 immutable integrity
 
-- Status: Accepted
-- Date: 2026-09-03
-- Owners: kokoro-system
+状态：Accepted，2026-09-07；承接Root ADR-031，替代2026-09-03手写OpenAPI/双协议目标。G1当前业务仍旧HTTP/Connect。
 
-## Context
+1. System HTTP唯一字段源是本仓src/modules业务schema；Zod运行时校验与toJSONSchema单向生成contract/openapi/system.openapi.json，不维护第二份DTO/class-validator/手写OpenAPI。scripts只编排path/metadata，src不依赖scripts；后续Nest route inventory对齐生成operation。
+2. generated artifact固定2.0.0、v1-fresh-cutover；provenance记录每个Zod与生成器source digest和OpenAPI digest。首发发布任务再绑定source commit/artifact，不假造已发布registry。
+3. 旧Site Proto/generated仅在G1保留以运行旧基线；G2承接HTTP行为后删除source/handler/generated/工具，Model transport按Root ADR031不保留RPC。
+4. 每个operation记录owner/visibility/stability/permission/idempotency/CAS/global-operator，request/response实际typed schema不得退化data:{}。
+5. SQL-first canonical database/schema.sql唯一；允许两个具名技术完整性trigger：model_revision_immutable_guard、system_feature_identity_guard。它们只拒绝不可变身份/已发布快照的更新删除，不自动改字段、写其他表、编排事件或业务状态；真实PG负例验证。这承接旧Model不可变DB保障，应用仍负责publish/retire事务与授权。
+6. 根规范API§2：成功{data}；错误{error:{code,message,retryable}}；x-request-id仅响应header。G1替换旧meta为fresh-cut breaking，不增加alias。
 
-Root 只拥有拓扑与治理。如果 Root、System 和 consumer 各维护一份可编辑 HTTP/protobuf DTO，字段、版本和 tenant boundary
-会漂移；手改 generated output 也会切断 source provenance。
+比较：手写OpenAPI+parser双源易漂移，弃用；class DTO重复Zod无收益，弃用；仅应用保护快照弱于旧Model已存在DB保障，采用具名技术trigger而不是泛化审计trigger。
 
-## Decision
-
-1. `contract/openapi/system.openapi.json` 是 System HTTP machine source；`contract/proto/` 是 System protobuf source。
-2. 每个 OpenAPI operation 声明 owner、visibility、stability、idempotency 与 permission metadata。
-3. `src/generated/proto/` 只由本仓 Buf/protoc generation 产生，禁止手改；application 不依赖 generated wire type。
-4. `contract/provenance.json` 验证本地 Proto/OpenAPI source 与 generated output digest，并记录 release classification/consumer
-   disposition；consumer 依赖版本固定的 artifact/commit/digest，不复制可编辑 source。
-5. Root Developer API 门户不发布 System internal-owner contract，也不成为其字段事实源。
-6. Breaking change 必须先改 owner contract、执行 lint/breaking review/generation/provenance/tests，再更新实现与 consumer。
-
-## Consequences
-
-- Contract review 先于 consumer/runtime 更新；generated drift 可在 owner repository 内定位。
-- OpenAPI 与 proto 有独立版本语义，但都由 System owner 发布。
-- System Proto 只保留运行时使用的 `kokoro.site.v1`；owner gate 拒绝重新声明 `kokoro.common.v1`，不复制 IAM、BFF
-  或 Agent DTO。
-- 当前 provenance 已覆盖 Proto/OpenAPI source、generated output 与 V1 fresh-cutover classification；首次发布后的 OpenAPI
-  semantic breaking baseline、source commit/published artifact provenance 与自动 consumer matrix 仍是
-  `../../contract/README.md` 记录的缺口，不被 ADR 文字视为已实现。
-- 手写 TypeScript Runtime Manifest SDK 是 consumer adapter，不是第二份 schema authority。
-
-## Alternatives rejected
-
-- Root 保存跨仓 canonical proto/OpenAPI：违反事实 owner，增加双向同步。
-- Consumer vendor 一份可编辑 DTO：无法证明来源和 breaking upgrade。
-- 直接手改 generated TypeScript：下次 generation 会丢失且无法审计。
-- 只在 Markdown 描述字段：缺少 machine validation 与 generation source。
-
-## Verification
-
-`pnpm contract:check`、contract-source tests、architecture tests 与 Root `kokoro-system` audit slice 验证当前仓结构。发布级
-breaking/provenance 证据仍需按 `../../contract/README.md` 的缺口收敛。
+验证：contract:generate:openapi、contract:lint、verify:contract-provenance、test:contract:target、test:schema:fresh；G1不等同业务HTTP或生产SLO完成。

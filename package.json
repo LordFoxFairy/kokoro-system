@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22 <25"
+    "node": ">=24 <25"
   },
-  "packageManager": "pnpm@11.25.0",
+  "packageManager": "pnpm@12.3.4",
   "scripts": {
     "dev": "tsx src/main.ts",
     "start": "node dist/main.js",
@@ -17,11 +17,11 @@
     "test:integration": "pnpm test:postgres-concurrency && pnpm test:runtime-smoke && pnpm test:real-consistency",
     "test:real-consistency": "vitest run --no-file-parallelism test/integration/*.test.ts",
     "test:contract": "pnpm exec vitest run --no-file-parallelism test/schema-contract.test.ts",
-    "contract:lint": "buf lint contract && tsx scripts/verify-openapi-contract.ts",
-    "contract:generate": "buf generate --template contract/buf.gen.yaml contract && tsx scripts/normalize-generated-contract.ts",
+    "contract:lint": "buf lint contract && redocly lint contract/openapi/system.openapi.json --extends minimal && tsx scripts/verify-openapi-contract.ts",
+    "contract:generate": "pnpm contract:generate:openapi && buf generate --template contract/buf.gen.yaml contract && tsx scripts/normalize-generated-contract.ts",
     "test:contract-owner": "vitest run test/contract/proto-owner-boundary.test.ts",
     "contract:check": "pnpm contract:lint && pnpm contract:generate && pnpm verify:contract-provenance && pnpm test:contract-owner",
-    "verify:contract-provenance": "tsx scripts/verify-contract-provenance.ts",
+    "verify:contract-provenance": "tsx scripts/verify-contract-provenance.ts && tsx scripts/update-system-openapi-provenance.ts --check",
     "check": "pnpm typecheck && pnpm lint && pnpm build && pnpm sdk:typecheck && pnpm sdk:build",
     "verify": "pnpm contract:check && pnpm check && pnpm test:unit",
     "sdk:build": "pnpm --dir sdk/typescript build",
@@ -31,25 +31,36 @@
     "db:apply-schema": "tsx scripts/apply-schema.ts",
     "test:runtime-smoke": "tsx scripts/test/runtime-smoke.ts",
     "test:runtime-real-system": "tsx scripts/test/runtime-real-system-smoke.ts",
-    "test:postgres-concurrency": "tsx scripts/test/postgres-idempotency-concurrency.ts"
+    "test:postgres-concurrency": "tsx scripts/test/postgres-idempotency-concurrency.ts",
+    "contract:generate:openapi": "tsx scripts/generate-system-openapi.ts && tsx scripts/update-system-openapi-provenance.ts",
+    "test:contract:target": "vitest run --no-file-parallelism test/contract/system-target-contract.test.ts",
+    "test:schema:fresh": "tsx scripts/verify-system-fresh-schema.ts"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.14.0",
     "@connectrpc/connect": "2.1.2",
     "@connectrpc/connect-node": "2.1.2",
-    "pg": "^8.16.3",
-    "redis": "^5.8.2"
+    "@nestjs/common": "12.0.1",
+    "@nestjs/core": "12.0.1",
+    "@nestjs/platform-express": "12.0.1",
+    "pg": "8.23.0",
+    "redis": "6.2.1",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@bufbuild/buf": "1.72.0",
     "@bufbuild/protoc-gen-es": "2.14.0",
-    "@eslint/js": "^10.0.1",
-    "@types/node": "^22.15.21",
-    "@types/pg": "^8.15.5",
-    "eslint": "^10.9.1",
-    "tsx": "^4.19.4",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.67.0",
-    "vitest": "^4.1.10"
+    "@eslint/js": "10.0.1",
+    "@redocly/cli": "2.46.1",
+    "@types/node": "24.13.3",
+    "@types/pg": "8.23.1",
+    "eslint": "10.9.1",
+    "prettier": "3.9.6",
+    "tsx": "4.23.12",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.11"
   }
 }

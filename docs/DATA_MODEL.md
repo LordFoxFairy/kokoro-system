@@ -1,168 +1,72 @@
-# kokoro-system 数据模型
+# System 数据模型
 
-## G0：目标数据设计准备（2026-09-07）
+状态：G1 目标 fresh SQL，业务 writer 尚未实现。唯一 canonical schema：database/schema.sql；SQL-first + pg，禁止 Prisma/第二schema/历史 migrations。
+基线7dde8e7；保留已有真实 Site/Workspace/Policy/Config/Release/Binding/Receipt/fence 表，增补产品与Model业务结构，不迁移开发数据。
 
-**当前唯一 canonical schema 仍是现有 database/schema.sql；本轮没有改表。**
-下方第 1 节起是当前实现说明，不是新目录/ORM 的安装授权。
-目标技术选型见 [TECHNICAL_DESIGN](TECHNICAL_DESIGN.md)，任务表见 [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md)。
+## 表、索引、约束与生命周期
 
-| 数据面 | 当前事实 | G1 必须完成的设计 |
-|---|---|---|
-| System vs Model 数据栈 | System pg；Model Prisma runtime + SQL-first 安装 | 一次选择合入后的唯一 schema/访问栈；推荐 pg 尚待 ADR，不保留双轨 |
-| tenant 身份 | System tenant_id TEXT，旧 context 含 organization | 对齐 IAM Organization.id == tenant_id；无第二套 Organization；ID 类型依据真实 contract，不能只靠类型转换 |
-| Product/Profile | Product 只读，Profile schema-only | 建立 Product/App/Feature/exposure 用例；无用途 Profile 删除，有用途则明确 writer，非直接按旧表造模块 |
-| Site/Host/Workspace | 当前身份关系与部分 CRUD | 明确生命周期、引用校验、删除锁协议；Workspace 新职责需消费者依据 |
-| Config/Release/Binding | 任意 JSON、validation 缺失、binding writer 缺失 | typed 业务配置归 owner；生效策略定稿后设计快照/版本/绑定与原子事务，补 Config 并发唯一性 |
-| Manifest generation | 当前 tenant generation + Redis fence | 站点差异化后完整 identity、策略/配置变更失效与一致读取，防止站点串配置 |
-| Audit | system_audit_event 没有 reader/writer | 不创建第二个 Audit owner；确认无用途后随 schema 切片删除，可靠投递另按业务用例设计 |
-| Model | 仍独立 model_* schema/database/Redis DB3 | 保留模块边界，合入唯一 System schema；退出旧实例身份/DB3 不等于本轮删除共享数据 |
-
-Model 合入还需解决：provider health 冗余存储、删除/restore/orphan、global 与 tenant mutation 的 receipt scope、
-ID 策略、不可变 revision、advisory lock、generation fence。模型发布与产品配置发布不共用状态机。
-Model adapter 若从 Prisma 改为 pg，必须连同真实 PG fixture/断言单独成片验证，不能只替换 import。
-
-每张新增或改造表必须给出字段/NULL/时间精度/删除策略、实际查询、索引理由、唯一性不变量、事务与锁顺序、
-tenant 隔离、retention/orphan/reconciliation、fresh install 与 drift 证据。无消费者的候选模块不先生成表。
-
-文档门待验：目标 schema/contract 尚未产生，因此现有 schema 检查通过只能证明当前实现，不能证明目标数据设计通过。
-
-
-
-状态：当前 canonical schema 说明，2026-09-04。唯一可执行事实源是
-[`../database/schema.sql`](../database/schema.sql)；本文记录 owner、不变量、查询依据和缺口，不替代 SQL。
-
-## 1. 存储策略
-
-**已实现**
-
-- PostgreSQL 16+ 保存 durable System facts；表/列/constraint/index 使用小写 snake_case。
-- 只有一个 `database/schema.sql`，没有 migration ledger 或历史 migration 目录。
-- `pnpm db:apply-schema` 在 transaction + advisory lock 中检查 public schema 为空，再安装当前 schema；它不升级旧库。
-- V1 明确不使用 `FOREIGN KEY`/`REFERENCES`；关系由 application/repository transaction、tenant predicate、row lock、
-  CHECK 与业务 UNIQUE 维护。
-- 瞬时点使用 `TIMESTAMPTZ(3)`；应用 row mapper 输出 RFC 3339 UTC；tenant ID 为 opaque `TEXT`，资源 ID 为 UUID。
-- Redis 不保存 durable fact，只缓存按 PostgreSQL tenant generation 分区的完整 Runtime Manifest，TTL 30 秒。
-- PostgreSQL `BIGINT` 序号在 TypeScript domain/application/receipt 与 HTTP JSON 中统一表示为 canonical decimal string，
-  不转换为可能丢精度的 JavaScript `number`。
-
-## 2. Schema owner inventory
-
-| Table | Owner/fact | Tenant | 当前 production path |
+| 表 | owner / writer | 主查询与索引 | 约束理由 / 生命周期 |
 |---|---|---|---|
-| `system_product` | Product catalog key/name/status | global | Manifest read；无 HTTP writer |
-| `system_product_profile` | Product profile/version | global | Schema only；当前 source 无 reader/writer |
-| `system_config_release` | Config release/digest/state/version | nullable column；HTTP writer 为 tenant | HTTP create/transition；Manifest 只读取同 tenant published release |
-| `system_runtime_manifest_generation` | tenant cache visibility generation | required primary key | publish/retire transaction 推进；Manifest read fence |
-| `system_release_binding` | scope/product 到 release 的 active binding | `scope_type/scope_id` 表达 | Manifest 将 active tenant binding 与同 tenant published release 联查；无 application writer |
-| `system_config_record` | module/config/scope/locale/value/version/release | global 可 null，其余 tenant | HTTP list/upsert；Manifest assembly |
-| `system_audit_event` | 未接入的 audit-shaped schema artifact | nullable | Schema only；当前 source 无 writer/reader，需与 IAM Audit owner 重新确认 |
-| `system_site` | Tenant Site identity/display/timezone/state | required | HTTP create/list；Host resolution |
-| `system_site_host` | Site hostname binding | required | 随 Site 创建；list/resolve；无独立管理 surface |
-| `system_workspace` | Tenant Site 下 Workspace | required | HTTP create/list |
-| `system_site_policy` | Site locale/product/public policy | required | HTTP get/put；Host resolution 默认 locale |
-| `system_command_receipt` | Mutation idempotency request hash/response | required | 所有 control-plane mutation |
+| system_site | sites | tenant+status+id；tenant+created_at DESC+id DESC | 活跃tenant/site_key唯一；version>0；软删30天，仍有活引用拒绝清理 |
+| system_site_host | sites | tenant/site+hostname；global hostname | active域名全局唯一防跨tenant接管；关联无恢复，删除archived，30天物理清理 |
+| system_site_policy | sites | tenant/site active | 一站一active；version CAS；allowed locale/product版本化数组用于装配不作查询条件，64KiB；默认语言必须允许；随Site清理 |
+| system_workspace | workspaces | tenant/site/status/id及tenant/created_at/id | tenant/site/key活跃唯一；site不可变；软删30天 |
+| system_product | products/global | product_key；created_at/id | 产品键永久不复用；version CAS；软删30天可恢复，期满保留ID/key tombstone，不物理删除身份 |
+| system_application | products/tenant | tenant/site/created_at/id；product反向检查 | tenant/site/app_key活跃唯一；product/site不可变；软删30天，先删除关联 |
+| system_feature_definition | products/global | global_feature_key；product/created_at/id | global key永久唯一、不可变结果契约；retired_at生命周期，无软删；永久保留身份，32KiB schema_version1结果契约 |
+| system_app_feature_exposure | products/tenant | tenant/application/feature | 每App/Feature唯一；无恢复语义关系，删除物理，generation同事务；enabled独立boolean |
+| system_presentation | products/tenant | tenant/application/locale/surface | 身份唯一；version CAS；navigation/theme/i18n typed schema_version1 JSON≤64KiB；App清理时物理清理 |
+| system_config_record | products | tenant/locale/module/scope/product；release引用检查 | active完整identity唯一（tenant/site/module/key/scope/product/locale/release）；schema_version>0；普通配置软删30天；release快照随retention |
+| system_config_release | products | tenant/status/id；tenant/created_at/id | tenant非空、tenant/release_key未retired唯一；digest64hex/version>0；draft→validated→published→retired；retired无binding后保留90天 |
+| system_release_binding | products | tenant/site/product/scope；release反向影响 | active完整scope唯一；tenant必需，site可空表示tenant默认；归属同tenant published release；archived30天物理清理 |
+| system_runtime_manifest_generation | runtime-manifests | tenant PK | 正BIGINT；每tenant写同事务增加，tenant注销时随owner清理 |
+| system_catalog_generation | products | singleton scope PK | global配置写fence；常驻一行，不是业务config KV |
+| system_command_receipt | 各写用例内部 | scope_kind/scope_id/key；expires_at | scope_kind/scope_id/key唯一+hash+completion一致性；operation/actor进入digest；完成7天后分批物理清理；pending只在事务内不持久泄漏 |
+| model_definition | model-catalog | model_key；created_at/id | 全局key永久唯一；version>0；软删30天可恢复，期满保留ID/key tombstone |
+| model_provider | model-catalog | provider/provider_key；created_at/id | provider/key永久唯一；只存secret_handle_ref不存secret；软删30天可恢复，期满保留ID/key tombstone |
+| model_label | model-catalog | label_key；feature_key/created_at/id | label_key永久唯一；feature_key引用产品Feature，default_revision同feature；软删30天可恢复，期满保留ID/key tombstone |
+| model_revision | model-catalog | model/revision；feature/published/retired/priority/id；provider反向 | model+revision唯一；draft可编辑，published/retired内容immutable，无通用delete；永久保留revision引用 |
+| model_routing_policy | model-catalog/tenant | tenant/label | tenant/label唯一，tenant/feature WHERE is_default唯一；指定revision须published且feature匹配；删除物理；version CAS |
+| model_provider_health_state | model-catalog | provider PK | 唯一health权威投影，不在provider复制health字段；generation CAS；observed_at UTC，provider删除后清理 |
+| model_cache_generation | model-catalog | resolve singleton | global模型写推进，tenant routing另推进tenant fence；常驻 |
 
-“Schema only”表示表已存在，但当前 runtime 没有相应 application use case；不能把表存在解释为功能已交付。
+SQL-only system_product_profile 从无production writer，删除；system_audit_event 无writer且Audit归IAM，删除。不存在新Profile/Audit兼容表。
+Model旧Prisma schema只在独立旧仓，G1不复制其访问层/enum/receipt；合入模型统一System receipt，避免旧operation+key缺tenant的冲突范围。
+旧Model TEXT资源ID fresh-cut统一UUID（外部model_key/provider_key仍TEXT）；这是明确breaking，与旧数据不做迁移兼容。
 
-## 3. 资源标识与关系
+## 关系完整性与锁
 
-```text
-system_site (tenant_id, id)
-  -> system_site_host (tenant_id, site_id)
-  -> system_workspace (tenant_id, site_id)
-  -> system_site_policy (tenant_id, site_id)
+无外键：每条引用写与父删除共享TECHNICAL_DESIGN锁序；先tenant身份再父行FOR UPDATE，锁内校验deleted/status/tenant，后写关系。
+Site→Host/Workspace/App/Policy；Product→App/Feature/Config/Binding；App→Exposure/Presentation；Feature→Exposure/Label/Revision；Release→Config/Binding；Model/Provider→Revision；Label→Routing；Revision→Label默认/Routing。
+跨tenant父ID统一NOT_FOUND，活依赖删除RESOURCE_IN_USE；Provider unhealthy仅影响resolve不影响基础CRUD。恢复重新校验自然键与所有父引用；冲突409不抢占其他资源。
+全局Feature/Provider/Model删除或retire与tenant引用新增共锁同global父行，防跨tenant竞态。
 
-system_product.id
-  -> system_product_profile.product_id
-  -> system_release_binding.product_id
-  -> system_config_record.product_id
+Reconciliation（目标每小时批量1000行，当前尚未接线）由各module owner执行显式列LEFT JOIN/NOT EXISTS：
 
-system_config_release.id
-  -> system_release_binding.release_id
-  -> system_config_record.release_id
+```sql
+SELECT w.id, w.tenant_id, w.site_id FROM system_workspace w
+WHERE w.deleted_at IS NULL AND NOT EXISTS
+ (SELECT 1 FROM system_site s WHERE s.id=w.site_id AND s.tenant_id=w.tenant_id AND s.deleted_at IS NULL);
+SELECT e.id, e.tenant_id, e.application_id FROM system_app_feature_exposure e
+WHERE NOT EXISTS (SELECT 1 FROM system_application a WHERE a.id=e.application_id AND a.tenant_id=e.tenant_id AND a.deleted_at IS NULL);
+SELECT r.id, r.model_id, r.provider_id FROM model_revision r
+WHERE NOT EXISTS (SELECT 1 FROM model_definition m WHERE m.id=r.model_id)
+   OR NOT EXISTS (SELECT 1 FROM model_provider p WHERE p.id=r.provider_id);
 ```
 
-这些箭头是应用关系，不是数据库 FK。
+其余关系采用同样tenant复合谓词，交付须逐关系测试；发现orphan写结构化错误/告警，投影fail-closed，不自动删除不可变快照。
+GC以expires_at或deleted_at批量索引查询，SKIP LOCKED限制批次，父清理重新检查引用，7/30/90天目标需实际测试时钟与恢复证明。法律留存不归本仓自动决策，有hold请求时暂停对应purge。
 
-**当前维护**
+## 验证门
 
-- Site + 初始 Host 在一个 idempotent transaction 中创建；active hostname 在全表唯一。
-- Site list 的 Host JOIN 同时使用 `tenant_id` 与 `site_id`。
-- Workspace create 先查同 tenant、非 archived Site，再写 Workspace。
-- Policy put 先查同 tenant Site，锁当前 active policy，原位 version + 1。
-- Site Host resolve 同时约束 tenant、active Site、active Host，并用 tenant+site LEFT JOIN active policy。
-- Release transition 锁 release，检查顺序状态，并按 expected version update。
-- publish/retire 在 release/receipt 同一 transaction 内 upsert并递增 tenant manifest generation；缺行在读路径解释为 generation 0，
-  首次可见性变化创建 generation 1。
-- Config 写入若携带 release，先按 `release.id + caller tenant` 锁行；只有 `draft`/`validated` 可写，published/retired 被拒绝，
-  foreign tenant 与不存在统一为 `NOT_FOUND`。
-- Manifest 的 tenant binding 与 Config Release 按 `release_id` 联查，并同时要求 binding active、release tenant 与请求 tenant
-  一致、release status=`published`；不满足时 release-specific Config 不进入结果。
+G1：schema静态owner/no-FK检查、唯一约束负例、PG fresh安装/重装拒绝；目标隔离数据库 system_g1_<random>，禁止重置共享数据。
+G2后：真实双连接父删除/关系创建竞态、CAS、receipt replay、跨tenant、global+tenant fence、immutable revision、retention，以及EXPLAIN(ANALYZE,BUFFERS)真实查询plan。
+空库安装不能证明业务事务/权限已实现；所有尚未运行行为测试在任务表显式待验。
 
-**缺口**
+Receipt scope_kind固定global/tenant；global scope_id空串、tenant非空由SQL CHECK约束，不能用tenant magic string碰撞global。Config结构矩阵见API_CONTRACT与ck_system_config_scope_fields；关系scope指向的资源在同事务父锁内重验。
 
-- Config upsert 尚未验证 `product_id` 的存在/状态以及 product/release 与 scope 的完整一致性。
-- Release Binding 没有 application writer，publish 也不自动创建 binding。
-- Product/Profile 没有 application management surface。
-- 不同 idempotency key 并发创建同一 Config identity 时，当前“先查再写”没有 UNIQUE 兜底，可能产生重复 active rows。
-- Policy 查询只看 active policy；Site archive/suspend lifecycle surface 尚不存在，关系回收没有实现。
+### 快照技术约束
+model_revision_immutable_guard承接旧Model数据库安全不变量，拒绝所有DELETE、identity修改；published后只允许retired_at/version/updated_at，published_at/digest/内容不可改，retirement不可撤销。system_feature_identity_guard永久保护Feature key/结果契约与身份，仅可retire/version；两者不编排业务、不隐藏写入，例外依据ADR0002与Root批准的immutable快照要求。真实SQL负例验证其行为。
+Binding不提供global release/API；tenant scope要求scope_id=tenant、site空，product scope要求scope_id=product UUID、site空，surface要求site+非空surface；均必需product，服务端同tenant校验published release。全局普通Config仍支持，无global release发布路径。
 
-## 4. 业务 UNIQUE 语义
-
-| Name | Columns/predicate | 业务语义 |
-|---|---|---|
-| `uq_system_product_key_active` | `product_key WHERE active` | 同一 active product key 唯一 |
-| `uq_system_product_profile_key_active` | `product_id, profile_key WHERE active` | Product 内 active profile key 唯一 |
-| `uq_system_config_release_tenant_key` | `COALESCE(tenant_id,''), release_key WHERE not retired` | tenant/global 非 retired release key 唯一；retire 后可复用 |
-| `uq_system_release_binding_active` | scope/scope_id/product WHERE active | 每个 scope+product 只有一个 active binding |
-| `uq_system_site_tenant_key_active` | `tenant_id, site_key WHERE not archived` | tenant 内非 archived Site key 唯一 |
-| `uq_system_site_host_active_hostname` | `hostname WHERE active` | active hostname 跨 tenant 全局唯一 |
-| `uq_system_site_host_site_hostname` | `tenant_id, site_id, hostname` | 同 Site 不重复登记同 hostname（含 archived） |
-| `uq_system_workspace_tenant_site_key_active` | tenant/site/workspace key WHERE not archived | Site 内非 archived Workspace key 唯一 |
-| `uq_system_site_policy_active` | tenant/site WHERE active | Site 只有一个 active policy |
-| `uq_system_command_receipt_tenant_key` | tenant/idempotency key | tenant 内 command key 全局唯一 |
-
-`system_config_record` 当前没有 config identity UNIQUE；这是已登记缺口，不应通过文档假设唯一。
-
-## 5. 状态与 CHECK
-
-| Table | 状态/检查 |
-|---|---|
-| Product/Profile | `active/archived` |
-| Config Release | `draft/validated/published/retired`、version > 0、digest 64 位小写 hex |
-| Runtime Manifest Generation | tenant 主键、generation > 0；缺行代表初始 generation 0 |
-| Release Binding | `global/tenant/product/surface` scope、`active/archived`、非 global 必须有 scope_id |
-| Config Record | scope enum、`active/deleted`、schema/config version > 0、digest hex |
-| Site | `draft/active/suspended/archived`、version > 0 |
-| Site Host | `active/archived`、hostname 必须非空小写 |
-| Workspace/Policy | `active/archived`、version > 0 |
-| Command Receipt | `pending/completed`；status 与 response/completed_at 必须一致 |
-
-Application 当前只暴露部分状态路径，详见 [`TECHNICAL_DESIGN.md`](TECHNICAL_DESIGN.md)；Schema enum 不等于所有
-transition 已实现。
-
-## 6. 查询、索引与 cursor
-
-- Manifest lookup 使用 product status/key、tenant+product active binding、release tenant/status 与
-  tenant/locale/module/scope/product/status config indexes；先后读取 generation 主键做 fence，输出 version 使用 BIGINT 数值最大值。
-- Site/Host、Workspace、Policy query 的索引以 tenant 作为前导或显式过滤条件。
-- Audit Event 索引支持 tenant+time 与 command 查找，但当前没有 runtime query。
-- Command Receipt 唯一索引支持 claim conflict，created index为未来 retention/inspection 提供顺序。
-- List API 当前按 UUID `id` 升序，cursor 为该 UUID 的 base64url；它是稳定不透明协议，不是 offset。
-
-## 7. JSONB 与 digest
-
-- `value_json` 保存 module-owned structured config；核心 scope、locale、product、release、version 均为普通列。
-- Policy 的 locale/product allow-list 当前为 JSONB string array，并由 row decoder验证。
-- Receipt `response_json` 保存首次 domain result；replay 时由类型专属 decoder 重新校验。
-- Config digest 是 `SHA-256(JSON.stringify(value))`；Manifest digest 是 assembled object 的同类 hash。
-
-**缺口**：没有 canonical JSON 规范；Config `schema_version` 没有 registry validator；digest 不是签名或内容授权证明。
-
-## 8. Retention、审计与恢复
-
-**当前实现**：Schema 含 soft-delete/retired 字段和 append-only `system_audit_event` 形状；Redis TTL 自动淘汰 manifest。
-
-**缺口**：没有 receipt/audit/retired row retention job、partition、archive、legal hold、backup restore script 或已记录恢复演练；
-`system_audit_event` 也未接入 application writer，且 Root 将 Audit 事实归 IAM，表的长期 owner 尚待独立架构决策。生产 retention、RPO/RTO 与备份由部署/数据 owner 明确后再落地，
-不能从当前 Schema 推断。
+Global Config release_id强制NULL；system_config_release.tenant_id NOT NULL；Config读写conditional scope的认证、查询选择见API_CONTRACT，不能用COALESCE回退全局release。

@@ -1,5 +1,7 @@
 # kokoro-system
 
+**G1过渡工作树：目标contract/schema已先行，旧业务尚未替换，不作为可部署版本；以下启动命令待G2承接，勿对已有数据库应用schema。**
+
 `kokoro-system` 是 Kokoro 的 System owner，负责 Site、Host、Workspace、Runtime Manifest、System Config、
 Config Release、Release Binding 与 System Policy 事实。它是内部服务，不是浏览器 API；调用方向固定为
 `Browser -> Web same-origin adapter -> BFF -> System`。
@@ -28,12 +30,12 @@ Config Release、Release Binding 与 System Policy 事实。它是内部服务�
 
 - IAM 的 Tenant、Identity、AuthN/AuthZ、Role、Permission 与 Audit 事实；
 - BFF 的 Conversation、Message、Share、Project、ScheduledTask 与 public Product API；
-- Model、Billing、Capability、Storage、Agent 或 Scheduler 的业务事实；
+- Billing、Capability、Storage、Agent 或 Scheduler 的业务事实；Model目标按ADR031合入，当前仍独立运行；
 - 浏览器 session、CSRF admission、服务发现、TLS 终止与生产 secret 分发。
 
 ## 五分钟本地启动
 
-前置条件：Node.js `>=22 <25`、`pnpm@11.25.0`、共享 PostgreSQL 16+、共享 Redis 7。System 使用独立
+前置条件：Node.js `>=24 <25`、`pnpm@12.3.4`、共享 PostgreSQL 16+、共享 Redis 7。System 使用独立
 PostgreSQL database/schema 与 Redis logical DB 2；不要为本仓重复启动一套依赖。
 
 ```bash
@@ -91,7 +93,7 @@ pnpm verify:contract-provenance
 pnpm contract:check
 ```
 
-`contract/openapi/system.openapi.json` 与 `contract/proto/` 是本仓 machine-readable source。
+目标HTTP字段source是src/modules/*/schemas/*.schema.ts，contract/openapi/system.openapi.json只读生成；contract/proto/仅旧运行基线待移除。
 `src/generated/proto/` 只能由 Buf/protoc 插件生成，禁止手改。版本、breaking policy、provenance 限制与 consumer
 升级步骤见 [`contract/README.md`](contract/README.md)。
 
