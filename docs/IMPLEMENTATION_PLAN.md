@@ -1,6 +1,6 @@
 # System 完整交付唯一实施计划
 
-当前：R6工程收敛已由Root提交并在clean HEAD验收，提交 `dcfa8468446108c17cd65b32fc028af261472c99`；G1–G5完整源码与G6消费者HTTP均已验收。R6 committed HEAD全量97pass/0skip+fresh23断言22表，跨仓live PASS，System结构门0违规。Docker RC、CI扫描/attestation与部署环境证据单独待验，不把它们标为通过。完整五模块83业务操作，非仅Site交付。
+当前：完整System源码、消费者HTTP、NestJS工程边界与tag镜像发布均已验收。R8提交 `7252d50c67338842978961244e86a884daa87f5b`、tag `v0.1.2`；GitHub release run `34222465469`与常规CI run `34222465488`成功，GHCR digest `sha256:8fe6e701451f461b02b84c6520d76f49ad872c8f11d6ae3a8c5b80532797eb37`。private仓GitHub attestation按平台能力跳过，不冒称已签。完整五模块83业务操作，非仅Site交付。
 第0–1节及G1–G4早期卡是历史授权/证据，不覆盖末尾G5稳定交付状态。最新本仓门、Root跨仓live、Docker环境未验项以末尾G5记录及CURRENT/ACCEPTANCE为准。
 
 ## 0. G0历史基线与范围
@@ -429,7 +429,7 @@ R6-guard（Root最终审查窄修）：唯一System writer继续，Root提交；
 R6-guard补放置裁决：全Controller规则实际命中HealthController两技术依赖，Root明确不设例外。src/health/health.service.ts在既有health目录承接readiness聚合（对比Controller继续直连加豁免，采用Service使规则一致）；HealthController仅委托，HealthModule注册。live探针仍不调用依赖，ready仅调用已公开technical ready方法，HTTP/error语义不变。增加test/unit/system-health.test.ts纯聚合测试；真实probe与全生命周期由现有integration承接。
 R6-guard最终交付：`/tmp/r6-guard-red.log`1fail6pass、`/tmp/r6-guard-probe-conflict.log`真实HealthController两命中、`/tmp/r6-health-red.log`缺Service RED；修复后`/tmp/r6-guard-green.log`8pass，`/tmp/r6-guard-verify.log`完整16files97pass0skip+fresh23/22、全部质量/契约门通过。新增HealthService及其测试、HealthModule注册（HealthController已在原变更集），总86精确路径在`/tmp/r6-file-manifest.txt`。不设Controller技术probe豁免，手工Service/Repository直接与alias均拒绝。writer再次冻结。
 
-## R7 — v0.1.1 runtime OS security refresh（待Root提交/CI，writer冻结）
+## R7 — v0.1.1 runtime OS security refresh（远端已验证）
 
 | 项 | 决定 |
 | --- | --- |
@@ -442,10 +442,12 @@ R6-guard最终交付：`/tmp/r6-guard-red.log`1fail6pass、`/tmp/r6-guard-probe-
 
 R7最终本仓验证：RED1fail3pass→GREEN4pass；Node24完整verify16files98pass0skip+fresh23断言22表，质量/契约全部通过，`/tmp/r7-verify.log`。7文件精确清单`/tmp/r7-file-manifest.txt`；Root拥有Git/tag/push与远端CI验收，system_owner停写；本机Docker未运行，Trivy未放宽。SQL/OpenAPI/lock无diff。
 
-## R8 — private repository attestation capability gate（进行中）
+## R8 — private repository attestation capability gate（已验收）
 
 Owner：kokoro-system/system_owner唯一writer；Root提交/tag/push。基线clean1f91325d0b0df2403cb2fca0078e35f9dbb3382a，目录/分支沿R7。
 事实：Root确认v0.1.1 Actions34221703911验证/fresh/build/image smoke/Trivy/SBOM/GHCR push成功；0.1.1/0.1/latest已发布，digest sha256:827bb91720fbd1bbe0fe2dab1efaae98b3905b7830c491535c5de5f0e2bf34b4。provenance随后因user-owned private repository平台能力不可用失败，SBOM attest被跳过。
 放置：仅既有release-image.yml两个attestation step增加github.event.repository.private条件；对比continue-on-error或全job跳过，选择精确能力门，不降低其它门。现有smoke-cleanup静态测试RED→GREEN；package0.1.2及CURRENT/ACCEPTANCE/TECH/本计划。禁止Dockerfile/业务/SQL/OpenAPI/lock修改，不新建目录。
 验证：两个attest均非private才执行，verify/smoke/scan/SBOM/push仍无条件强制；Node24完整verify与隔离PG/Redis。交付精确manifest后停写，v0.1.2待Root tag远端闭环，不宣称已执行attestation。
 R8本仓最终：RED1fail4pass→GREEN5pass，完整`/tmp/r8-final-verify.log`16files99pass0skip+fresh23/22，质量/契约全部通过。7精确文件`/tmp/r8-file-manifest.txt`，仅workflow两个if、package0.1.2、既有静态测试和四文档；Dockerfile/src/SQL/contract/lock均无diff。writer停写，不操作Git/index/tag/push；Root后续发布v0.1.2并判断远端整体状态。
+
+Root最终远端验收：提交`7252d50c67338842978961244e86a884daa87f5b`、tag`v0.1.2`；release run `34222465469`与常规CI run `34222465488`均success。tested image依次通过build、真实smoke、Trivy与SBOM后推广至GHCR，`0.1.2`/`0.1`/`latest`统一digest `sha256:8fe6e701451f461b02b84c6520d76f49ad872c8f11d6ae3a8c5b80532797eb37`；private仓两个attestation步骤按设计skip，未生成GitHub attestation。

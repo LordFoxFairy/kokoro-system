@@ -83,7 +83,7 @@ MaintenanceModule仅定时调用各owner公开维护Service，默认每小时；
 R6-guard：Controller同时禁止直接driver和解析到`src/database/**`/`src/cache/**`的相对import，没有HealthController豁免。既有health目录的HealthService只聚合技术ready检查，Controller委托，live不检查依赖；HealthModule负责DI注册。手工实例化Service/Repository（含import alias）由同一架构门禁止。
 
 
-R7 runtime镜像策略：保留固定Node24基础digest，但runtime在安装应用工具/依赖前从Debian仓库刷新安全更新（apt-get update、apt-get upgrade -y，同层清/var/lib/apt/lists）。该层包版本取构建时仓库状态，最终交付身份由构建产物digest/SBOM记录，而非宣称基础digest足以冻结所有OS包。既有同一镜像smoke→Trivy→SBOM→正式tag推广顺序不变，不以忽略漏洞代替修复。v0.1.1是否消除远端扫描告警由CI实际结果证明。
+R7 runtime镜像策略：保留固定Node24基础digest，但runtime在安装应用工具/依赖前从Debian仓库刷新安全更新（apt-get update、apt-get upgrade -y，同层清/var/lib/apt/lists）。该层包版本取构建时仓库状态，最终交付身份由构建产物digest/SBOM记录，而非宣称基础digest足以冻结所有OS包。既有同一镜像smoke→Trivy→SBOM→正式tag推广顺序不变，不以忽略漏洞代替修复。v0.1.1与v0.1.2远端Trivy均已实际通过。
 
 
 R8 attestation平台边界：user-owned private repository当前GitHub能力不支持artifact attestation，两个attest步骤根据可信GitHub event repository.private布尔值只对非private仓执行。public仓继续执行provenance与SBOM attest，private仓不伪称已签attestation；镜像仍必须经历全部验证、smoke、Trivy、SBOM生成后push同一产物。该条件不是continue-on-error或忽略扫描，不改变容器构建/运行职责。

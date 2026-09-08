@@ -18,7 +18,7 @@ G4 committed HEAD：51pass/0skip（7 focused files）；旧全量152pass/5legacy
 
 Root冻结源码跨仓live已PASS：System/BFF正式pnpm dev、发布binding覆盖、catalog/default/manifest、跨tenant404/空catalog、BFF resolve403、Agent真实default/explicit+factory映射；committed HEAD 重跑已PASS，记录见 Root CURRENT。BFF consumer `1e03b87` + dev `26eec011`，Agent `e24b4aa`已提交测试；Root拥有旧Model active退出/九active拓扑，不由System复制其文件。
 
-**环境阻断**：Docker Desktop后端存在但daemon API1.51/1.47 info均500、socket ping/version超时，Root独立复现；未重启/重置Docker或共享infra。本机镜像RC仍未验；远端v0.1.0 Actions 34221025412已通过build/image smoke，Trivy发现6项已修复HIGH/CRITICAL并阻断发布；SBOM/provenance与v0.1.1完整发布待CI验证。长期生产SLO/容量/灾备/secret轮换仍是部署环境证据，不以本轮System验收替代九仓生产验收。
+**镜像发布已闭环**：本机Docker Desktop故障未重启；改由tag触发GitHub Actions。`v0.1.2`绑定 `7252d50c67338842978961244e86a884daa87f5b`，release run `34222465469`与常规CI run `34222465488`均成功。测试、fresh schema、镜像build、真实image smoke、HIGH/CRITICAL Trivy门、SBOM生成与GHCR推广全部通过；`0.1.2`/`0.1`/`latest`指向digest `sha256:8fe6e701451f461b02b84c6520d76f49ad872c8f11d6ae3a8c5b80532797eb37`。user-owned private repository不支持GitHub attestation，两个attest步骤按仓库可见性明确跳过，不冒称已有attestation。长期生产SLO/容量/灾备/secret轮换仍属部署环境证据。
 
 
 ## R6 已提交工程收敛（`dcfa8468446108c17cd65b32fc028af261472c99`）
@@ -28,12 +28,12 @@ Root冻结源码跨仓live已PASS：System/BFF正式pnpm dev、发布binding覆�
 R6-guard最终提交后，Root 在 clean `dcfa8468446108c17cd65b32fc028af261472c99` 独立复跑 `pnpm verify`：16files/97pass/0skip、fresh23断言/22表，全部质量与契约门通过；跨仓 source HTTP smoke PASS 且 owned resources removed；Root结构门对System为0违规。Controller零database/cache直连（probe也无豁免），HealthService承接原ready聚合，手工Service/Repository含alias门已补。日志 `/tmp/r6-root-verify-committed.log`、`/tmp/r6-root-smoke-committed.log`。原一次非复现hook风险继续保留。
 
 
-## R7 v0.1.1 发布修复（待Root提交/tag）
+## R7 v0.1.1 发布修复（已由远端镜像门验证）
 
-基线f487f635294c98cb8a44e638ed1ee0afa6d28feb。固定Debian12.13 runtime中libcap2需deb12u3、libgnutls30需deb12u7；按Root提供的v0.1.0扫描证据，在runtime依赖安装前执行apt-get update/upgrade并清apt lists，不降低Trivy exit-code、不加ignore/VEX。package版本0.1.1，无业务/SQL/OpenAPI/lock变更。Node24完整verify16files98pass0skip+fresh23断言22表，日志`/tmp/r7-verify.log`；远端镜像升级结果未在本机验证，由Root提交并推v0.1.1触发原单构建扫描推广流程。
+基线f487f635294c98cb8a44e638ed1ee0afa6d28feb。固定Debian12.13 runtime中libcap2需deb12u3、libgnutls30需deb12u7；按Root提供的v0.1.0扫描证据，在runtime依赖安装前执行apt-get update/upgrade并清apt lists，不降低Trivy exit-code、不加ignore/VEX。package版本0.1.1，无业务/SQL/OpenAPI/lock变更。Node24完整verify16files98pass0skip+fresh23断言22表，日志`/tmp/r7-verify.log`；v0.1.1远端Trivy已通过并完成GHCR推广，后续仅受private仓attestation平台能力影响而整单标红。
 
 
-## R8 v0.1.2 attestation能力门（待Root提交/tag）
+## R8 v0.1.2 tag发布闭环
 
 Root确认v0.1.1 Actions34221703911的verify/fresh/build/image smoke/Trivy/SBOM/GHCR push全部通过，镜像已发布0.1.1/0.1/latest，digest `sha256:827bb91720fbd1bbe0fe2dab1efaae98b3905b7830c491535c5de5f0e2bf34b4`。随后provenance attestation因GitHub不支持user-owned private repositories而失败，SBOM attestation被跳过；因此镜像已发布但该workflow为红，不能写成镜像未发布或attestation成功。
-R8仅为两个attestation step增加`github.event.repository.private == false`条件，private仓明确跳过，不降低测试/smoke/漏洞扫描/SBOM生成/push门。package0.1.2，Dockerfile/业务/SQL/OpenAPI/lock不变；v0.1.2完整CI闭环由Root提交/tag后验收。
+R8仅为两个attestation step增加`github.event.repository.private == false`条件，private仓明确跳过，不降低测试/smoke/漏洞扫描/SBOM生成/push门。package0.1.2，Dockerfile/业务/SQL/OpenAPI/lock不变。Root提交 `7252d50c67338842978961244e86a884daa87f5b` 并推送tag `v0.1.2`；release run `34222465469`成功，常规CI run `34222465488`亦成功，发布digest为 `sha256:8fe6e701451f461b02b84c6520d76f49ad872c8f11d6ae3a8c5b80532797eb37`。

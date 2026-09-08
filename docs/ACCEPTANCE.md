@@ -78,13 +78,15 @@ Controller相对database/cache依赖四负例（含直接/alias手工Repository�
 Root 将经双只读审查且与86文件manifest完全一致的交付提交为 `dcfa8468446108c17cd65b32fc028af261472c99`。随后在clean HEAD独立执行完整 `pnpm verify`：16files/97pass/0skip、fresh PostgreSQL 23断言/22表；83业务operation+2probes drift、19source provenance、12contract tests均通过。跨仓System/BFF/Agent source HTTP smoke PASS并清理全部owned资源；Root结构门对System为0违规。日志 `/tmp/r6-root-verify-committed.log`、`/tmp/r6-root-smoke-committed.log`、`/tmp/r6-root-structural-committed.json`。OpenAPI artifact、canonical SQL、package与lock仍无变化。
 
 
-## R7 runtime OS修复与0.1.1（待Root提交/CI）
+## R7 runtime OS修复与0.1.1（远端镜像门已验证）
 
 Root提供远端v0.1.0 Actions34221025412结果：测试/fresh schema/build/image smoke通过；Trivy阻断6项已修复HIGH/CRITICAL，未发布镜像。变更仅Dockerfile runtime apt更新升级清lists、package版本0.1.1、静态测试及文档。
 TDD `/tmp/r7-red.log`1fail3pass（缺OS更新），`/tmp/r7-green.log`4pass；断言runtime先更新升级清理再安装npm/pnpm依赖，原Trivy exit-code1且无ignore/VEX。`/tmp/r7-verify.log`完整16files98pass0skip、fresh23断言22表，format/lint/typecheck/build/Redocly/83+2 drift/19source/contract12pass全通过。SQL/OpenAPI/lock无diff，artifact SHA仍f9ea76f107e1ea0fc19df20ee7c59032c0fbac66e640e9a16a1b770ab27c1f37。本机Docker故障未重启，不宣称新镜像已通过scan；Root提交/tag/push v0.1.1并验CI结果。
 
-## R8 private repository attestation门（待Root提交/CI）
+## R8 private repository attestation门与v0.1.2发布（已验收）
 
 基线clean1f91325d0b0df2403cb2fca0078e35f9dbb3382a。Root远端证据：v0.1.1 Actions34221703911已通过verify/fresh/build/image smoke/Trivy/SBOM/push，tags0.1.1/0.1/latest对应sha256:827bb91720fbd1bbe0fe2dab1efaae98b3905b7830c491535c5de5f0e2bf34b4；provenance随后因user-owned private repositories能力不可用失败，SBOM attest跳过。该次镜像已发布，workflow未全绿。
 R8仅两个attest step按event repository.private条件跳过private仓，package0.1.2；其它发布门保持强制。TDD `/tmp/r8-red.log`1fail4pass→`/tmp/r8-green.log`5pass，证明两attest精确条件且其它steps无if/continue-on-error、四个原验证命令/smoke/scan/SBOM/push保留。中间测试误预期pnpm verify而原workflow为显式四门，已修为核对真实四门；lint正则空格修为{6}，未改业务或放宽规则。
 最终`/tmp/r8-final-verify.log`16files99pass0skip+fresh23断言22表，format/lint/typecheck/build/Redocly/83+2drift/19source/12contract全部通过。Dockerfile/业务/SQL/OpenAPI/lock无diff；本机Docker未跑。7文件清单`/tmp/r8-file-manifest.txt`，writer冻结，Root负责提交与v0.1.2 tag/远端最终验收；private仓跳过attest不等于已有attestation。
+
+Root提交 `7252d50c67338842978961244e86a884daa87f5b` 并推送 `v0.1.2`。GitHub Actions release run `34222465469`成功：verify/fresh schema、production image build、真实image smoke、HIGH/CRITICAL Trivy、CycloneDX SBOM与同一tested image GHCR推广全部通过；两个attestation步骤因private仓条件按设计skip。常规CI run `34222465488`同时成功。`ghcr.io/lordfoxfairy/kokoro-system:0.1.2`、`:0.1`、`:latest`均发布为 `sha256:8fe6e701451f461b02b84c6520d76f49ad872c8f11d6ae3a8c5b80532797eb37`。GitHub private仓没有provenance/SBOM attestation，不把skip描述为通过。
