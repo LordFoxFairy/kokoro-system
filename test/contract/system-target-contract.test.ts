@@ -1,5 +1,7 @@
+import { execFileSync } from "node:child_process";
+import { z } from "zod";
 import { StandardSchemaValidationPipe } from "@nestjs/common";
-import { readFileSync } from "node:fs";
+import { readFileSync, globSync, existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   siteSchema,
@@ -242,5 +244,40 @@ describe("complete System target contract (not runtime acceptance)", () => {
     expect(sql).not.toMatch(/\b(?:FOREIGN KEY|REFERENCES)\b/u);
     expect(sql).toContain("uq_system_config_record_identity");
     expect(sql).toContain("uq_model_revision_number");
+  });
+  it("tracks every HTTP wire schema but excludes internal Redis cache representation", () => {
+    const provenance = z
+      .object({
+        openapi: z.object({ sourceSha256: z.record(z.string(), z.string()) }),
+      })
+      .parse(JSON.parse(readFileSync("contract/provenance.json", "utf8")));
+    const expected = [
+      ...globSync("src/modules/*/schemas/**/*.schema.ts"),
+      "src/http/protocol.schema.ts",
+      "scripts/generate-system-openapi.ts",
+      "scripts/system-openapi-operations.ts",
+    ].sort();
+    expect(expected).toHaveLength(18);
+    expect(Object.keys(provenance.openapi.sourceSha256).sort()).toEqual(
+      expected,
+    );
+    expect(
+      existsSync("src/modules/model-catalog/resolve-cache.schema.ts"),
+    ).toBe(true);
+    expect(provenance.openapi.sourceSha256).not.toHaveProperty(
+      "src/modules/model-catalog/resolve-cache.schema.ts",
+    );
+    expect(
+      execFileSync(
+        process.execPath,
+        [
+          "--import",
+          "tsx",
+          "scripts/update-system-openapi-provenance.ts",
+          "--check",
+        ],
+        { encoding: "utf8" },
+      ),
+    ).toContain("18 sources");
   });
 });

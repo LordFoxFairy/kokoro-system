@@ -44,6 +44,14 @@ export class ResponseInterceptor implements NestInterceptor {
           typeof data.config_version === "string"
         )
           response.setHeader("etag", `"${data.config_version}"`);
+        if (
+          data !== null &&
+          typeof data === "object" &&
+          "observed_at" in data &&
+          "generation" in data &&
+          typeof data.generation === "string"
+        )
+          response.setHeader("etag", `"${data.generation}"`);
         return { data };
       }),
     );

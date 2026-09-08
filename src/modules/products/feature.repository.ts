@@ -57,7 +57,7 @@ export class FeatureRepository {
   }
   public async retire(tx: TransactionContext, id: string) {
     const references = await tx.query<{ used: boolean }>(
-      "SELECT EXISTS(SELECT 1 FROM system_app_feature_exposure e JOIN system_application a ON a.id=e.application_id AND a.tenant_id=e.tenant_id WHERE e.feature_id=$1 AND e.enabled AND a.deleted_at IS NULL) AS used",
+      "SELECT EXISTS(SELECT 1 FROM system_app_feature_exposure e JOIN system_application a ON a.id=e.application_id AND a.tenant_id=e.tenant_id WHERE e.feature_id=$1 AND e.enabled AND a.deleted_at IS NULL) OR EXISTS(SELECT 1 FROM model_label l JOIN system_feature_definition f ON f.global_feature_key=l.feature_key WHERE f.id=$1 AND l.deleted_at IS NULL) OR EXISTS(SELECT 1 FROM model_revision r JOIN system_feature_definition f ON f.global_feature_key=r.feature_key WHERE f.id=$1 AND r.retired_at IS NULL) AS used",
       [id],
     );
     if (references.rows[0]?.used)

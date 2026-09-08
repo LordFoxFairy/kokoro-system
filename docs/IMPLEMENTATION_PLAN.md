@@ -319,3 +319,38 @@ G3审查修复证据：发布优先级逆UUID先RED→GREEN；suspended Site清�
 
 Root在d057deb+交接40文件复跑6files/39pass/0skip（真实独立PG/Redis）；typecheck/build/lint/Redocly/drift/18source provenance全部通过；38TS格式与diff check通过。全量140pass/5既有fail/8旧skip，日志/tmp/kokoro-system-g3-root-all.log。独立system_capability_review静态复查三项P2均关闭、未见新增P1/P2。Root串行提交后同负责人立即继续G4/G5，不以此宣布完整完成。
 Root隔离跨仓smoke单测20pass，与topology/governance合计59pass；BFF真实源码启动+fresh PG/Redis readiness已通过，但完整System消费者smoke仍待G5。
+
+### G3 Root验收与G4进行中
+
+G3 f13bb73dfe81c3d79036852d3d3cb7a6cbb1916d（40文件），Root稳定树39pass/0skip、typecheck/build/lint/contract/provenance/38TS格式均pass；全test140pass/5既有fail/8skip，committed HEAD39pass且clean。独立审查三P2关闭。Root smoke safety20pass/combined59pass，BFF源码freshPG/Redis readiness实测通过；完整live仍待G5。
+G4唯一writer继续：model-catalog下definition/provider/label/revision/routing/health/resolve/catalog的具名controller/service/repository，model-generation.repository承载本模块fence。普通资源不建mapper；model-catalog.module注册；AppModule挂载，测试新增system-target-model.test.ts，architecture扩83业务；必要health时效配置属src/config。复用G1 schemas、不复制旧Model契约/DTO/Prisma，不跨repo import。全局Model写同事务推进model_cache_generation与已有catalog generation，tenant routing推进该tenant generation；resolve仅litellm、无默认不fallback。健康默认60s新鲜度、未来时间窗口5s，陈旧/unknown/degraded/down不执行；配置与实测落在本切片，不混入服务readiness。
+G6-Root范围补充：scripts/INDEX.md、docs/test-cases.md、旧stage2 owner-health/full-gate两个危险runner停用及topology测试；Root唯一writer。旧runner固定DROP/FLUSHDB、失效db:setup/混Node PATH，不再运行，危险实现删除保留明确非零停用提示，历史留Git；本轮跨仓正式入口为隔离System smoke。全9仓runner重建是后续Root工作；G5 System本仓完整gates独立实现，不依赖停用runner、不将System验收冒称九仓生产验收。
+G6-Root追加边界：Root AGENTS §10仅默认验证/旧runner暂停说明；scripts/governance的TypeScript lexical预检两个文件调整，将src/cache与src/database技术Service排除业务driver/SQL禁令，仍检测modules内同名目录和Controller，System精确写表owner架构门保持。Root focused topology/governance/smoke61pass，全scripts/tests62pass/2既有手册基线失败，未把过渡topology先行声明已完成live。
+
+### G4 实施边界与审查修复
+
+30 Model操作全部原生Nest；全83业务method/path/operation/permission/scope/CAS由architecture独立核对，HTTP逐30路径鉴权验证。Model全局资源与health每次实际mutation在同receipt事务推进model_cache_generation；tenant routing仅推进自己tenant generation，replay不重复推进。immutable revision保留SQL trigger与service双层，Label/route只能引用同feature published/unretired revision；父反查阻止Definition/Provider/Feature删除及被default/pinned引用的revision退役。
+
+Resolve caller仅kokoro-agent；Agent operation allowlist只catalog/resolve，不再允许public Manifest绕过。默认取同tenant/feature显式is_default；显式label也必须有tenant policy；隐藏403、无路由404、不可执行503。候选优先pinned revision、label default，否则同feature published healthy revision按priority/id确定；不返回endpoint/secret、不执行推理。Catalog按tenant可见routing投影key/display_name/is_default，不冒充BFF public API。
+
+健康采用KOKORO_SYSTEM_MODEL_HEALTH_MAX_AGE_MS（默认60000，100..300000），未来>5s拒400，倒序observed_at拒409。缓存正/负结果TTL最长30s，正结果不跨health有效截止；generation在GET/SET前后复查，身份+checksum严格解析。独立审查P2“cache hit最终PG fence查询跨健康截止”已新增真实延迟测试先RED返回旧route，补return前expiry复验后GREEN MODEL_UNAVAILABLE；unknown/down/degraded/stale不影响System dependency readiness。
+
+内部缓存resolve-cache.schema.ts仅Redis表示。Root批准修正provenance收集边界为modules/<module>/schemas/**.schema.ts及明确protocol/generator/operations，保留内部schema命名；新增契约测试先RED→GREEN，验证18个真实HTTP输入完整且内部缓存不计。未修改artifact、18 source digest或consumer pin。
+
+### G4 稳定交接与实际门禁（2026-09-08）
+
+基线f13bb73dfe81c3d79036852d3d3cb7a6cbb1916d；状态待Root审查/串行提交，writer停写，Root提交后立即G5。40文件：38个新增/修改TS与CURRENT/IMPLEMENTATION_PLAN；精确集合为当前git diff --name-only加git ls-files --others --exclude-standard。Root批准额外修改provenance收集脚本/契约测试；access添加Agent operation allowlist，Products Feature反查活Model Label/Revision，HTTP health generation ETag，config健康时效；没有artifact/SQL/依赖变化。
+
+- `TEST_ADMIN_DATABASE_URL=postgresql://nako@localhost/postgres pnpm exec vitest run --no-file-parallelism test/integration/system-target-control.test.ts test/integration/system-target-products.test.ts test/integration/system-target-model.test.ts test/architecture/system-target-boundary.test.ts test/unit/system-kernel.test.ts test/contract/system-target-contract.test.ts test/contract/proto-owner-boundary.test.ts` →7files/51pass/0skip；其中新真实Model集成11、契约新增1，原G2/G3全部保留通过。
+- `pnpm typecheck && pnpm build && pnpm lint && pnpm contract:lint && pnpm verify:contract-provenance` →全部exit0，独立OpenAPI有效，83+2 inventory与18真实HTTP source provenance通过。
+- 本切片38 TS精确Prettier check全部通过，git diff --check通过。
+- `TEST_ADMIN_DATABASE_URL=postgresql://nako@localhost/postgres pnpm test` →31files：26pass/2fail/3skip；165tests：152pass/5既有fail/8旧integration skip，日志/tmp/system-g4-owner-all-tests.log。旧5代际断言仍留G5随源码cutover承接。
+- 真实PG隔离system_g4随机库各次fresh安装canonical；Redis独立namespace复用共享服务。测试包括正/负cache、默认/显式/隐藏、tenant隔离、health时效和future/stale拒绝、health截止前后缓存复查、global/tenant SET和GET fence、双连接revision退役/Label默认创建两序、published SQL不可变/禁止DELETE、默认partial unique、CAS并发receipt只推进一次tenant generation、storage整数越界400、CRUD/restore永久key tombstone、30真实路径鉴权与完整83架构规则。
+- system_capability_review只读复核确认健康expiry P2关闭，HTTP provenance与内部cache边界合理，无新增阻断；未冒称审查员运行测试。
+
+未完成仍为G5：正式main/启动失败清理/取消与drain、retention/reconciliation及restore截止、观测、旧树/Proto/SDK/DOM删除、完整CI/Docker/本仓gate和真实smoke；G6跨仓live与Root active cutover。此提交不是完整System部署验收。
+
+### G4 Root 稳定树复验与放行
+
+Root在f13bb73+交接40文件复跑7files/51pass/0skip（真实独立PG/Redis）；typecheck/build/lint/Redocly/drift/18source provenance与38TS格式、diffcheck全部通过。全量152pass/5既有fail/8旧skip，日志/tmp/kokoro-system-g4-root-all.log；未放宽遗留断言。独立system_capability_review确认健康deadline P2及provenance边界闭环、未见新阻断。Root串行提交后同负责人立即续G5全部运行职责、生产main和旧树退出。
+Root latest focused71pass（governance46/topology4/smoke21）；lexical门禁仅根database Service允许pg及技术SQL、根cache Service仅redis，业务/Controller和异种provider反例仍拦截，独立审查通过。G6 live仍未执行，不作完成证据。

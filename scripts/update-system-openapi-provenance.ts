@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 function sourceFiles(directory: string): string[] {
@@ -14,7 +14,12 @@ function sourceFiles(directory: string): string[] {
     .sort();
 }
 const sources = [
-  ...sourceFiles("src/modules"),
+  ...readdirSync("src/modules", { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) => {
+      const directory = join("src/modules", entry.name, "schemas");
+      return existsSync(directory) ? sourceFiles(directory) : [];
+    }),
   "src/http/protocol.schema.ts",
   "scripts/generate-system-openapi.ts",
   "scripts/system-openapi-operations.ts",

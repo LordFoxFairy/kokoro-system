@@ -68,6 +68,11 @@ export class AccessGuard implements CanActivate {
         403,
       );
     const caller = service as RequestContext["service"];
+    if (
+      caller === "kokoro-agent" &&
+      !["getModelCatalog", "resolveModel"].includes(rule.operation)
+    )
+      throw new OwnerError("FORBIDDEN", "Agent operation denied", 403);
     let scope = rule.scope ?? "tenant";
     if (scope === "conditional") {
       if (request.method === "POST")

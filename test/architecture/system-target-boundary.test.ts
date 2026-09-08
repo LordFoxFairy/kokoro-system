@@ -1,3 +1,11 @@
+import { ResolveController } from "../../src/modules/model-catalog/resolve.controller.js";
+import { CatalogController } from "../../src/modules/model-catalog/catalog.controller.js";
+import { HealthController } from "../../src/modules/model-catalog/health.controller.js";
+import { RoutingController } from "../../src/modules/model-catalog/routing.controller.js";
+import { RevisionController } from "../../src/modules/model-catalog/revision.controller.js";
+import { LabelController } from "../../src/modules/model-catalog/label.controller.js";
+import { ProviderController } from "../../src/modules/model-catalog/provider.controller.js";
+import { DefinitionController } from "../../src/modules/model-catalog/definition.controller.js";
 import { RuntimeManifestController } from "../../src/modules/runtime-manifests/runtime-manifest.controller.js";
 import { BindingController } from "../../src/modules/products/binding.controller.js";
 import { ReleaseController } from "../../src/modules/products/release.controller.js";
@@ -28,7 +36,7 @@ function files(directory: string): string[] {
   );
 }
 describe("System target native Nest boundaries", () => {
-  it("matches every G2/G3 native method/path/access rule against frozen owner contract", () => {
+  it("matches every native method/path/access rule against frozen owner contract", () => {
     const actual: string[] = [];
     for (const controller of [
       SitesController,
@@ -42,6 +50,14 @@ describe("System target native Nest boundaries", () => {
       ReleaseController,
       BindingController,
       RuntimeManifestController,
+      DefinitionController,
+      ProviderController,
+      LabelController,
+      RevisionController,
+      RoutingController,
+      HealthController,
+      CatalogController,
+      ResolveController,
     ]) {
       const prefix = Reflect.getMetadata(PATH_METADATA, controller) as string;
       for (const name of Object.getOwnPropertyNames(controller.prototype)) {
@@ -72,15 +88,10 @@ describe("System target native Nest boundaries", () => {
     }
     expect(actual.sort()).toEqual(
       systemOperations
-        .filter((operation) =>
-          ["sites", "workspaces", "products", "runtime-manifests"].includes(
-            operation.module,
-          ),
-        )
         .map((operation) => `${operation.method} ${operation.path}`)
         .sort(),
     );
-    expect(new Set(actual).size).toBe(53);
+    expect(new Set(actual).size).toBe(83);
   });
   it("keeps SQL in owner repositories and forbids cross-module writes/deep imports", () => {
     const owners: Record<string, readonly string[]> = {
@@ -97,6 +108,15 @@ describe("System target native Nest boundaries", () => {
         "system_release_binding",
       ],
       "runtime-manifests": [],
+      "model-catalog": [
+        "model_definition",
+        "model_provider",
+        "model_label",
+        "model_revision",
+        "model_routing_policy",
+        "model_provider_health_state",
+        "model_cache_generation",
+      ],
     };
     for (const [module, tables] of Object.entries(owners)) {
       for (const file of files(`src/modules/${module}`)) {
