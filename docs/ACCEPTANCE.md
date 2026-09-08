@@ -76,3 +76,9 @@ Controller相对database/cache依赖四负例（含直接/alias手工Repository�
 ### Root committed HEAD 复验
 
 Root 将经双只读审查且与86文件manifest完全一致的交付提交为 `dcfa8468446108c17cd65b32fc028af261472c99`。随后在clean HEAD独立执行完整 `pnpm verify`：16files/97pass/0skip、fresh PostgreSQL 23断言/22表；83业务operation+2probes drift、19source provenance、12contract tests均通过。跨仓System/BFF/Agent source HTTP smoke PASS并清理全部owned资源；Root结构门对System为0违规。日志 `/tmp/r6-root-verify-committed.log`、`/tmp/r6-root-smoke-committed.log`、`/tmp/r6-root-structural-committed.json`。OpenAPI artifact、canonical SQL、package与lock仍无变化。
+
+
+## R7 runtime OS修复与0.1.1（待Root提交/CI）
+
+Root提供远端v0.1.0 Actions34221025412结果：测试/fresh schema/build/image smoke通过；Trivy阻断6项已修复HIGH/CRITICAL，未发布镜像。变更仅Dockerfile runtime apt更新升级清lists、package版本0.1.1、静态测试及文档。
+TDD `/tmp/r7-red.log`1fail3pass（缺OS更新），`/tmp/r7-green.log`4pass；断言runtime先更新升级清理再安装npm/pnpm依赖，原Trivy exit-code1且无ignore/VEX。`/tmp/r7-verify.log`完整16files98pass0skip、fresh23断言22表，format/lint/typecheck/build/Redocly/83+2 drift/19source/contract12pass全通过。SQL/OpenAPI/lock无diff，artifact SHA仍f9ea76f107e1ea0fc19df20ee7c59032c0fbac66e640e9a16a1b770ab27c1f37。本机Docker故障未重启，不宣称新镜像已通过scan；Root提交/tag/push v0.1.1并验CI结果。

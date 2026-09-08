@@ -428,3 +428,16 @@ R6最终冻结日志`/tmp/r6-freeze-verify.log`：15files96pass0skip+fresh23/22�
 R6-guard（Root最终审查窄修）：唯一System writer继续，Root提交；仅扩展test/architecture/system-module-boundary.test.ts及现有验收/计划记录。Controller禁止相对引用src/database与src/cache（不仅外部driver）；手工provider覆盖Service/Repository及import alias。先加四负例与业务Service正例RED，再修改判定GREEN；无业务/API/SQL/artifact变更，完整verify后重新冻结。
 R6-guard补放置裁决：全Controller规则实际命中HealthController两技术依赖，Root明确不设例外。src/health/health.service.ts在既有health目录承接readiness聚合（对比Controller继续直连加豁免，采用Service使规则一致）；HealthController仅委托，HealthModule注册。live探针仍不调用依赖，ready仅调用已公开technical ready方法，HTTP/error语义不变。增加test/unit/system-health.test.ts纯聚合测试；真实probe与全生命周期由现有integration承接。
 R6-guard最终交付：`/tmp/r6-guard-red.log`1fail6pass、`/tmp/r6-guard-probe-conflict.log`真实HealthController两命中、`/tmp/r6-health-red.log`缺Service RED；修复后`/tmp/r6-guard-green.log`8pass，`/tmp/r6-guard-verify.log`完整16files97pass0skip+fresh23/22、全部质量/契约门通过。新增HealthService及其测试、HealthModule注册（HealthController已在原变更集），总86精确路径在`/tmp/r6-file-manifest.txt`。不设Controller技术probe豁免，手工Service/Repository直接与alias均拒绝。writer再次冻结。
+
+## R7 — v0.1.1 runtime OS security refresh（待Root提交/CI，writer冻结）
+
+| 项 | 决定 |
+| --- | --- |
+| Owner/基线 | kokoro-system/system_owner唯一writer；Root审查、Git提交/tag/push。绝对目录/分支沿R6；clean f487f635294c98cb8a44e638ed1ee0afa6d28feb |
+| 当前事实 | v0.1.0 Actions 34221025412测试/fresh/build/image smoke通过，Trivy发现固定Debian基础镜像6项已修复HIGH/CRITICAL而阻断，未发布 |
+| 目标/放置 | 仅Dockerfile runtime阶段在依赖安装前apt update+upgrade并清lists；对比忽略CVE或降低扫描门，选择更新OS安全包，不引入新目录/运行进程 |
+| 文件集 | Dockerfile、现有test/unit/system-smoke-cleanup.test.ts静态契约、package.json仅0.1.1、CURRENT/ACCEPTANCE/TECHNICAL_DESIGN/本计划；无业务/SQL/OpenAPI/lock修改 |
+| 依赖/删除 | 保留固定Node基础digest、Node24/pnpm12及既有镜像单构建推广；不添加ignore/VEX，不降低Trivy exit-code；清理apt lists避免索引进入最终层 |
+| 验证/交付 | 静态顺序/清理断言RED→GREEN；Node24完整pnpm verify真实隔离PG/Redis；本机Docker故障不宣称镜像通过，Root提交并推v0.1.1由CI复验扫描/发布 |
+
+R7最终本仓验证：RED1fail3pass→GREEN4pass；Node24完整verify16files98pass0skip+fresh23断言22表，质量/契约全部通过，`/tmp/r7-verify.log`。7文件精确清单`/tmp/r7-file-manifest.txt`；Root拥有Git/tag/push与远端CI验收，system_owner停写；本机Docker未运行，Trivy未放宽。SQL/OpenAPI/lock无diff。

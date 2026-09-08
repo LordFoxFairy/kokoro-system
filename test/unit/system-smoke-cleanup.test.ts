@@ -64,3 +64,23 @@ it("promotes exactly the tested local image rather than rebuilding on a second r
     workflow.indexOf("Promote tested production candidate"),
   );
 });
+
+it("refreshes runtime OS packages before installing dependencies without weakening the image scan", async () => {
+  const { readFileSync } = await import("node:fs");
+  const dockerfile = readFileSync("Dockerfile", "utf8");
+  const runtime = dockerfile.split(/FROM[^\n]+ AS runtime\n/u)[1];
+  expect(runtime).toBeDefined();
+  const source = runtime ?? "";
+  expect(source).toMatch(
+    /RUN apt-get update\s*\\?\s*&& apt-get upgrade -y\s*\\?\s*&& rm -rf \/var\/lib\/apt\/lists\/\*/u,
+  );
+  expect(source.indexOf("RUN apt-get update")).toBeLessThan(
+    source.indexOf("RUN npm install"),
+  );
+  expect(source.indexOf("apt-get upgrade -y")).toBeLessThan(
+    source.indexOf("RUN pnpm install"),
+  );
+  const release = readFileSync(".github/workflows/release-image.yml", "utf8");
+  expect(release).toMatch(/exit-code:\s*['"]?1/u);
+  expect(release).not.toMatch(/trivyignores:|ignore-policy:|vex:/u);
+});
