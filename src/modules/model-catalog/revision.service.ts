@@ -6,7 +6,7 @@ import { CommandReceipt } from "../../database/command-receipt.js";
 import { commandDigest } from "../../database/command-digest.js";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { DefinitionRepository } from "./definition.repository.js";
@@ -41,7 +41,7 @@ export class RevisionService {
       input.revision > 2147483647 ||
       (input.context_window !== null && input.context_window > 2147483647)
     )
-      throw new OwnerError(
+      throw new SystemError(
         "INVALID_ARGUMENT",
         "Revision integer exceeds storage range",
       );
@@ -89,10 +89,9 @@ export class RevisionService {
       const current = await this.revisions.find(tx, id, true);
       requireVersion(current.version, context.precondition);
       if (current.published_at)
-        throw new OwnerError(
+        throw new SystemError(
           "INVALID_STATE",
           "Published revision is immutable",
-          409,
         );
       await this.generation.advance(tx);
       return this.revisions.update(tx, id, content);
@@ -105,13 +104,9 @@ export class RevisionService {
       const current = await this.revisions.find(tx, id, true);
       requireVersion(current.version, context.precondition);
       if (current.published_at)
-        throw new OwnerError(
-          "INVALID_STATE",
-          "Revision already published",
-          409,
-        );
+        throw new SystemError("INVALID_STATE", "Revision already published");
       if (current.digest !== commandDigest(revisionContent(current)))
-        throw new OwnerError("INVALID_STATE", "Revision digest mismatch", 409);
+        throw new SystemError("INVALID_STATE", "Revision digest mismatch");
       await this.generation.advance(tx);
       return this.revisions.publish(tx, id);
     });
@@ -123,7 +118,7 @@ export class RevisionService {
       const current = await this.revisions.find(tx, id, true);
       requireVersion(current.version, context.precondition);
       if (!current.published_at || current.retired_at)
-        throw new OwnerError("INVALID_STATE", "Revision cannot retire", 409);
+        throw new SystemError("INVALID_STATE", "Revision cannot retire");
       await this.generation.advance(tx);
       return this.revisions.retire(tx, id);
     });

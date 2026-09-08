@@ -3,8 +3,8 @@ import { Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import type { PageQuery } from "../../http/pagination.js";
-import { OwnerError } from "../../http/owner-error.js";
+import type { PageQuery } from "../../database/page-query.js";
+import { SystemError } from "../../system.error.js";
 import { workspaceSchema } from "./schemas/workspace.schema.js";
 import type { workspaceInputSchema } from "./schemas/workspace.schema.js";
 const columns =
@@ -21,10 +21,9 @@ export class WorkspaceRepository {
       "SELECT id,status FROM system_site WHERE tenant_id=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE",
       [tenant, siteId],
     );
-    if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Site not found", 404);
+    if (!result.rows[0]) throw new SystemError("NOT_FOUND", "Site not found");
     if (requireActive && result.rows[0].status !== "active")
-      throw new OwnerError("SITE_UNAVAILABLE", "Site is unavailable", 409);
+      throw new SystemError("SITE_UNAVAILABLE", "Site is unavailable");
   }
   public async find(
     tx: TransactionContext,
@@ -38,7 +37,7 @@ export class WorkspaceRepository {
       [tenant, id],
     );
     if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Workspace not found", 404);
+      throw new SystemError("NOT_FOUND", "Workspace not found");
     return decodeRow(workspaceSchema, result.rows[0]);
   }
   public async list(tx: TransactionContext, tenant: string, query: PageQuery) {
@@ -94,10 +93,9 @@ export class WorkspaceRepository {
       [tenant, id],
     );
     if (!result.rowCount)
-      throw new OwnerError(
+      throw new SystemError(
         "INVALID_STATE",
         "Resource is outside its restore window",
-        409,
       );
     return decodeRow(workspaceSchema, result.rows[0]!);
   }

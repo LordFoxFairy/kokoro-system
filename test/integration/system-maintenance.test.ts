@@ -233,10 +233,10 @@ it("reconciles every stored relationship without repairing or deleting immutable
         before,
       );
     }
-    const plans = await db.query(
+    const plans = await db.query<{ "QUERY PLAN": unknown[] }>(
       "EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) SELECT id FROM system_command_receipt WHERE status='completed' AND expires_at<CURRENT_TIMESTAMP ORDER BY expires_at,id LIMIT 1000",
     );
-    expect(plans.rows[0]["QUERY PLAN"][0]).toHaveProperty("Execution Time");
+    expect(plans.rows[0]?.["QUERY PLAN"][0]).toHaveProperty("Execution Time");
     expect(
       (
         await db.query(

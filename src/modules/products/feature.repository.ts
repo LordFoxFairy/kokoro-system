@@ -3,8 +3,8 @@ import { Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import type { PageQuery } from "../../http/pagination.js";
-import { OwnerError } from "../../http/owner-error.js";
+import type { PageQuery } from "../../database/page-query.js";
+import { SystemError } from "../../system.error.js";
 import { featureSchema } from "./schemas/feature.schema.js";
 import type { featureInputSchema } from "./schemas/feature.schema.js";
 const columns =
@@ -17,7 +17,7 @@ export class FeatureRepository {
       [id],
     );
     if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Product not found", 404);
+      throw new SystemError("NOT_FOUND", "Product not found");
   }
   public async find(tx: TransactionContext, id: string, lock = false) {
     const result = await tx.query(
@@ -25,7 +25,7 @@ export class FeatureRepository {
       [id],
     );
     if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Feature not found", 404);
+      throw new SystemError("NOT_FOUND", "Feature not found");
     return decodeRow(featureSchema, result.rows[0]);
   }
   public async list(tx: TransactionContext, query: PageQuery) {
@@ -63,10 +63,9 @@ export class FeatureRepository {
           "constraint" in error &&
           error.constraint === "ck_system_feature_contract"
         )
-          throw new OwnerError(
+          throw new SystemError(
             "INVALID_ARGUMENT",
             "Input exceeds stored representation limits",
-            400,
           );
         throw error;
       });
@@ -78,7 +77,7 @@ export class FeatureRepository {
       [id],
     );
     if (references.rows[0]?.used)
-      throw new OwnerError("RESOURCE_IN_USE", "Feature is exposed", 409);
+      throw new SystemError("RESOURCE_IN_USE", "Feature is exposed");
     const result = await tx.query(
       `UPDATE system_feature_definition SET retired_at=CURRENT_TIMESTAMP(3),version=version+1 WHERE id=$1 RETURNING ${columns}`,
       [id],

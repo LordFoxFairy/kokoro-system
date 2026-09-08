@@ -1,0 +1,21 @@
+import type { SystemErrorCode } from "../system.error.js";
+export const systemErrorStatus = {
+  INVALID_ARGUMENT: 400,
+  service_auth_failed: 403,
+  FORBIDDEN: 403,
+  IDEMPOTENCY_KEY_REUSED: 409,
+  SYSTEM_UNAVAILABLE: 503,
+  PRECONDITION_REQUIRED: 428,
+  VERSION_CONFLICT: 409,
+  INVALID_CURSOR: 400,
+  NOT_FOUND: 404,
+  RESOURCE_IN_USE: 409,
+  INVALID_STATE: 409,
+  ROUTE_NOT_FOUND: 404,
+  POLICY_DENIED: 403,
+  MODEL_UNAVAILABLE: 503,
+  SITE_UNAVAILABLE: 409,
+  INVALID_CONFIG_SCHEMA: 400,
+  HOST_CONFLICT: 409,
+  POLICY_INVALID: 409,
+} satisfies Record<SystemErrorCode, number>;

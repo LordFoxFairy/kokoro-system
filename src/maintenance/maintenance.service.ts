@@ -6,10 +6,10 @@ import type {
 } from "@nestjs/common";
 import { SystemConfig } from "../config/system-config.js";
 import { ReceiptMaintenanceService } from "../database/receipt-maintenance.service.js";
-import { SiteMaintenanceService } from "../modules/sites/site-maintenance.service.js";
-import { WorkspaceMaintenanceService } from "../modules/workspaces/workspace-maintenance.service.js";
-import { ProductMaintenanceService } from "../modules/products/product-maintenance.service.js";
-import { ModelMaintenanceService } from "../modules/model-catalog/model-maintenance.service.js";
+import { SiteMaintenanceService } from "../modules/sites/sites.public.js";
+import { WorkspaceMaintenanceService } from "../modules/workspaces/workspaces.public.js";
+import { ProductMaintenanceService } from "../modules/products/products.public.js";
+import { ModelMaintenanceService } from "../modules/model-catalog/model-catalog.public.js";
 import { withRequestBudget } from "../http/request-budget.js";
 import { lifecycleLog } from "../http/structured-logger.js";
 @Injectable()

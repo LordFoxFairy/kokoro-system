@@ -1,6 +1,6 @@
 # System 技术设计
 
-状态：2026-09-08，G1–G4 已提交验收，G5 当前工作树已切唯一 Nest HTTP 入口；最终 commit/门禁与外部阻断见 CURRENT/ACCEPTANCE。
+状态：2026-09-08，G1–G5 已提交验收（最终文档基线280d5d），R6当前工作树收敛typed lint/中性错误/模块公开面；最终 commit/门禁与外部阻断见 CURRENT/ACCEPTANCE。
 Root ADR-031 冻结本设计；五模块、83业务操作及2probes已实现，不保留旧Node router/RPC。
 唯一任务表：[IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md)。完整 System 为交付范围，Site 不是最终范围。
 
@@ -9,7 +9,7 @@ Root ADR-031 冻结本设计；五模块、83业务操作及2probes已实现，�
 | 项 | 决定 |
 |---|---|
 | Owner | System；sites、workspaces、products、runtime-manifests、model-catalog；本轮 system_owner 唯一 writer，Root 提交 |
-| 当前事实 | G4基线51bc22d；main→start-system→AppModule，五业务模块及access/http/database/cache/maintenance技术支持；83业务HTTP+2probes，SQL-first唯一22表；Root负责旧Model active退出 |
+| 当前事实 | R6基线280d5d；main→start-system→AppModule，五业务模块及access/http/database/cache/maintenance技术支持；83业务HTTP+2probes，SQL-first唯一22表；Root负责旧Model active退出 |
 | 目标职责 | 五个业务模块的 HTTP 控制面与配置投影；模型不推理、价格不归本仓、Workspace 不复制 IAM 组织/BFF Project |
 | 目录比较 | src/<feature> 可行；采用 src/modules/<feature> 配合已有 config 与后续 database/access/http，避免业务/技术入口混杂；拒绝全局四层与独立 releases/configs |
 | 粒度 | 每个能力的运行时 wire schema 位于 schemas/；Root追加批准src/http/protocol.schema.ts仅承载共享HTTP envelope/error/request-id/probe/page schema，generator与运行时共同消费，无I/O；一个文件只定义同一资源 wire schema；schema 集合按 schemas/ 聚合。scripts 只做契约/隔离验证；同模块Controller/Service/Repository按变化原因分开 |
@@ -69,3 +69,15 @@ resolve label_key可省、feature_key必填。省略时仅查询tenant/feature�
 main调用startSystem：配置先验、Nest DI初始化、PG/Redis readiness后listen；失败释放已构造资源。request-lifecycle将10s请求预算与断连传播至PG/Redis，日志只写结构化白名单；强制drain覆盖未完成PG握手socket。正式源码子进程/HTTP锁超时无late commit/黑洞握手取消有真实测试。
 
 MaintenanceModule仅定时调用各owner公开维护Service，默认每小时；单cycle最多5s（不超过shutdown配置），禁止重叠，shutdown取消并等待。每种候选查询上限1000；Site/Workspace/Products逐资源独立事务，先固定父锁顺序、锁内重验年龄/状态与所有保留引用，再删自身表；不会将前一候选的父锁带入下一候选。Model自然key与immutable revision身份永久保留，仅清过期Provider credential handle。Receipt7天、普通软删30天、无binding退役release90天；每次restore以PG clock_timestamp原子UPDATE谓词检查30天截止。hold暂停维护purge且阻止过期receipt key复用删除（409现有码），不延长恢复时间。异常cycle结构化报告并由下一周期重试，不自动修复immutable orphan。
+
+
+## R6 工程边界（当前方案）
+
+- `src/system.error.ts` 是本进程有限业务错误码与中性 Error 的唯一入口，不包含 HTTP status；`src/http/system-error-status.ts` 用 `satisfies Record<SystemErrorCode, number>` 穷尽映射，filter 保留 native HttpException 的既有纯传输行为。18码/status/retryable及完整错误envelope测试冻结，不把旧OwnerError搬到新目录保留别名。
+- Repository 不引用任何 `src/http/**`。内部已解析 keyset 查询类型在 `src/database/page-query.ts`，HTTP cursor codec 与 PageInput 仍属 HTTP；Service/Repository/技术故障使用中性 SystemError。
+- sites/products/workspaces/model-catalog 各有显式 `<feature>.public.ts`。跨feature和maintenance组合层只从public入口读取；AppModule直接组合Module为唯一例外。Products Nest exports仅 ProductProjectionService/ProductMaintenanceService；Workspaces仅WorkspaceMaintenanceService；Sites与Model仅实际投影/维护消费者需要的provider。没有export*、Repository公开出口或额外业务API。
+- Manifest五个投影schema从Products public入口读取。provenance保留全部原18输入并新增products.public.ts第19输入，HTTP生成artifact与83operation保持不变；源码digest按当前真实文件更新，消费者已提交HTTP验证状态不继续标pending。
+- startSystem只读取`app.get(SystemConfig)`；ConfigModule仍在建资源前唯一校验环境，bootstrap不再手工重复构造配置。无效配置fail-fast；部分初始化失败关闭已构造PG/Redis资源。
+- ESLint recommendedTypeChecked+projectService作用于src/test/scripts，显式启用unsafe assignment/argument/call/member/return、floating/misused promise与固定穷尽switch规则。没有disable或规则降级；未知HTTP测试identifier先Zod验证、PG结果按查询真实列声明类型，不把unknown直接插入URL。architecture实际执行ESLint正反例，扫描public-only/精确消费者和Nest exports、类型import循环、Repository HTTP、Controller driver、业务Service express/driver、forwardRef/ModuleRef/manual Service。
+
+R6-guard：Controller同时禁止直接driver和解析到`src/database/**`/`src/cache/**`的相对import，没有HealthController豁免。既有health目录的HealthService只聚合技术ready检查，Controller委托，live不检查依赖；HealthModule负责DI注册。手工实例化Service/Repository（含import alias）由同一架构门禁止。

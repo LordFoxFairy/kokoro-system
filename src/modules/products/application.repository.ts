@@ -3,8 +3,8 @@ import { Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import type { PageQuery } from "../../http/pagination.js";
-import { OwnerError } from "../../http/owner-error.js";
+import type { PageQuery } from "../../database/page-query.js";
+import { SystemError } from "../../system.error.js";
 import { applicationSchema } from "./schemas/application.schema.js";
 import type { applicationInputSchema } from "./schemas/application.schema.js";
 const columns =
@@ -21,10 +21,9 @@ export class ApplicationRepository {
       "SELECT id,status FROM system_site WHERE tenant_id=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE",
       [tenant, siteId],
     );
-    if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Site not found", 404);
+    if (!result.rows[0]) throw new SystemError("NOT_FOUND", "Site not found");
     if (requireActive && result.rows[0].status !== "active")
-      throw new OwnerError("SITE_UNAVAILABLE", "Site is unavailable", 409);
+      throw new SystemError("SITE_UNAVAILABLE", "Site is unavailable");
   }
   public async lockProduct(
     tx: TransactionContext,
@@ -36,9 +35,9 @@ export class ApplicationRepository {
       [id],
     );
     if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Product not found", 404);
+      throw new SystemError("NOT_FOUND", "Product not found");
     if (requireActive && result.rows[0].status !== "active")
-      throw new OwnerError("INVALID_STATE", "Product unavailable", 409);
+      throw new SystemError("INVALID_STATE", "Product unavailable");
   }
   public async find(
     tx: TransactionContext,
@@ -52,7 +51,7 @@ export class ApplicationRepository {
       [tenant, id],
     );
     if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Application not found", 404);
+      throw new SystemError("NOT_FOUND", "Application not found");
     return decodeRow(applicationSchema, result.rows[0]);
   }
   public async list(tx: TransactionContext, tenant: string, query: PageQuery) {
@@ -115,20 +114,18 @@ export class ApplicationRepository {
       [tenant, id],
     );
     if (invalid.rows[0]?.used)
-      throw new OwnerError(
+      throw new SystemError(
         "INVALID_STATE",
         "Application exposes retired feature",
-        409,
       );
     const result = await tx.query(
       `UPDATE system_application SET deleted_at=NULL,deleted_by=NULL,version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE tenant_id=$1 AND id=$2 AND deleted_at > clock_timestamp()-INTERVAL '30 days' RETURNING ${columns}`,
       [tenant, id],
     );
     if (!result.rowCount)
-      throw new OwnerError(
+      throw new SystemError(
         "INVALID_STATE",
         "Resource is outside its restore window",
-        409,
       );
     return decodeRow(applicationSchema, result.rows[0]!);
   }

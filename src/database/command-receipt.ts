@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import type { RequestContext } from "../access/request-context.js";
-import { OwnerError } from "../http/owner-error.js";
+import { SystemError } from "../system.error.js";
 import { DatabaseService } from "./database.service.js";
 import type { TransactionContext } from "./transaction-context.js";
 import { commandDigest } from "./command-digest.js";
@@ -20,11 +20,10 @@ export class CommandReceipt {
     execute: (transaction: TransactionContext) => Promise<T>,
   ): Promise<T> {
     if (!context.idempotencyKey)
-      throw new OwnerError("INVALID_ARGUMENT", "Idempotency-Key required");
+      throw new SystemError("INVALID_ARGUMENT", "Idempotency-Key required");
     const key = context.idempotencyKey;
     const scopeId = context.scope === "global" ? "" : context.tenantId;
-    if (scopeId === null)
-      throw new OwnerError("FORBIDDEN", "Tenant required", 403);
+    if (scopeId === null) throw new SystemError("FORBIDDEN", "Tenant required");
     const digest = commandDigest({
       operation: context.operation,
       actor: context.actorId,
@@ -48,10 +47,9 @@ export class CommandReceipt {
           );
           if (prior.rows[0]) {
             if (prior.rows[0].request_hash !== digest)
-              throw new OwnerError(
+              throw new SystemError(
                 "IDEMPOTENCY_KEY_REUSED",
                 "Idempotency key reused",
-                409,
               );
             return schema.parse(prior.rows[0].response_json);
           }
@@ -61,10 +59,9 @@ export class CommandReceipt {
               [context.scope, scopeId, key],
             );
             if (held.rows.length)
-              throw new OwnerError(
+              throw new SystemError(
                 "IDEMPOTENCY_KEY_REUSED",
                 "Expired key retained under hold",
-                409,
               );
           }
           await transaction.query(

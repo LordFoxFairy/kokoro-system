@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import type { PageQuery } from "../../http/pagination.js";
-import { OwnerError } from "../../http/owner-error.js";
+import type { PageQuery } from "../../database/page-query.js";
+import { SystemError } from "../../system.error.js";
 import { commandDigest } from "../../database/command-digest.js";
 import { configInputSchema } from "./schemas/config.schema.js";
 import { releaseSchema } from "./schemas/release.schema.js";
@@ -22,7 +22,7 @@ export class ReleaseRepository {
       [tenant, id],
     );
     if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Release not found", 404);
+      throw new SystemError("NOT_FOUND", "Release not found");
     return decodeRow(releaseSchema, result.rows[0]);
   }
   public async list(tx: TransactionContext, tenant: string, query: PageQuery) {
@@ -51,11 +51,7 @@ export class ReleaseRepository {
   public async invalidate(tx: TransactionContext, tenant: string, id: string) {
     const current = await this.find(tx, tenant, id, true);
     if (current.status !== "draft" && current.status !== "validated")
-      throw new OwnerError(
-        "INVALID_STATE",
-        "Published release is immutable",
-        409,
-      );
+      throw new SystemError("INVALID_STATE", "Published release is immutable");
     await tx.query(
       "UPDATE system_config_release SET status='draft',version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE tenant_id=$1 AND id=$2",
       [tenant, id],
@@ -71,11 +67,7 @@ export class ReleaseRepository {
       [tenant, id],
     );
     if (!result.rows.length)
-      throw new OwnerError(
-        "INVALID_STATE",
-        "Release has no configuration",
-        409,
-      );
+      throw new SystemError("INVALID_STATE", "Release has no configuration");
     for (const row of result.rows) {
       const { value_json, ...identity } = row;
       const parsed = configInputSchema.safeParse({
@@ -84,7 +76,7 @@ export class ReleaseRepository {
         release_id: id,
       });
       if (!parsed.success)
-        throw new OwnerError(
+        throw new SystemError(
           "INVALID_CONFIG_SCHEMA",
           "Release contains invalid configuration",
         );
@@ -94,10 +86,9 @@ export class ReleaseRepository {
       [tenant, id],
     );
     if (references.rows[0]?.invalid)
-      throw new OwnerError(
+      throw new SystemError(
         "INVALID_STATE",
         "Release contains unavailable references",
-        409,
       );
     return commandDigest(result.rows);
   }

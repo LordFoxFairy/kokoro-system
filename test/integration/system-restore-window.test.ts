@@ -91,15 +91,20 @@ const resources = [
 ] as const;
 const generations = async () => ({
   catalog: (
-    await db.query("SELECT generation::text FROM system_catalog_generation")
+    await db.query<{ generation: string }>(
+      "SELECT generation::text FROM system_catalog_generation",
+    )
   ).rows,
   tenant: (
-    await db.query(
+    await db.query<{ tenant_id: string; generation: string }>(
       "SELECT tenant_id,generation::text FROM system_runtime_manifest_generation ORDER BY tenant_id",
     )
   ).rows,
-  model: (await db.query("SELECT generation::text FROM model_cache_generation"))
-    .rows,
+  model: (
+    await db.query<{ generation: string }>(
+      "SELECT generation::text FROM model_cache_generation",
+    )
+  ).rows,
 });
 for (const resource of resources)
   for (const age of [29, 30, 31])
@@ -141,20 +146,20 @@ for (const resource of resources)
       }
       expect(response.status).toBe(age === 29 ? 200 : 409);
       const row = (
-        await db.query(
+        await db.query<{ version: string; deleted_at: Date | null }>(
           `SELECT version::text,deleted_at FROM ${resource.table} WHERE id=$1`,
           [id],
         )
-      ).rows[0];
+      ).rows[0]!;
       expect(row.version).toBe(age === 29 ? "2" : "1");
       expect(row.deleted_at === null).toBe(age === 29);
       if (age === 29 && resource.table.startsWith("model_")) {
         const after = await generations();
-        expect(BigInt(after.model[0].generation)).toBe(
-          BigInt(before.model[0].generation) + 1n,
+        expect(BigInt(after.model[0]!.generation)).toBe(
+          BigInt(before.model[0]!.generation) + 1n,
         );
-        expect(BigInt(after.catalog[0].generation)).toBe(
-          BigInt(before.catalog[0].generation) + 1n,
+        expect(BigInt(after.catalog[0]!.generation)).toBe(
+          BigInt(before.catalog[0]!.generation) + 1n,
         );
       }
       if (age !== 29) {

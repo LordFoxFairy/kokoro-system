@@ -1,20 +1,20 @@
-import { OwnerError } from "./owner-error.js";
+import { SystemError } from "../system.error.js";
 export function forwardedHost(
   forwarded: string | undefined,
   host: string | undefined,
 ): string {
   if (forwarded !== undefined) {
     if (forwarded.length > 2048)
-      throw new OwnerError("INVALID_ARGUMENT", "Forwarded too long");
+      throw new SystemError("INVALID_ARGUMENT", "Forwarded too long");
     const first = forwarded.split(",", 1)[0] ?? "";
     const match =
       /(?:^|;)\s*host=(?:"([^"\\]*(?:\\.[^"\\]*)*)"|([^;\s]+))/iu.exec(first);
     const value = match?.[1] ?? match?.[2];
     if (!value?.trim())
-      throw new OwnerError("INVALID_ARGUMENT", "Invalid Forwarded");
+      throw new SystemError("INVALID_ARGUMENT", "Invalid Forwarded");
     return value;
   }
   if (!host || host.length > 255)
-    throw new OwnerError("INVALID_ARGUMENT", "Host required");
+    throw new SystemError("INVALID_ARGUMENT", "Host required");
   return host;
 }

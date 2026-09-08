@@ -3,8 +3,8 @@ import { Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import type { PageQuery } from "../../http/pagination.js";
-import { OwnerError } from "../../http/owner-error.js";
+import type { PageQuery } from "../../database/page-query.js";
+import { SystemError } from "../../system.error.js";
 import { bindingSchema } from "./schemas/release.schema.js";
 import type { bindingInputSchema } from "./schemas/release.schema.js";
 const columns =
@@ -22,7 +22,7 @@ export class BindingRepository {
       [tenant, id],
     );
     if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Binding not found", 404);
+      throw new SystemError("NOT_FOUND", "Binding not found");
     return decodeRow(bindingSchema, result.rows[0]);
   }
   public async list(tx: TransactionContext, tenant: string, query: PageQuery) {

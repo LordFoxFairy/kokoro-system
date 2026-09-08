@@ -1,15 +1,15 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { OwnerError } from "./owner-error.js";
+import { SystemError } from "../system.error.js";
 const cursorSchema = z.strictObject({
   resource: z.string(),
   scope: z.string(),
   createdAt: z.iso.datetime(),
   id: z.uuid(),
 });
-export type PagePosition = Readonly<{ createdAt: string; id: string }>;
+import type { PagePosition, PageQuery } from "../database/page-query.js";
 export type PageInput = Readonly<{ limit?: string; cursor?: string }>;
-export type PageQuery = Readonly<{ limit: number; after: PagePosition | null }>;
+
 const scopeHash = (scope: string): string =>
   createHash("sha256").update(scope).digest("hex");
 export function encodeCursor(
@@ -34,7 +34,7 @@ export function decodeCursor(
       throw new Error("scope");
     return { createdAt: value.createdAt, id: value.id };
   } catch {
-    throw new OwnerError("INVALID_CURSOR", "Invalid cursor");
+    throw new SystemError("INVALID_CURSOR", "Invalid cursor");
   }
 }
 export function pageQuery(

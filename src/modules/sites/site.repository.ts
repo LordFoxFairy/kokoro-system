@@ -3,8 +3,8 @@ import { Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import type { PageQuery } from "../../http/pagination.js";
-import { OwnerError } from "../../http/owner-error.js";
+import type { PageQuery } from "../../database/page-query.js";
+import { SystemError } from "../../system.error.js";
 import { siteSchema } from "./schemas/site.schema.js";
 import type {
   siteInputSchema,
@@ -23,8 +23,7 @@ export class SiteRepository {
       `SELECT ${columns} FROM system_site s JOIN system_site_host h ON h.site_id=s.id AND h.tenant_id=s.tenant_id WHERE s.tenant_id=$1 AND h.hostname=$2 AND h.status='active' AND s.deleted_at IS NULL`,
       [tenant, host],
     );
-    if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Site not found", 404);
+    if (!result.rows[0]) throw new SystemError("NOT_FOUND", "Site not found");
     return decodeRow(siteSchema, result.rows[0]);
   }
   public async find(
@@ -38,8 +37,7 @@ export class SiteRepository {
       `SELECT ${columns} FROM system_site s WHERE s.tenant_id=$1 AND s.id=$2 ${includeDeleted ? "" : "AND s.deleted_at IS NULL"} ${lock ? "FOR UPDATE OF s" : ""}`,
       [tenant, id],
     );
-    if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Site not found", 404);
+    if (!result.rows[0]) throw new SystemError("NOT_FOUND", "Site not found");
     return decodeRow(siteSchema, result.rows[0]);
   }
   public async list(tx: TransactionContext, tenant: string, query: PageQuery) {
@@ -76,11 +74,7 @@ export class SiteRepository {
         "code" in error &&
         error.code === "23505"
       )
-        throw new OwnerError(
-          "HOST_CONFLICT",
-          "Hostname already registered",
-          409,
-        );
+        throw new SystemError("HOST_CONFLICT", "Hostname already registered");
       throw error;
     }
     return this.find(tx, tenant, id);
@@ -114,7 +108,7 @@ export class SiteRepository {
       [tenant, id],
     );
     if (references.rows[0]?.used)
-      throw new OwnerError("RESOURCE_IN_USE", "Site has live references", 409);
+      throw new SystemError("RESOURCE_IN_USE", "Site has live references");
     await tx.query(
       "UPDATE system_site SET status='archived',deleted_at=CURRENT_TIMESTAMP(3),deleted_by=$3,updated_at=CURRENT_TIMESTAMP(3),version=version+1 WHERE tenant_id=$1 AND id=$2 AND deleted_at IS NULL",
       [tenant, id, actor],
@@ -131,10 +125,9 @@ export class SiteRepository {
       [tenant, id],
     );
     if (!result.rowCount)
-      throw new OwnerError(
+      throw new SystemError(
         "INVALID_STATE",
         "Resource is outside its restore window",
-        409,
       );
     return this.find(tx, tenant, id);
   }

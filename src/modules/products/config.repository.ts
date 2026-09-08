@@ -3,8 +3,8 @@ import { Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import type { PageQuery } from "../../http/pagination.js";
-import { OwnerError } from "../../http/owner-error.js";
+import type { PageQuery } from "../../database/page-query.js";
+import { SystemError } from "../../system.error.js";
 import { commandDigest } from "../../database/command-digest.js";
 import { configSchema } from "./schemas/config.schema.js";
 import type { configInputSchema } from "./schemas/config.schema.js";
@@ -22,8 +22,7 @@ export class ConfigRepository {
       `SELECT ${columns} FROM system_config_record WHERE tenant_id IS NOT DISTINCT FROM $1 AND id=$2 AND status='active' ${lock ? "FOR UPDATE" : ""}`,
       [tenant, id],
     );
-    if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Config not found", 404);
+    if (!result.rows[0]) throw new SystemError("NOT_FOUND", "Config not found");
     return decodeRow(configSchema, result.rows[0]);
   }
   public async list(

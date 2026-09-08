@@ -1,3 +1,4 @@
+import { systemErrorStatus } from "./system-error-status.js";
 import { randomUUID } from "node:crypto";
 import { Catch, HttpException } from "@nestjs/common";
 import type { ArgumentsHost, ExceptionFilter } from "@nestjs/common";
@@ -5,7 +6,7 @@ import type { Response } from "express";
 import { ZodError } from "zod";
 import type { OwnerRequest } from "../access/request-context.js";
 import { requestIdSchema } from "./protocol.schema.js";
-import { OwnerError } from "./owner-error.js";
+import { SystemError } from "../system.error.js";
 @Catch()
 export class OwnerErrorFilter implements ExceptionFilter {
   public catch(error: unknown, host: ArgumentsHost): void {
@@ -19,13 +20,13 @@ export class OwnerErrorFilter implements ExceptionFilter {
       request.ownerContext?.requestId ??
         (parsed.success ? parsed.data : randomUUID()),
     );
-    let mapped: OwnerError;
-    if (error instanceof OwnerError) mapped = error;
+    let mapped: SystemError;
+    let transportStatus: number | undefined;
+    if (error instanceof SystemError) mapped = error;
     else if (error instanceof ZodError)
-      mapped = new OwnerError(
+      mapped = new SystemError(
         "SYSTEM_UNAVAILABLE",
         "Stored representation is invalid",
-        503,
         true,
       );
     else if (
@@ -34,37 +35,35 @@ export class OwnerErrorFilter implements ExceptionFilter {
       "status" in error &&
       (error.status === 400 || error.status === 413)
     )
-      mapped = new OwnerError(
+      mapped = new SystemError(
         "INVALID_ARGUMENT",
         "Request body is invalid or too large",
       );
-    else if (error instanceof HttpException)
-      mapped = new OwnerError(
+    else if (error instanceof HttpException) {
+      transportStatus = error.getStatus();
+      mapped = new SystemError(
         error.getStatus() === 404 ? "NOT_FOUND" : "INVALID_ARGUMENT",
         error.getStatus() === 404
           ? "Resource not found"
           : "Request validation failed",
-        error.getStatus(),
       );
-    else if (
+    } else if (
       typeof error === "object" &&
       error !== null &&
       "code" in error &&
       error.code === "23505"
     )
-      mapped = new OwnerError(
+      mapped = new SystemError(
         "VERSION_CONFLICT",
         "Resource identity conflict",
-        409,
       );
     else
-      mapped = new OwnerError(
+      mapped = new SystemError(
         "SYSTEM_UNAVAILABLE",
         "System temporarily unavailable",
-        503,
         true,
       );
-    response.status(mapped.status).json({
+    response.status(transportStatus ?? systemErrorStatus[mapped.code]).json({
       error: {
         code: mapped.code,
         message: mapped.message,

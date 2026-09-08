@@ -19,6 +19,7 @@ const sources = [
       const directory = join("src/modules", entry.name, "schemas");
       return existsSync(directory) ? sourceFiles(directory) : [];
     }),
+  "src/modules/products/products.public.ts",
   "src/http/protocol.schema.ts",
   "scripts/generate-system-openapi.ts",
   "scripts/system-openapi-operations.ts",
@@ -47,14 +48,12 @@ provenance.consumers = [
   {
     consumer: "kokoro-bff",
     surface: "runtime-manifest/model-catalog",
-    disposition:
-      "pinned-consumer-live-exploration-passed-final-commit-verification-pending",
+    disposition: "pinned-consumer-committed-http-verified",
   },
   {
     consumer: "kokoro-agent",
     surface: "model-catalog/resolve",
-    disposition:
-      "pinned-factory-wiring-live-exploration-passed-final-commit-verification-pending",
+    disposition: "pinned-factory-wiring-committed-http-verified",
   },
   {
     consumer: "control-plane-service-callers",

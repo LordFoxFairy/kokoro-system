@@ -125,27 +125,37 @@ describe("real Nest Sites/Workspace control", () => {
       ).response.status,
     ).toBe(409);
     expect(
-      (await request(`sites/${site.id}`, "GET", undefined, {}, "other-tenant"))
-        .response.status,
+      (
+        await request(
+          `sites/${z.string().parse(site.id)}`,
+          "GET",
+          undefined,
+          {},
+          "other-tenant",
+        )
+      ).response.status,
     ).toBe(404);
     expect(
-      (await request(`sites/${site.id}`, "PATCH", { display_name: "Changed" }))
-        .response.status,
+      (
+        await request(`sites/${z.string().parse(site.id)}`, "PATCH", {
+          display_name: "Changed",
+        })
+      ).response.status,
     ).toBe(428);
     const updated = await request(
-      `sites/${site.id}`,
+      `sites/${z.string().parse(site.id)}`,
       "PATCH",
       { display_name: "Changed" },
-      { "if-match": `"${site.version}"` },
+      { "if-match": `"${z.string().parse(site.version)}"` },
     );
     expect(updated.response.status).toBe(200);
     expect(
       (
         await request(
-          `sites/${site.id}`,
+          `sites/${z.string().parse(site.id)}`,
           "PATCH",
           { display_name: "Race" },
-          { "if-match": `"${site.version}"` },
+          { "if-match": `"${z.string().parse(site.version)}"` },
         )
       ).response.status,
     ).toBe(409);
@@ -157,16 +167,21 @@ describe("real Nest Sites/Workspace control", () => {
     expect(workspace.response.status).toBe(201);
     expect(
       (
-        await request(`sites/${site.id}`, "DELETE", undefined, {
-          "if-match": `"${updated.json.data!.version}"`,
-        })
+        await request(
+          `sites/${z.string().parse(site.id)}`,
+          "DELETE",
+          undefined,
+          {
+            "if-match": `"${z.string().parse(updated.json.data!.version)}"`,
+          },
+        )
       ).json.error?.code,
     ).toBe("RESOURCE_IN_USE");
     const workspaceId = workspace.json.data!.id;
     expect(
       (
         await request(
-          `workspaces/${workspaceId}`,
+          `workspaces/${z.string().parse(workspaceId)}`,
           "PATCH",
           { name: "Renamed" },
           { "if-match": '"1"' },
@@ -175,40 +190,67 @@ describe("real Nest Sites/Workspace control", () => {
     ).toBe(200);
     expect(
       (
-        await request(`workspaces/${workspaceId}`, "DELETE", undefined, {
-          "if-match": '"2"',
-        })
+        await request(
+          `workspaces/${z.string().parse(workspaceId)}`,
+          "DELETE",
+          undefined,
+          {
+            "if-match": '"2"',
+          },
+        )
       ).response.status,
     ).toBe(200);
     expect(
-      (await request(`workspaces/${workspaceId}`, "GET")).response.status,
+      (await request(`workspaces/${z.string().parse(workspaceId)}`, "GET"))
+        .response.status,
     ).toBe(404);
     expect(
       (
-        await request(`workspaces/${workspaceId}/restore`, "POST", undefined, {
-          "if-match": '"3"',
-        })
+        await request(
+          `workspaces/${z.string().parse(workspaceId)}/restore`,
+          "POST",
+          undefined,
+          {
+            "if-match": '"3"',
+          },
+        )
       ).response.status,
     ).toBe(200);
     expect(
       (
-        await request(`workspaces/${workspaceId}`, "DELETE", undefined, {
-          "if-match": '"4"',
-        })
+        await request(
+          `workspaces/${z.string().parse(workspaceId)}`,
+          "DELETE",
+          undefined,
+          {
+            "if-match": '"4"',
+          },
+        )
       ).response.status,
     ).toBe(200);
-    const deleted = await request(`sites/${site.id}`, "DELETE", undefined, {
-      "if-match": `"${updated.json.data!.version}"`,
-    });
-    expect(deleted.response.status).toBe(200);
-    expect((await request(`sites/${site.id}`, "GET")).response.status).toBe(
-      404,
+    const deleted = await request(
+      `sites/${z.string().parse(site.id)}`,
+      "DELETE",
+      undefined,
+      {
+        "if-match": `"${z.string().parse(updated.json.data!.version)}"`,
+      },
     );
+    expect(deleted.response.status).toBe(200);
+    expect(
+      (await request(`sites/${z.string().parse(site.id)}`, "GET")).response
+        .status,
+    ).toBe(404);
     expect(
       (
-        await request(`sites/${site.id}/restore`, "POST", undefined, {
-          "if-match": `"${deleted.json.data!.version}"`,
-        })
+        await request(
+          `sites/${z.string().parse(site.id)}/restore`,
+          "POST",
+          undefined,
+          {
+            "if-match": `"${z.string().parse(deleted.json.data!.version)}"`,
+          },
+        )
       ).response.status,
     ).toBe(200);
   });
@@ -225,7 +267,7 @@ describe("real Nest Sites/Workspace control", () => {
       request("sites", "POST", input, { "idempotency-key": key }),
     ]);
     expect(results.map((result) => result.response.status)).toEqual([201, 201]);
-    expect(results[0]!.json.data).toEqual(results[1]!.json.data);
+    expect(results[0].json.data).toEqual(results[1].json.data);
     expect(
       (
         await request("sites", "POST", input, {
@@ -245,10 +287,10 @@ describe("real Nest Sites/Workspace control", () => {
         )
       ).response.status,
     ).toBe(201);
-    const siteId = results[0]!.json.data!.id;
+    const siteId = results[0].json.data!.id;
     const failedKey = randomUUID();
     const denied = await request(
-      `sites/${siteId}/policy`,
+      `sites/${z.string().parse(siteId)}/policy`,
       "PUT",
       {
         default_locale: "en",
@@ -262,16 +304,16 @@ describe("real Nest Sites/Workspace control", () => {
     const db = new Client({ connectionString: databaseUrl.href });
     await db.connect();
     try {
-      const receipt = await db.query(
+      const receipt = await db.query<{ count: number }>(
         "SELECT COUNT(*)::int AS count FROM public.system_command_receipt WHERE idempotency_key=$1",
         [failedKey],
       );
-      expect(receipt.rows[0].count).toBe(0);
-      const policy = await db.query(
+      expect(receipt.rows[0]?.count).toBe(0);
+      const policy = await db.query<{ count: number }>(
         "SELECT COUNT(*)::int AS count FROM public.system_site_policy WHERE site_id=$1",
         [siteId],
       );
-      expect(policy.rows[0].count).toBe(0);
+      expect(policy.rows[0]?.count).toBe(0);
     } finally {
       await db.end();
     }
@@ -293,22 +335,22 @@ describe("real Nest Sites/Workspace control", () => {
     };
     const schema = z.strictObject({ owner: z.string() });
     expect(
-      await receipts.run(context, {}, schema, async () => ({
-        owner: "global",
-      })),
+      await receipts.run(context, {}, schema, () =>
+        Promise.resolve({ owner: "global" }),
+      ),
     ).toEqual({ owner: "global" });
     expect(
       await receipts.run(
         { ...context, tenantId: "global", scope: "tenant" },
         {},
         schema,
-        async () => ({ owner: "tenant" }),
+        () => Promise.resolve({ owner: "tenant" }),
       ),
     ).toEqual({ owner: "tenant" });
     expect(
-      await receipts.run(context, {}, schema, async () => {
-        throw new Error("replay executed");
-      }),
+      await receipts.run(context, {}, schema, () =>
+        Promise.reject(new Error("replay executed")),
+      ),
     ).toEqual({ owner: "global" });
   });
   it("rejects malformed payloads, privilege forgery and cross-resource cursors", async () => {
@@ -359,12 +401,13 @@ describe("real Nest Sites/Workspace control", () => {
     const cursor = page.json.data!.next_cursor;
     expect(typeof cursor).toBe("string");
     expect(
-      (await request(`workspaces?cursor=${cursor}`)).json.error?.code,
+      (await request(`workspaces?cursor=${z.string().parse(cursor)}`)).json
+        .error?.code,
     ).toBe("INVALID_CURSOR");
     expect(
       (
         await request(
-          `sites?cursor=${cursor}`,
+          `sites?cursor=${z.string().parse(cursor)}`,
           "GET",
           undefined,
           {},
@@ -397,7 +440,7 @@ describe("real Nest Sites/Workspace control", () => {
               workspace_key: "race",
               name: "Race",
             })
-          : request(`sites/${site.id}`, "DELETE", undefined, {
+          : request(`sites/${z.string().parse(site.id)}`, "DELETE", undefined, {
               "if-match": '"1"',
             })
       ).then((result) => {
@@ -406,11 +449,11 @@ describe("real Nest Sites/Workspace control", () => {
       });
       let blocked = false;
       for (let attempt = 0; attempt < 80; attempt++) {
-        const result = await admin.query(
+        const result = await admin.query<{ blocked: boolean }>(
           "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=$1 AND cardinality(pg_blocking_pids(pid))>0) AS blocked",
           [databaseName],
         );
-        if (result.rows[0].blocked) {
+        if (result.rows[0]?.blocked) {
           blocked = true;
           break;
         }
@@ -453,11 +496,11 @@ describe("real Nest Sites/Workspace control", () => {
     } finally {
       await db.end();
     }
-    expect((await request(`sites/${id}`)).json.data!.version).toBe(
-      "9007199254740993123",
-    );
+    expect(
+      (await request(`sites/${z.string().parse(id)}`)).json.data!.version,
+    ).toBe("9007199254740993123");
     const updated = await request(
-      `sites/${id}`,
+      `sites/${z.string().parse(id)}`,
       "PATCH",
       { display_name: "Exact" },
       { "if-match": '"9007199254740993123"' },
@@ -480,17 +523,22 @@ describe("real Nest Sites/Workspace control", () => {
       display_name: "Policy",
     });
     const site = created.json.data!;
-    const domain = await request(`sites/${site.id}/domains`, "POST", {
-      hostname: "second.example.test",
-    });
-    expect(domain.response.status).toBe(201);
-    expect((await request(`sites/${site.id}/domains`)).response.status).toBe(
-      200,
+    const domain = await request(
+      `sites/${z.string().parse(site.id)}/domains`,
+      "POST",
+      {
+        hostname: "second.example.test",
+      },
     );
+    expect(domain.response.status).toBe(201);
+    expect(
+      (await request(`sites/${z.string().parse(site.id)}/domains`)).response
+        .status,
+    ).toBe(200);
     expect(
       (
         await request(
-          `sites/${site.id}/domains/${domain.json.data!.id}`,
+          `sites/${z.string().parse(site.id)}/domains/${z.string().parse(domain.json.data!.id)}`,
           "DELETE",
           undefined,
           { "if-match": '"1"' },
@@ -505,22 +553,32 @@ describe("real Nest Sites/Workspace control", () => {
     };
     expect(
       (
-        await request(`sites/${site.id}/policy`, "PUT", policy, {
-          "if-none-match": "*",
-        })
+        await request(
+          `sites/${z.string().parse(site.id)}/policy`,
+          "PUT",
+          policy,
+          {
+            "if-none-match": "*",
+          },
+        )
       ).response.status,
     ).toBe(200);
     expect(
       (
-        await request(`sites/${site.id}/policy`, "PUT", policy, {
-          "if-none-match": "*",
-        })
+        await request(
+          `sites/${z.string().parse(site.id)}/policy`,
+          "PUT",
+          policy,
+          {
+            "if-none-match": "*",
+          },
+        )
       ).response.status,
     ).toBe(409);
     expect(
       (
         await request(
-          `sites/${site.id}/policy`,
+          `sites/${z.string().parse(site.id)}/policy`,
           "PUT",
           { ...policy, public_manifest: false },
           { "if-match": '"1"' },

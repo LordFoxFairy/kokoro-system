@@ -6,7 +6,7 @@ import {
   localeNamespaceSchema,
   featureFlagSchema,
   referenceSchema,
-} from "../../products/schemas/presentation.schema.js";
+} from "../../products/products.public.js";
 export const manifestQuerySchema = z.strictObject({
   product_id: z.string().min(1).max(128),
   locale: z.string().min(1).max(32).optional(),

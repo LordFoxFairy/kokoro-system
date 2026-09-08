@@ -1,10 +1,11 @@
+import { CacheService } from "../../src/cache/cache.service.js";
 import type { Socket } from "node:net";
 import { createServer } from "node:net";
 import { SystemConfig } from "../../src/config/system-config.js";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Client } from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { startSystem } from "../../src/start-system.js";
 import { DatabaseService } from "../../src/database/database.service.js";
 import { withRequestBudget } from "../../src/http/request-budget.js";
@@ -43,6 +44,26 @@ const env = {
   KOKORO_SYSTEM_REQUEST_TIMEOUT_MS: "200",
 };
 describe("production Nest lifecycle", () => {
+  it("constructs one validated config shared by bootstrap and Nest providers", async () => {
+    let reads = 0;
+    const environment = {
+      ...env,
+      get DATABASE_URL() {
+        reads++;
+        return env.DATABASE_URL;
+      },
+    };
+    const running = await startSystem(environment);
+    try {
+      expect(reads).toBe(1);
+      expect(running.app.get(SystemConfig)).toBe(running.app.get(SystemConfig));
+      expect(running.app.get(SystemConfig).values.DATABASE_URL).toBe(
+        env.DATABASE_URL,
+      );
+    } finally {
+      await running.close();
+    }
+  });
   it("starts full owner, cancels active SQL and closes within drain deadline", async () => {
     const running = await startSystem(env);
     try {
@@ -189,8 +210,23 @@ describe("production Nest lifecycle", () => {
     ).rejects.toThrow();
     const missing = new URL(url);
     missing.pathname = `/system_g5_missing_${randomUUID().replaceAll("-", "")}`;
-    await expect(
-      startSystem({ ...env, DATABASE_URL: missing.href }),
-    ).rejects.toThrow();
+    const cacheClose = vi.spyOn(
+      CacheService.prototype,
+      "onApplicationShutdown",
+    );
+    const databaseClose = vi.spyOn(
+      DatabaseService.prototype,
+      "onApplicationShutdown",
+    );
+    try {
+      await expect(
+        startSystem({ ...env, DATABASE_URL: missing.href }),
+      ).rejects.toThrow();
+      expect(cacheClose).toHaveBeenCalledOnce();
+      expect(databaseClose).toHaveBeenCalledOnce();
+    } finally {
+      cacheClose.mockRestore();
+      databaseClose.mockRestore();
+    }
   });
 });

@@ -5,7 +5,7 @@ import { tenantScope } from "../../access/tenant-scope.js";
 import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { ApplicationRepository } from "./application.repository.js";
 import { PresentationRepository } from "./presentation.repository.js";
 import { presentationSchema } from "./schemas/presentation.schema.js";
@@ -37,8 +37,7 @@ export class PresentationService {
         query.locale,
         query.surface_id ?? null,
       );
-      if (!value)
-        throw new OwnerError("NOT_FOUND", "Presentation not found", 404);
+      if (!value) throw new SystemError("NOT_FOUND", "Presentation not found");
       return value;
     });
   }
@@ -76,10 +75,9 @@ export class PresentationService {
         );
         if (prior) requireVersion(prior.version, context.precondition);
         else if (context.precondition?.kind !== "create")
-          throw new OwnerError(
+          throw new SystemError(
             "VERSION_CONFLICT",
             "Presentation does not exist",
-            409,
           );
         return this.presentations.put(
           tx,

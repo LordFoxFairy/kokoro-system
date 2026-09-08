@@ -4,7 +4,7 @@ import type { RequestContext } from "../../access/request-context.js";
 import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { FeatureRepository } from "./feature.repository.js";
@@ -43,7 +43,7 @@ export class FeatureService {
       const current = await this.features.find(tx, id, true);
       requireVersion(current.version, context.precondition);
       if (current.retired_at)
-        throw new OwnerError("INVALID_STATE", "Feature already retired", 409);
+        throw new SystemError("INVALID_STATE", "Feature already retired");
       return this.features.retire(tx, id);
     });
   }

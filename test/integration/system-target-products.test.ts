@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { CacheService } from "../../src/cache/cache.service.js";
 import { systemOperations } from "../../scripts/system-openapi-operations.js";
 import { randomUUID } from "node:crypto";
@@ -192,10 +193,15 @@ describe("real Nest Product control", () => {
     ).toBe(404);
     expect(
       (
-        await request(`products/${input.product_id}`, "DELETE", undefined, {
-          ...adminHeaders,
-          "if-match": '"1"',
-        })
+        await request(
+          `products/${z.string().parse(input.product_id)}`,
+          "DELETE",
+          undefined,
+          {
+            ...adminHeaders,
+            "if-match": '"1"',
+          },
+        )
       ).json.error?.code,
     ).toBe("RESOURCE_IN_USE");
     const updated = await request(
@@ -532,9 +538,14 @@ describe("real Nest Product control", () => {
     expect(published.response.status).toBe(200);
     expect(
       (
-        await request(`config/${cfg.json.data?.id}`, "DELETE", undefined, {
-          "if-match": '"1"',
-        })
+        await request(
+          `config/${z.string().parse(cfg.json.data?.id)}`,
+          "DELETE",
+          undefined,
+          {
+            "if-match": '"1"',
+          },
+        )
       ).json.error?.code,
     ).toBe("INVALID_STATE");
     const binding = await request("release-bindings", "POST", {
@@ -701,11 +712,11 @@ describe("real Nest Product control", () => {
             });
         let blocked = false;
         for (let attempt = 0; attempt < 80; attempt++) {
-          const result = await admin.query(
+          const result = await admin.query<{ blocked: boolean }>(
             "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=$1 AND cardinality(pg_blocking_pids(pid))>0) AS blocked",
             [databaseName],
           );
-          if (result.rows[0].blocked) {
+          if (result.rows[0]?.blocked) {
             blocked = true;
             break;
           }
@@ -940,8 +951,8 @@ describe("real Nest Product control", () => {
       ).response.status,
     ).toBe(200);
     for (const path of [
-      `config/${config.json.data?.id}`,
-      `release-bindings/${binding.json.data?.id}`,
+      `config/${z.string().parse(config.json.data?.id)}`,
+      `release-bindings/${z.string().parse(binding.json.data?.id)}`,
       `applications/${aid}/exposures/${fid}`,
       `applications/${aid}`,
     ])
@@ -1009,11 +1020,11 @@ describe("real Nest Product control", () => {
           : request(`sites/${sid}`, "DELETE", undefined, { "if-match": '"1"' });
         let blocked = false;
         for (let attempt = 0; attempt < 80; attempt++) {
-          const result = await admin.query(
+          const result = await admin.query<{ blocked: boolean }>(
             "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=$1 AND cardinality(pg_blocking_pids(pid))>0) AS blocked",
             [databaseName],
           );
-          if (result.rows[0].blocked) {
+          if (result.rows[0]?.blocked) {
             blocked = true;
             break;
           }
@@ -1125,7 +1136,7 @@ describe("real Nest Product control", () => {
         .response.status,
     ).toBe(403);
     secondSet.mockRestore();
-    await cache.onApplicationShutdown();
+    cache.onApplicationShutdown();
     expect(
       (
         await request(path, "GET", undefined, {

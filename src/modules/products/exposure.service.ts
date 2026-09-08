@@ -5,7 +5,7 @@ import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { ApplicationRepository } from "./application.repository.js";
@@ -34,7 +34,7 @@ export class ExposureService {
     await this.apps.find(tx, tenant, appId, false, true);
     const feature = await this.features.find(tx, featureId, true);
     if (feature.product_id !== app.product_id)
-      throw new OwnerError(
+      throw new SystemError(
         "INVALID_ARGUMENT",
         "Feature belongs to another product",
       );
@@ -64,15 +64,11 @@ export class ExposureService {
       const tenant = tenantScope(context);
       const feature = await this.lockParents(tx, tenant, appId, featureId);
       if (input.enabled && feature.retired_at)
-        throw new OwnerError("INVALID_STATE", "Feature retired", 409);
+        throw new SystemError("INVALID_STATE", "Feature retired");
       const prior = await this.exposures.find(tx, tenant, appId, featureId);
       if (prior) requireVersion(prior.version, context.precondition);
       else if (context.precondition?.kind !== "create")
-        throw new OwnerError(
-          "VERSION_CONFLICT",
-          "Exposure does not exist",
-          409,
-        );
+        throw new SystemError("VERSION_CONFLICT", "Exposure does not exist");
       return this.exposures.put(tx, tenant, appId, featureId, input);
     });
   }
@@ -81,7 +77,7 @@ export class ExposureService {
       const tenant = tenantScope(context);
       await this.lockParents(tx, tenant, appId, featureId, false);
       const prior = await this.exposures.find(tx, tenant, appId, featureId);
-      if (!prior) throw new OwnerError("NOT_FOUND", "Exposure not found", 404);
+      if (!prior) throw new SystemError("NOT_FOUND", "Exposure not found");
       requireVersion(prior.version, context.precondition);
       return this.exposures.remove(tx, tenant, appId, featureId);
     });

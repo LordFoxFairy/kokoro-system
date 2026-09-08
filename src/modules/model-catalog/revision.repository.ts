@@ -3,8 +3,8 @@ import { Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import type { PageQuery } from "../../http/pagination.js";
-import { OwnerError } from "../../http/owner-error.js";
+import type { PageQuery } from "../../database/page-query.js";
+import { SystemError } from "../../system.error.js";
 import { commandDigest } from "../../database/command-digest.js";
 import { revisionSchema } from "./schemas/revision.schema.js";
 import type { revisionInputSchema } from "./schemas/revision.schema.js";
@@ -18,7 +18,7 @@ export class RevisionRepository {
       [id],
     );
     if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Revision not found", 404);
+      throw new SystemError("NOT_FOUND", "Revision not found");
     return decodeRow(revisionSchema, result.rows[0]);
   }
   public async list(tx: TransactionContext, query: PageQuery) {
@@ -94,10 +94,9 @@ export class RevisionRepository {
       [id],
     );
     if (result.rows[0]?.used)
-      throw new OwnerError(
+      throw new SystemError(
         "RESOURCE_IN_USE",
         "Revision has routing references",
-        409,
       );
     const updated = await tx.query(
       `UPDATE model_revision SET retired_at=CURRENT_TIMESTAMP(3),version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=$1 RETURNING ${columns}`,

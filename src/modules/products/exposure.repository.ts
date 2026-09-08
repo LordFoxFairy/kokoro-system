@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import type { PageQuery } from "../../http/pagination.js";
+import type { PageQuery } from "../../database/page-query.js";
 import { exposureSchema } from "./schemas/feature.schema.js";
 const columns =
   "id,tenant_id,application_id,feature_id,enabled,display_order,version,created_at,updated_at";

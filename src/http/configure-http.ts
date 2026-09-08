@@ -5,7 +5,7 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import type { Server } from "node:http";
 import { OwnerErrorFilter } from "./error.filter.js";
 import { ResponseInterceptor } from "./response.interceptor.js";
-import { OwnerError } from "./owner-error.js";
+import { SystemError } from "../system.error.js";
 export function configureHttp(app: NestExpressApplication): void {
   app.use(
     requestLifecycle(
@@ -16,12 +16,12 @@ export function configureHttp(app: NestExpressApplication): void {
   app.useGlobalPipes(
     new StandardSchemaValidationPipe({
       exceptionFactory: () =>
-        new OwnerError("INVALID_ARGUMENT", "Request validation failed"),
+        new SystemError("INVALID_ARGUMENT", "Request validation failed"),
     }),
   );
   app.useGlobalFilters(new OwnerErrorFilter());
   app.useGlobalInterceptors(new ResponseInterceptor());
-  const server = app.getHttpServer() as Server;
+  const server: Server = app.getHttpServer();
   server.requestTimeout = 15000;
   server.headersTimeout = 10000;
   server.keepAliveTimeout = 5000;

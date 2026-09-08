@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { existsSync, readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 it("publishes only System HTTP with no retired transport, SDK or global layers", () => {
@@ -19,10 +20,13 @@ it("publishes only System HTTP with no retired transport, SDK or global layers",
   const manifest = readFileSync("package.json", "utf8");
   expect(manifest).not.toMatch(/bufbuild|connectrpc|sdk:|buf generate/);
   expect(
-    JSON.parse(readFileSync("tsconfig.json", "utf8")).compilerOptions.lib,
+    z
+      .object({ compilerOptions: z.object({ lib: z.array(z.string()) }) })
+      .parse(JSON.parse(readFileSync("tsconfig.json", "utf8"))).compilerOptions
+      .lib,
   ).toEqual(["ES2024"]);
   expect(readFileSync("src/main.ts", "utf8")).toContain("startSystem");
-  const provenance = JSON.parse(
+  const provenance: unknown = JSON.parse(
     readFileSync("contract/provenance.json", "utf8"),
   );
   expect(JSON.stringify(provenance)).not.toMatch(

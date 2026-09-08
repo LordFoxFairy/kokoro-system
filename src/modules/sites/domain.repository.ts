@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import { OwnerError } from "../../http/owner-error.js";
-import type { PageQuery } from "../../http/pagination.js";
+import { SystemError } from "../../system.error.js";
+import type { PageQuery } from "../../database/page-query.js";
 import { domainSchema } from "./schemas/site.schema.js";
 const columns =
   "id,tenant_id,site_id,hostname,status,version,created_at,updated_at";
@@ -39,11 +39,7 @@ export class DomainRepository {
         [randomUUID(), tenant, siteId, hostname],
       );
       if (!result.rows[0])
-        throw new OwnerError(
-          "HOST_CONFLICT",
-          "Hostname already registered",
-          409,
-        );
+        throw new SystemError("HOST_CONFLICT", "Hostname already registered");
       await tx.query(
         "UPDATE system_site SET version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE tenant_id=$1 AND id=$2",
         [tenant, siteId],
@@ -56,11 +52,7 @@ export class DomainRepository {
         "code" in error &&
         error.code === "23505"
       )
-        throw new OwnerError(
-          "HOST_CONFLICT",
-          "Hostname already registered",
-          409,
-        );
+        throw new SystemError("HOST_CONFLICT", "Hostname already registered");
       throw error;
     }
   }
@@ -74,8 +66,7 @@ export class DomainRepository {
       `SELECT ${columns} FROM system_site_host WHERE tenant_id=$1 AND site_id=$2 AND id=$3 AND status='active' FOR UPDATE`,
       [tenant, siteId, id],
     );
-    if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Domain not found", 404);
+    if (!result.rows[0]) throw new SystemError("NOT_FOUND", "Domain not found");
     return decodeRow(domainSchema, result.rows[0]);
   }
   public async remove(

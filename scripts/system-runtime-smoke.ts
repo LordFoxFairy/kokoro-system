@@ -43,7 +43,7 @@ const env = {
 };
 const stop = async () => {
   await runCleanup([
-    async () => {
+    () => {
       if (image) {
         const removal = spawnSync("docker", ["rm", "--force", name], {
           stdio: "ignore",
@@ -184,7 +184,10 @@ try {
           );
   }
 }
-if (primaryFailure !== undefined) throw primaryFailure;
+if (primaryFailure !== undefined)
+  throw primaryFailure instanceof Error
+    ? primaryFailure
+    : new Error("System smoke failed", { cause: primaryFailure });
 console.log(
   `System ${image ? "image" : "source"} smoke passed: fresh DB, readiness, authentication, request ID, signal drain and cleanup`,
 );

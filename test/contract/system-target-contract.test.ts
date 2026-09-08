@@ -253,11 +253,15 @@ describe("complete System target contract (not runtime acceptance)", () => {
       .parse(JSON.parse(readFileSync("contract/provenance.json", "utf8")));
     const expected = [
       ...globSync("src/modules/*/schemas/**/*.schema.ts"),
+      "src/modules/products/products.public.ts",
       "src/http/protocol.schema.ts",
       "scripts/generate-system-openapi.ts",
       "scripts/system-openapi-operations.ts",
     ].sort();
-    expect(expected).toHaveLength(18);
+    expect(expected).toHaveLength(19);
+    expect(
+      expected.filter((path) => !path.endsWith("products.public.ts")),
+    ).toHaveLength(18);
     expect(Object.keys(provenance.openapi.sourceSha256).sort()).toEqual(
       expected,
     );
@@ -278,6 +282,6 @@ describe("complete System target contract (not runtime acceptance)", () => {
         ],
         { encoding: "utf8" },
       ),
-    ).toContain("18 sources");
+    ).toContain("19 sources");
   });
 });

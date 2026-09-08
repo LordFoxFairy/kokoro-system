@@ -7,8 +7,8 @@ import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import type { PageQuery } from "../../http/pagination.js";
-import { OwnerError } from "../../http/owner-error.js";
+import type { PageQuery } from "../../database/page-query.js";
+import { SystemError } from "../../system.error.js";
 import { providerSchema } from "./schemas/provider.schema.js";
 const columns =
   "id,provider,provider_key,display_name,secret_handle_ref,transport,priority,version,created_at,updated_at,deleted_at";
@@ -25,7 +25,7 @@ export class ProviderRepository {
       [id],
     );
     if (!result.rows[0])
-      throw new OwnerError("NOT_FOUND", "Provider not found", 404);
+      throw new SystemError("NOT_FOUND", "Provider not found");
     return decodeRow(providerSchema, result.rows[0]);
   }
   public async list(tx: TransactionContext, query: PageQuery) {
@@ -79,11 +79,7 @@ export class ProviderRepository {
       [id],
     );
     if (references.rows[0]?.used)
-      throw new OwnerError(
-        "RESOURCE_IN_USE",
-        "Provider has live references",
-        409,
-      );
+      throw new SystemError("RESOURCE_IN_USE", "Provider has live references");
     await tx.query(
       "DELETE FROM model_provider_health_state WHERE provider_id=$1",
       [id],
@@ -100,10 +96,9 @@ export class ProviderRepository {
       [id],
     );
     if (!result.rowCount)
-      throw new OwnerError(
+      throw new SystemError(
         "INVALID_STATE",
         "Resource is outside its restore window",
-        409,
       );
     return decodeRow(providerSchema, result.rows[0]!);
   }

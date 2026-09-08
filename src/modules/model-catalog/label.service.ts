@@ -5,7 +5,7 @@ import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { LabelRepository } from "./label.repository.js";
@@ -41,10 +41,9 @@ export class LabelService {
         revision.retired_at ||
         revision.feature_key !== feature
       )
-        throw new OwnerError(
+        throw new SystemError(
           "INVALID_STATE",
           "Default revision must be published with matching feature",
-          409,
         );
     }
   }

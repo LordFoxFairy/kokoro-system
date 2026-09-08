@@ -3,7 +3,7 @@ import type { z } from "zod";
 import type { RequestContext } from "../../access/request-context.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { ProviderRepository } from "./provider.repository.js";
 import { HealthRepository } from "./health.repository.js";
 import { ModelGenerationRepository } from "./model-generation.repository.js";
@@ -28,9 +28,9 @@ export class HealthService {
       const prior = await this.health.find(tx, id);
       if (prior) requireVersion(prior.generation, context.precondition);
       else if (context.precondition?.kind !== "create")
-        throw new OwnerError("VERSION_CONFLICT", "Health does not exist", 409);
+        throw new SystemError("VERSION_CONFLICT", "Health does not exist");
       if (Date.parse(input.observed_at) > Date.now() + 5000)
-        throw new OwnerError(
+        throw new SystemError(
           "INVALID_ARGUMENT",
           "Health timestamp is in future",
         );
@@ -38,11 +38,7 @@ export class HealthService {
         prior &&
         Date.parse(input.observed_at) < Date.parse(prior.observed_at)
       )
-        throw new OwnerError(
-          "VERSION_CONFLICT",
-          "Stale health observation",
-          409,
-        );
+        throw new SystemError("VERSION_CONFLICT", "Stale health observation");
       await this.generation.advance(tx);
       return this.health.put(tx, id, input);
     });

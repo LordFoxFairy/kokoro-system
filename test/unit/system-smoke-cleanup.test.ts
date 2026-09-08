@@ -36,14 +36,14 @@ it("continues all resource cleanup and aggregates failures", async () => {
   const done: string[] = [];
   await expect(
     runCleanup([
-      async () => {
+      () => {
         throw new Error("process failed");
       },
-      async () => {
+      () => {
         done.push("drop");
         throw new Error("drop failed");
       },
-      async () => {
+      () => {
         done.push("close");
       },
     ]),

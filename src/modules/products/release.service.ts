@@ -4,7 +4,7 @@ import { tenantScope } from "../../access/tenant-scope.js";
 import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { ReleaseRepository } from "./release.repository.js";
@@ -47,11 +47,7 @@ export class ReleaseService {
         current = await this.releases.find(tx, tenant, id, true);
       requireVersion(current.version, context.precondition);
       if (current.status !== "draft" && current.status !== "validated")
-        throw new OwnerError(
-          "INVALID_STATE",
-          "Release cannot be validated",
-          409,
-        );
+        throw new SystemError("INVALID_STATE", "Release cannot be validated");
       return this.releases.validate(
         tx,
         tenant,
@@ -66,15 +62,11 @@ export class ReleaseService {
         current = await this.releases.find(tx, tenant, id, true);
       requireVersion(current.version, context.precondition);
       if (current.status !== "validated")
-        throw new OwnerError("INVALID_STATE", "Release must be validated", 409);
+        throw new SystemError("INVALID_STATE", "Release must be validated");
       if (
         current.digest !== (await this.releases.contentDigest(tx, tenant, id))
       )
-        throw new OwnerError(
-          "VERSION_CONFLICT",
-          "Release content changed",
-          409,
-        );
+        throw new SystemError("VERSION_CONFLICT", "Release content changed");
       return this.releases.publish(tx, tenant, id);
     });
   }
@@ -84,10 +76,9 @@ export class ReleaseService {
         current = await this.releases.find(tx, tenant, id, true);
       requireVersion(current.version, context.precondition);
       if (current.status !== "published")
-        throw new OwnerError(
+        throw new SystemError(
           "INVALID_STATE",
           "Only published release can retire",
-          409,
         );
       return this.releases.retire(tx, tenant, id);
     });

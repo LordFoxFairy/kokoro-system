@@ -10,11 +10,11 @@ import { lifecycleLog } from "./http/structured-logger.js";
 export async function startSystem(environment: NodeJS.ProcessEnv) {
   const started = Date.now(),
     requestId = randomUUID();
-  const config = new SystemConfig(environment);
   const app = await NestFactory.create<NestExpressApplication>(
     AppModule.forRoot(environment),
     { logger: false, abortOnError: false },
   );
+  const config = app.get(SystemConfig);
   try {
     configureHttp(app);
     await app.init();
@@ -45,7 +45,7 @@ export async function startSystem(environment: NodeJS.ProcessEnv) {
     closing = (async () => {
       const began = Date.now();
       let forced = false;
-      const server = app.getHttpServer() as Server;
+      const server: Server = app.getHttpServer();
       const timer = setTimeout(() => {
         forced = true;
         server.closeAllConnections();

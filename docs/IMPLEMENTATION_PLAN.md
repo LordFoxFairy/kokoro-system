@@ -1,6 +1,6 @@
 # System 完整交付唯一实施计划
 
-当前：G1–G5完整源码与G6消费者HTTP已由Root验收；System代码提交 `d7257aa56632627fe0ba8ec4576c32c550a25c3d`，committed clean HEAD全量86pass/0skip+fresh23断言22表，跨仓live PASS。Root负责最终文档/拓扑提交；Docker RC、CI扫描/attestation与部署环境证据单独待验，不把它们标为通过。完整五模块83业务操作，非仅Site交付。
+当前：R6工程收敛已完成本仓验证，待Root审查提交，唯一System writer/system_owner，Root审查提交；G1–G5完整源码与G6消费者HTTP已由Root验收；System代码提交 `d7257aa56632627fe0ba8ec4576c32c550a25c3d`，committed clean HEAD全量86pass/0skip+fresh23断言22表，跨仓live PASS。Root负责最终文档/拓扑提交；Docker RC、CI扫描/attestation与部署环境证据单独待验，不把它们标为通过。完整五模块83业务操作，非仅Site交付。
 第0–1节及G1–G4早期卡是历史授权/证据，不覆盖末尾G5稳定交付状态。最新本仓门、Root跨仓live、Docker环境未验项以末尾G5记录及CURRENT/ACCEPTANCE为准。
 
 ## 0. G0历史基线与范围
@@ -402,3 +402,29 @@ Root稳定源码跨仓隔离HTTP已PASS，独立PG/prefix/process全部清理；
 
 System `d7257aa56632627fe0ba8ec4576c32c550a25c3d` clean；Node24 `pnpm verify`完整86pass/0skip，fresh23断言22表，全质量/契约门pass。Root隔离 `run_system_owner_smoke.py` 在该commit真实运行System+BFF、发布绑定与配置覆盖、目录/default/manifest、tenant隔离和Agent默认/显式resolve/factory全部PASS，owned resources removed。日志 `/tmp/kokoro-system-g5-committed-verify.log`、`/tmp/kokoro-system-g6-committed-live.log`。
 BFF26eec011实际152pass，Agent e24b4aa实际611pass/6skip/77deselected；BFF两个任务外dirty保留不暂存。Root focused81pass、全tests82pass/2手册基线fail，System静态0违规/其他仓200条，topology九active与manifest-only通过。Root仅后续提交本计划/CURRENT/ACCEPTANCE验收记录，不改上述已验业务源码；Docker引擎500的RC、未运行CI扫描/attestation和生产SLO/灾备保留后续owner System/Root。
+
+## R6 — NestJS typed lint、错误与模块公开面收敛（待Root审查提交）
+
+- Owner：kokoro-system；唯一 writer system_owner；Root 审查、串行提交。基线 `/Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-system`，分支 codex/production-closure-docs，clean `280d5d0567c94de33e32f0e85f163fbcf75ede20`。无 Git index/commit/branch 权限。
+- 范围：eslint.config.js、必要 src/test、既有契约 provenance 记录与检查、CURRENT/ACCEPTANCE/TECHNICAL_DESIGN/INDEX/本计划；不改 canonical SQL、HTTP shape、83 operation、package/lock（确需先报 Root）。冻结 artifact SHA256 `f9ea76f107e1ea0fc19df20ee7c59032c0fbac66e640e9a16a1b770ab27c1f37`。
+- 顺序：自动盘点旧错误 code/status/retryable，冻结断言与架构反例 RED；启用真正 type-aware lint 并修真实错误；中性错误、public 入口及 DI bootstrap GREEN；完整真实门禁；停写交接 Root。
+
+| 放置项 | 当前事实、方案比较与目标职责 | 依赖与删除 | 验证 |
+| --- | --- | --- | --- |
+| src/system.error.ts | 当前 http/owner-error.ts 把全仓业务码与 HTTP status 绑定；选择顶层服务级错误 class+typed code，不建单文件 errors 目录，不分散复制 feature 错误码 | Repository/Service/technical/access 依赖中性错误；HTTP filter 独占穷尽 status 映射；删除 owner-error.ts | 自动旧矩阵冻结、过滤器回归、Repo 无 http |
+| src/database/page-query.ts | 当前 Repo 引用 http/pagination.ts 的已解析查询 type；选择已有 database 技术边界承载 PagePosition/PageQuery，而非 common/types 或复制每仓类型 | HTTP codec 导入内部查询类型；Repo 不导入 codec 或 wire cursor | 类型检查与 Repo import 门 |
+| 四个 feature 的 <feature>.public.ts | sites/products/workspaces/model-catalog 真实跨模块消费者为 Manifest/maintenance；选择具名 public 文件而非全目录 index/export* | 显式 export 实际 module/provider；Products 公开投影 schema；组合层只走 public；AppModule 可直接 module；收缩 Nest exports | 正反例与真实树 public-only、Nest export 白名单、循环检查 |
+| src/start-system.ts | 当前配置手工实例与 DI 实例重复；扩展既有 bootstrap，不新建 runtime 层 | app.get(SystemConfig)，保持部分失败释放、日志与 drain | 无效配置、部分启动失败与 source smoke |
+| eslint.config.js / test/architecture | 当前仅非 typed recommended；采用 recommendedTypeChecked+projectService 和显式 unsafe/Promise/exhaustive 规则，不建第二配置 | 修真实类型边界；不使用批量 disable；架构拒绝 driver/express 越界、forwardRef/ModuleRef/manual Service/cycle | RED→GREEN、lint 全树、架构真实树及反例 |
+
+验证资源复用 localhost PG/Redis，仅测试随机独立库/namespace；Node24 PATH；format:check/lint/typecheck/build/contract:check/test/test:schema:fresh/完整 verify。本任务不把 Docker RC/未执行 CI 扫描或九仓生产验收纳入已验证声明。完成后记录精确文件与日志、测试数、artifact 不变证据，由 Root 独立重跑并提交。
+
+R6实现范围补齐：HTTP映射单独`src/http/system-error-status.ts`；新增`test/unit/system-error.test.ts`与`test/architecture/system-module-boundary.test.ts`（包括实际ESLint正反例、公开面/消费者/模块导出/循环），扩展lifecycle真实配置与失败清理。Root批准provenance collector及contract/provenance.json只更新来源输入，保留原18+products.public.ts第19源。原错误自动AST清单`/tmp/r6-error-inventory.json`；typed lint RED81条`/tmp/r6-lint-red.json`，错误测试RED缺新类`/tmp/r6-errors-red.log`，public边界RED1fail2pass`/tmp/r6-boundary-red.log`，当前GREEN见最终门记录。类型修复包含必要scripts边界，不新增依赖，不削弱测试断言，不批量disable。
+
+
+R6稳定交付：第一轮及移除诊断后的完整verify均15files96pass0skip+fresh23/22通过；后者日志`/tmp/r6-final-clean-verify.log`。中间一次model afterAll10s超时，96tests通过但suite失败，诊断及风险记录ACCEPTANCE，未提高timeout或冒称根因已修。format/lint/typecheck/build/Redocly/83+2drift/19source provenance/contract12pass全通过。错误2pass+架构7pass+生命周期6pass，原81typed lint全部清零。artifact字节/SHA无diff、SQL/package/lock无diff。文件集为中性错误迁移与typed边界收紧、四public/最小Nest exports、bootstrap单配置、精确测试与本轮文档；准确绝对路径清单`/tmp/r6-file-manifest.txt`。Root独立审查/提交后回填SHA；writer停写交接，不操作index。DockerRC/CI扫描/部署证据未执行情况不变。
+R6最终冻结日志`/tmp/r6-freeze-verify.log`：15files96pass0skip+fresh23/22，含namespace/alias门最终版本。83精确文件绝对清单`/tmp/r6-file-manifest.txt`，删除旧owner-error、新增9文件，其余为批准类型/错误/public/DI/文档收敛。所有写入暂停待Root审查提交；一次非复现hook超时在ACCEPTANCE保留。
+
+R6-guard（Root最终审查窄修）：唯一System writer继续，Root提交；仅扩展test/architecture/system-module-boundary.test.ts及现有验收/计划记录。Controller禁止相对引用src/database与src/cache（不仅外部driver）；手工provider覆盖Service/Repository及import alias。先加四负例与业务Service正例RED，再修改判定GREEN；无业务/API/SQL/artifact变更，完整verify后重新冻结。
+R6-guard补放置裁决：全Controller规则实际命中HealthController两技术依赖，Root明确不设例外。src/health/health.service.ts在既有health目录承接readiness聚合（对比Controller继续直连加豁免，采用Service使规则一致）；HealthController仅委托，HealthModule注册。live探针仍不调用依赖，ready仅调用已公开technical ready方法，HTTP/error语义不变。增加test/unit/system-health.test.ts纯聚合测试；真实probe与全生命周期由现有integration承接。
+R6-guard最终交付：`/tmp/r6-guard-red.log`1fail6pass、`/tmp/r6-guard-probe-conflict.log`真实HealthController两命中、`/tmp/r6-health-red.log`缺Service RED；修复后`/tmp/r6-guard-green.log`8pass，`/tmp/r6-guard-verify.log`完整16files97pass0skip+fresh23/22、全部质量/契约门通过。新增HealthService及其测试、HealthModule注册（HealthController已在原变更集），总86精确路径在`/tmp/r6-file-manifest.txt`。不设Controller技术probe豁免，手工Service/Repository直接与alias均拒绝。writer再次冻结。

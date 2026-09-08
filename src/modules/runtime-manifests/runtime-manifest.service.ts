@@ -4,9 +4,9 @@ import type { RequestContext } from "../../access/request-context.js";
 import { tenantScope } from "../../access/tenant-scope.js";
 import { CacheService } from "../../cache/cache.service.js";
 import { commandDigest } from "../../database/command-digest.js";
-import { OwnerError } from "../../http/owner-error.js";
-import { SitesService } from "../sites/sites.service.js";
-import { ProductProjectionService } from "../products/product-projection.service.js";
+import { SystemError } from "../../system.error.js";
+import { SitesService } from "../sites/sites.public.js";
+import { ProductProjectionService } from "../products/products.public.js";
 import { RuntimeManifestRepository } from "./runtime-manifest.repository.js";
 import { manifestSchema } from "./schemas/manifest.schema.js";
 import type { manifestQuerySchema } from "./schemas/manifest.schema.js";
@@ -40,7 +40,7 @@ export class RuntimeManifestService {
         (!policy.public_manifest &&
           !context.permissions.includes("system:read"))
       )
-        throw new OwnerError("POLICY_DENIED", "Manifest policy denied", 403);
+        throw new SystemError("POLICY_DENIED", "Manifest policy denied");
       const surface = query.surface_id ?? null;
       const identity = {
         tenant_id: tenant,
@@ -55,10 +55,9 @@ export class RuntimeManifestService {
       if (cached !== null) {
         const parsed = manifestSchema.safeParse(JSON.parse(cached));
         if (!parsed.success)
-          throw new OwnerError(
+          throw new SystemError(
             "SYSTEM_UNAVAILABLE",
             "Cached manifest is invalid",
-            503,
             true,
           );
         const after = await this.repository.generations(tenant);
@@ -66,10 +65,9 @@ export class RuntimeManifestService {
         const value = parsed.data;
         const { digest, ...payload } = value;
         if (commandDigest(payload) !== digest)
-          throw new OwnerError(
+          throw new SystemError(
             "SYSTEM_UNAVAILABLE",
             "Cached manifest digest is invalid",
-            503,
             true,
           );
         if (
@@ -81,10 +79,9 @@ export class RuntimeManifestService {
           value.generation !== before.generation ||
           value.catalog_generation !== before.catalog_generation
         )
-          throw new OwnerError(
+          throw new SystemError(
             "SYSTEM_UNAVAILABLE",
             "Cached manifest identity is invalid",
-            503,
             true,
           );
         return value;
@@ -116,10 +113,9 @@ export class RuntimeManifestService {
       }
       return value;
     }
-    throw new OwnerError(
+    throw new SystemError(
       "SYSTEM_UNAVAILABLE",
       "Manifest changed during read",
-      503,
       true,
     );
   }

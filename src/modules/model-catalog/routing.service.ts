@@ -5,7 +5,7 @@ import { tenantScope } from "../../access/tenant-scope.js";
 import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { LabelRepository } from "./label.repository.js";
@@ -58,19 +58,17 @@ export class RoutingService {
           revision.retired_at ||
           revision.feature_key !== label.feature_key
         )
-          throw new OwnerError(
+          throw new SystemError(
             "INVALID_STATE",
             "Route revision must be published with matching feature",
-            409,
           );
       }
       const prior = await this.routing.find(tx, tenant, labelId);
       if (prior) requireVersion(prior.version, context.precondition);
       else if (context.precondition?.kind !== "create")
-        throw new OwnerError(
+        throw new SystemError(
           "VERSION_CONFLICT",
           "Routing policy does not exist",
-          409,
         );
       return this.routing.put(tx, tenant, labelId, label.feature_key, input);
     });
@@ -81,7 +79,7 @@ export class RoutingService {
       await this.labels.find(tx, labelId, false, true);
       const prior = await this.routing.find(tx, tenant, labelId);
       if (!prior)
-        throw new OwnerError("NOT_FOUND", "Routing policy not found", 404);
+        throw new SystemError("NOT_FOUND", "Routing policy not found");
       requireVersion(prior.version, context.precondition);
       return this.routing.remove(tx, tenant, labelId);
     });

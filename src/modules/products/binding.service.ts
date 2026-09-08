@@ -6,7 +6,7 @@ import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { ApplicationRepository } from "./application.repository.js";
@@ -31,7 +31,7 @@ export class BindingService {
     requireActive = true,
   ) {
     if (input.scope_type === "tenant" && input.scope_id !== tenant)
-      throw new OwnerError("INVALID_ARGUMENT", "Tenant scope mismatch");
+      throw new SystemError("INVALID_ARGUMENT", "Tenant scope mismatch");
     if (input.site_id)
       await this.parents.lockSite(tx, tenant, input.site_id, requireActive);
     await this.parents.lockProduct(tx, input.product_id, requireActive);
@@ -42,10 +42,9 @@ export class BindingService {
       true,
     );
     if (release.status !== "published")
-      throw new OwnerError(
+      throw new SystemError(
         "INVALID_STATE",
         "Binding requires published release",
-        409,
       );
   }
   public list(context: RequestContext, input: PageInput) {

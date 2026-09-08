@@ -5,7 +5,7 @@ import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
 import { policySchema } from "./schemas/policy.schema.js";
 import type { policyInputSchema } from "./schemas/policy.schema.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 const columns =
   "id,tenant_id,site_id,version,status,default_locale,allowed_locales_json AS allowed_locales,allowed_products_json AS allowed_products,public_manifest,updated_at";
 @Injectable()
@@ -29,10 +29,9 @@ export class PolicyRepository {
       [productKeys],
     );
     if (products.rows.length !== productKeys.length)
-      throw new OwnerError(
+      throw new SystemError(
         "POLICY_INVALID",
         "Policy references unavailable product",
-        409,
       );
     const result = await tx.query(
       `INSERT INTO system_site_policy (id,tenant_id,site_id,status,default_locale,allowed_locales_json,allowed_products_json,public_manifest) VALUES ($1,$2,$3,'active',$4,$5,$6,$7) ON CONFLICT (tenant_id,site_id) WHERE status='active' DO UPDATE SET default_locale=EXCLUDED.default_locale,allowed_locales_json=EXCLUDED.allowed_locales_json,allowed_products_json=EXCLUDED.allowed_products_json,public_manifest=EXCLUDED.public_manifest,version=system_site_policy.version+1,updated_at=CURRENT_TIMESTAMP(3) RETURNING ${columns}`,

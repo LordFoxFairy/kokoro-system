@@ -14,6 +14,6 @@ import { WorkspacesController } from "./workspaces.controller.js";
     WorkspacesService,
   ],
   controllers: [WorkspacesController],
-  exports: [WorkspaceMaintenanceService, WorkspacesService],
+  exports: [WorkspaceMaintenanceService],
 })
 export class WorkspacesModule {}

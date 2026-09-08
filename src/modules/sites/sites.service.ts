@@ -5,7 +5,7 @@ import { tenantScope } from "../../access/tenant-scope.js";
 import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { SiteRepository } from "./site.repository.js";
@@ -33,16 +33,16 @@ export class SitesService {
     try {
       normalized = normalizeHost(host);
     } catch {
-      throw new OwnerError("INVALID_ARGUMENT", "Invalid hostname");
+      throw new SystemError("INVALID_ARGUMENT", "Invalid hostname");
     }
     return this.database.read(async (tx) => {
       const tenant = tenantScope(context);
       const site = await this.sites.findByHost(tx, tenant, normalized);
       if (site.status !== "active")
-        throw new OwnerError("POLICY_DENIED", "Site unavailable", 403);
+        throw new SystemError("POLICY_DENIED", "Site unavailable");
       const policy = await this.policies.find(tx, tenant, site.id);
       if (!policy)
-        throw new OwnerError("POLICY_DENIED", "Site policy required", 403);
+        throw new SystemError("POLICY_DENIED", "Site policy required");
       return { site, policy };
     });
   }
@@ -71,7 +71,7 @@ export class SitesService {
     try {
       hostname = normalizeHost(input.hostname);
     } catch {
-      throw new OwnerError("INVALID_ARGUMENT", "Invalid hostname");
+      throw new SystemError("INVALID_ARGUMENT", "Invalid hostname");
     }
     return this.receipts.run(context, input, siteSchema, (tx) =>
       this.sites.create(tx, tenantScope(context), { ...input, hostname }),
@@ -86,7 +86,7 @@ export class SitesService {
       try {
         new Intl.DateTimeFormat("en", { timeZone: input.timezone });
       } catch {
-        throw new OwnerError("INVALID_ARGUMENT", "Invalid IANA timezone");
+        throw new SystemError("INVALID_ARGUMENT", "Invalid IANA timezone");
       }
     }
     return this.receipts.run(context, input, siteSchema, async (tx) => {
@@ -139,13 +139,13 @@ export class SitesService {
     try {
       hostname = normalizeHost(input.hostname);
     } catch {
-      throw new OwnerError("INVALID_ARGUMENT", "Invalid hostname");
+      throw new SystemError("INVALID_ARGUMENT", "Invalid hostname");
     }
     return this.receipts.run(context, input, domainSchema, async (tx) => {
       const tenant = tenantScope(context);
       const site = await this.sites.find(tx, tenant, siteId, false, true);
       if (site.status !== "active")
-        throw new OwnerError("INVALID_STATE", "Site not active", 409);
+        throw new SystemError("INVALID_STATE", "Site not active");
       return this.domains.create(tx, tenant, siteId, hostname);
     });
   }
@@ -163,7 +163,7 @@ export class SitesService {
       const tenant = tenantScope(context);
       await this.sites.find(tx, tenant, siteId);
       const policy = await this.policies.find(tx, tenant, siteId);
-      if (!policy) throw new OwnerError("NOT_FOUND", "Policy not found", 404);
+      if (!policy) throw new SystemError("NOT_FOUND", "Policy not found");
       return policy;
     });
   }
@@ -178,7 +178,7 @@ export class SitesService {
       const current = await this.policies.find(tx, tenant, siteId);
       if (current) requireVersion(current.version, context.precondition);
       else if (context.precondition?.kind !== "create")
-        throw new OwnerError("VERSION_CONFLICT", "Policy does not exist", 409);
+        throw new SystemError("VERSION_CONFLICT", "Policy does not exist");
       return this.policies.save(tx, tenant, siteId, input);
     });
   }

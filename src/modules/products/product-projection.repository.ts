@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { configSchema } from "./schemas/config.schema.js";
 import { presentationSchema } from "./schemas/presentation.schema.js";
 @Injectable()
@@ -12,7 +12,7 @@ export class ProductProjectionRepository {
       [key],
     );
     if (result.rows.length !== 1)
-      throw new OwnerError("NOT_FOUND", "Product not found", 404);
+      throw new SystemError("NOT_FOUND", "Product not found");
     return result.rows[0]!;
   }
   public async binding(

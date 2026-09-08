@@ -62,17 +62,6 @@ import { ProductController } from "./product.controller.js";
     ProductController,
     ApplicationController,
   ],
-  exports: [
-    ProductMaintenanceService,
-    ProductProjectionService,
-    BindingService,
-    ReleaseService,
-    ConfigService,
-    PresentationService,
-    ExposureService,
-    FeatureService,
-    ProductService,
-    ApplicationService,
-  ],
+  exports: [ProductMaintenanceService, ProductProjectionService],
 })
 export class ProductsModule {}

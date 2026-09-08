@@ -1,7 +1,7 @@
 import type { RequestContext } from "./request-context.js";
-import { OwnerError } from "../http/owner-error.js";
+import { SystemError } from "../system.error.js";
 export function tenantScope(context: RequestContext): string {
   if (!context.tenantId || context.scope !== "tenant")
-    throw new OwnerError("FORBIDDEN", "Tenant scope required", 403);
+    throw new SystemError("FORBIDDEN", "Tenant scope required");
   return context.tenantId;
 }

@@ -66,7 +66,7 @@ export class CacheService implements OnModuleInit, OnApplicationShutdown {
       })
       .del(`${this.namespace}:${key}`);
   }
-  public async onApplicationShutdown(): Promise<void> {
+  public onApplicationShutdown(): void {
     if (this.client.isOpen) this.client.destroy();
   }
 }

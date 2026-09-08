@@ -5,7 +5,7 @@ import { ROUTE_ARGS_METADATA } from "@nestjs/common/constants.js";
 import { RouteParamtypes } from "@nestjs/common/enums/route-paramtypes.enum.js";
 import { Reflector } from "@nestjs/core";
 import { SystemConfig } from "../config/system-config.js";
-import { OwnerError } from "../http/owner-error.js";
+import { SystemError } from "../system.error.js";
 import { parsePrecondition } from "../http/conditional-request.js";
 import { requestIdSchema } from "../http/protocol.schema.js";
 import { ACCESS_RULE } from "./access.decorator.js";
@@ -14,10 +14,10 @@ import type { OwnerRequest, RequestContext } from "./request-context.js";
 function header(request: OwnerRequest, name: string): string | undefined {
   const value = request.headers[name];
   if (Array.isArray(value))
-    throw new OwnerError("INVALID_ARGUMENT", `Duplicate ${name}`);
+    throw new SystemError("INVALID_ARGUMENT", `Duplicate ${name}`);
   if (value === undefined) return undefined;
   if (!value.trim() || value.length > 2048)
-    throw new OwnerError("INVALID_ARGUMENT", `Invalid ${name}`);
+    throw new SystemError("INVALID_ARGUMENT", `Invalid ${name}`);
   return value.trim();
 }
 function matches(actual: string | undefined, expected: string): boolean {
@@ -43,7 +43,7 @@ export class AccessGuard implements CanActivate {
       header(request, "x-request-id") ?? randomUUID(),
     );
     if (!requestId.success)
-      throw new OwnerError("INVALID_ARGUMENT", "Invalid x-request-id");
+      throw new SystemError("INVALID_ARGUMENT", "Invalid x-request-id");
     const service = header(request, "x-kokoro-service");
     const secret =
       service === "web-bff"
@@ -62,17 +62,16 @@ export class AccessGuard implements CanActivate {
         ) || matches(header(request, "x-kokoro-internal-secret"), secret)
       )
     )
-      throw new OwnerError(
+      throw new SystemError(
         "service_auth_failed",
         "Service authentication failed",
-        403,
       );
     const caller = service as RequestContext["service"];
     if (
       caller === "kokoro-agent" &&
       !["getModelCatalog", "resolveModel"].includes(rule.operation)
     )
-      throw new OwnerError("FORBIDDEN", "Agent operation denied", 403);
+      throw new SystemError("FORBIDDEN", "Agent operation denied");
     let scope = rule.scope ?? "tenant";
     if (scope === "conditional") {
       if (request.method === "POST")
@@ -90,16 +89,16 @@ export class AccessGuard implements CanActivate {
           selected !== "tenant" &&
           selected !== "global"
         )
-          throw new OwnerError("INVALID_ARGUMENT", "Invalid scope");
+          throw new SystemError("INVALID_ARGUMENT", "Invalid scope");
         scope = selected === "global" ? "global" : "tenant";
       }
     }
     if (scope === "global" && caller !== "system-admin")
-      throw new OwnerError("FORBIDDEN", "Global operator required", 403);
+      throw new SystemError("FORBIDDEN", "Global operator required");
     const tenantId =
       scope === "global" ? null : header(request, "x-kokoro-tenant-id");
     if (scope === "tenant" && (!tenantId || tenantId.length > 160))
-      throw new OwnerError("INVALID_ARGUMENT", "Trusted tenant required");
+      throw new SystemError("INVALID_ARGUMENT", "Trusted tenant required");
     const permissions = (header(request, "x-kokoro-iam-permissions") ?? "")
       .split(",")
       .map((value) => value.trim())
@@ -110,26 +109,29 @@ export class AccessGuard implements CanActivate {
           !["system:read", "system:write", "system:publish"].includes(value),
       )
     )
-      throw new OwnerError("INVALID_ARGUMENT", "Invalid permission snapshot");
+      throw new SystemError("INVALID_ARGUMENT", "Invalid permission snapshot");
     if (
       rule.permission.startsWith("system:") &&
       (!permissions.includes(rule.permission) || caller === "kokoro-agent")
     )
-      throw new OwnerError("FORBIDDEN", "Permission denied", 403);
-    const argumentsMetadata: Record<string, unknown> =
+      throw new SystemError("FORBIDDEN", "Permission denied");
+    const argumentsMetadata: unknown =
       Reflect.getMetadata(
         ROUTE_ARGS_METADATA,
         execution.getClass(),
         execution.getHandler().name,
       ) ?? {};
-    const argumentKinds = Object.keys(argumentsMetadata);
+    const argumentKinds =
+      typeof argumentsMetadata === "object" && argumentsMetadata !== null
+        ? Object.keys(argumentsMetadata)
+        : [];
     if (
       !argumentKinds.some((key) =>
         key.startsWith(`${RouteParamtypes.QUERY}:`),
       ) &&
       Object.keys(request.query).length > 0
     )
-      throw new OwnerError("INVALID_ARGUMENT", "Query fields are not allowed");
+      throw new SystemError("INVALID_ARGUMENT", "Query fields are not allowed");
     if (
       !argumentKinds.some((key) =>
         key.startsWith(`${RouteParamtypes.BODY}:`),
@@ -140,7 +142,7 @@ export class AccessGuard implements CanActivate {
         Array.isArray(request.body) ||
         Object.keys(request.body).length > 0)
     )
-      throw new OwnerError("INVALID_ARGUMENT", "Request body is not allowed");
+      throw new SystemError("INVALID_ARGUMENT", "Request body is not allowed");
     const mutation = rule.mutation ?? request.method !== "GET";
     const actorId = header(request, "x-kokoro-actor-id") ?? "";
     const key = mutation ? header(request, "idempotency-key") : null;
@@ -148,7 +150,7 @@ export class AccessGuard implements CanActivate {
       mutation &&
       (!actorId || actorId.length > 160 || !key || key.length > 128)
     )
-      throw new OwnerError(
+      throw new SystemError(
         "INVALID_ARGUMENT",
         "Actor and Idempotency-Key required",
       );

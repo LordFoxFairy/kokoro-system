@@ -3,7 +3,7 @@ import { Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import type { PageQuery } from "../../http/pagination.js";
+import type { PageQuery } from "../../database/page-query.js";
 import { routingSchema } from "./schemas/label.schema.js";
 import type { routingInputSchema } from "./schemas/label.schema.js";
 const columns =

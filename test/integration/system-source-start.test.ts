@@ -50,16 +50,18 @@ it("drops its registered database even when the runtime executable is missing", 
   }
 }, 25000);
 it("still drops its database when docker removal returns an error status", async () => {
-  const { mkdtemp, writeFile, chmod, rm } = await import("node:fs/promises");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const path = await import("node:path");
   const { Client } = await import("pg");
-  const directory = await mkdtemp(join(tmpdir(), "system-smoke-docker-"));
+  const directory = await fs.mkdtemp(
+    path.join(os.tmpdir(), "system-smoke-docker-"),
+  );
   let failure: unknown;
   try {
-    const executable = join(directory, "docker");
-    await writeFile(executable, "#!/bin/sh\nexit 73\n");
-    await chmod(executable, 0o700);
+    const executable = path.join(directory, "docker");
+    await fs.writeFile(executable, "#!/bin/sh\nexit 73\n");
+    await fs.chmod(executable, 0o700);
     try {
       await promisify(execFile)(
         process.execPath,
@@ -106,6 +108,6 @@ it("still drops its database when docker removal returns an error status", async
       await db.end();
     }
   } finally {
-    await rm(directory, { recursive: true, force: true });
+    await fs.rm(directory, { recursive: true, force: true });
   }
 }, 25000);

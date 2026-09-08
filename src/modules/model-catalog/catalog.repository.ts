@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { TransactionContext } from "../../database/transaction-context.js";
-import type { PageQuery } from "../../http/pagination.js";
+import type { PageQuery } from "../../database/page-query.js";
 import { catalogItemSchema } from "./schemas/resolve.schema.js";
 @Injectable()
 export class CatalogRepository {

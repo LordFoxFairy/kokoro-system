@@ -3,7 +3,7 @@ import { Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { presentationSchema } from "./schemas/presentation.schema.js";
 import type { presentationInputSchema } from "./schemas/presentation.schema.js";
 const columns =
@@ -39,7 +39,7 @@ export class PresentationRepository {
       [tenant, appId, unique],
     );
     if (result.rows.length !== unique.length)
-      throw new OwnerError(
+      throw new SystemError(
         "INVALID_ARGUMENT",
         "Navigation feature is not exposed",
       );
@@ -76,10 +76,9 @@ export class PresentationRepository {
           "constraint" in error &&
           error.constraint === "ck_system_presentation_schema"
         )
-          throw new OwnerError(
+          throw new SystemError(
             "INVALID_ARGUMENT",
             "Input exceeds stored representation limits",
-            400,
           );
         throw error;
       });

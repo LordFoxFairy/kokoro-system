@@ -10,7 +10,7 @@ import { map } from "rxjs";
 import type { Observable } from "rxjs";
 import type { OwnerRequest } from "../access/request-context.js";
 import { requestIdSchema } from "./protocol.schema.js";
-import { OwnerError } from "./owner-error.js";
+import { SystemError } from "../system.error.js";
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor {
   public intercept(
@@ -23,7 +23,7 @@ export class ResponseInterceptor implements NestInterceptor {
       request.headers["x-request-id"] ?? randomUUID(),
     );
     if (!id.success)
-      throw new OwnerError("INVALID_ARGUMENT", "Invalid x-request-id");
+      throw new SystemError("INVALID_ARGUMENT", "Invalid x-request-id");
     response.setHeader(
       "x-request-id",
       request.ownerContext?.requestId ?? id.data,

@@ -5,7 +5,7 @@ import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { ApplicationRepository } from "./application.repository.js";
@@ -30,17 +30,17 @@ export class ConfigService {
     requireActive = true,
   ) {
     if (input.scope_type === "tenant" && input.scope_id !== tenant)
-      throw new OwnerError("INVALID_ARGUMENT", "Tenant scope mismatch");
+      throw new SystemError("INVALID_ARGUMENT", "Tenant scope mismatch");
     if (input.site_id) {
       if (!tenant)
-        throw new OwnerError("INVALID_ARGUMENT", "Site requires tenant");
+        throw new SystemError("INVALID_ARGUMENT", "Site requires tenant");
       await this.parents.lockSite(tx, tenant, input.site_id, requireActive);
     }
     if (input.product_id)
       await this.parents.lockProduct(tx, input.product_id, requireActive);
     if (input.release_id) {
       if (!tenant)
-        throw new OwnerError("INVALID_ARGUMENT", "Release requires tenant");
+        throw new SystemError("INVALID_ARGUMENT", "Release requires tenant");
       await this.releases.invalidate(tx, tenant, input.release_id);
     }
   }
@@ -98,7 +98,7 @@ export class ConfigService {
         value: input.value,
       });
       if (!parsed.success)
-        throw new OwnerError(
+        throw new SystemError(
           "INVALID_CONFIG_SCHEMA",
           "Value does not match stored module",
         );

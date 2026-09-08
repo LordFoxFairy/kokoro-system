@@ -6,7 +6,7 @@ import { DatabaseService } from "../../database/database.service.js";
 import { CacheService } from "../../cache/cache.service.js";
 import { SystemConfig } from "../../config/system-config.js";
 import { commandDigest } from "../../database/command-digest.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 import { ModelGenerationRepository } from "./model-generation.repository.js";
 import { ResolveRepository } from "./resolve.repository.js";
 import { resolveSchema } from "./schemas/resolve.schema.js";
@@ -30,7 +30,7 @@ export class ResolveService {
     input: z.infer<typeof resolveInputSchema>,
   ) {
     if (context.service !== "kokoro-agent")
-      throw new OwnerError("FORBIDDEN", "Agent caller required", 403);
+      throw new SystemError("FORBIDDEN", "Agent caller required");
     const tenant = tenantScope(context);
     for (let attempt = 0; attempt < 3; attempt++) {
       const before = await this.generations(tenant),
@@ -39,26 +39,23 @@ export class ResolveService {
       if (cached !== null) {
         const parsed = resolveCacheSchema.safeParse(JSON.parse(cached));
         if (!parsed.success)
-          throw new OwnerError(
+          throw new SystemError(
             "SYSTEM_UNAVAILABLE",
             "Invalid route cache",
-            503,
             true,
           );
         const value = parsed.data;
         const { checksum, ...payload } = value;
         if (commandDigest(payload) !== checksum)
-          throw new OwnerError(
+          throw new SystemError(
             "SYSTEM_UNAVAILABLE",
             "Route cache checksum mismatch",
-            503,
             true,
           );
         if (value.key !== key)
-          throw new OwnerError(
+          throw new SystemError(
             "SYSTEM_UNAVAILABLE",
             "Route cache identity mismatch",
-            503,
             true,
           );
         const evidence = value.kind === "route" ? value.data : value;
@@ -66,10 +63,9 @@ export class ResolveService {
           evidence.generation !== before.generation ||
           evidence.tenant_generation !== before.tenant_generation
         )
-          throw new OwnerError(
+          throw new SystemError(
             "SYSTEM_UNAVAILABLE",
             "Route cache fence mismatch",
-            503,
             true,
           );
         if (
@@ -78,10 +74,9 @@ export class ResolveService {
             (input.label_key !== undefined &&
               value.data.label_key !== input.label_key))
         )
-          throw new OwnerError(
+          throw new SystemError(
             "SYSTEM_UNAVAILABLE",
             "Route cache identity mismatch",
-            503,
             true,
           );
         if (value.expires_at > Date.now()) {
@@ -95,14 +90,9 @@ export class ResolveService {
             continue;
           }
           if (value.kind === "route") return value.data;
-          throw new OwnerError(
+          throw new SystemError(
             value.code,
             "Model route unavailable",
-            value.code === "ROUTE_NOT_FOUND"
-              ? 404
-              : value.code === "POLICY_DENIED"
-                ? 403
-                : 503,
             value.code === "MODEL_UNAVAILABLE",
           );
         }
@@ -183,21 +173,15 @@ export class ResolveService {
         }
         return value.data;
       }
-      throw new OwnerError(
+      throw new SystemError(
         value.code,
         "Model route unavailable",
-        value.code === "ROUTE_NOT_FOUND"
-          ? 404
-          : value.code === "POLICY_DENIED"
-            ? 403
-            : 503,
         value.code === "MODEL_UNAVAILABLE",
       );
     }
-    throw new OwnerError(
+    throw new SystemError(
       "SYSTEM_UNAVAILABLE",
       "Route changed during read",
-      503,
       true,
     );
   }

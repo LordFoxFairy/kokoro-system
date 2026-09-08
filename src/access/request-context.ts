@@ -12,4 +12,6 @@ export type RequestContext = Readonly<{
   idempotencyKey: string | null;
   precondition: Precondition | null;
 }>;
-export type OwnerRequest = Request & { ownerContext?: RequestContext };
+export type OwnerRequest = Request<Record<string, string>, unknown, unknown> & {
+  ownerContext?: RequestContext;
+};

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { TransactionContext } from "../../database/transaction-context.js";
-import { OwnerError } from "../../http/owner-error.js";
+import { SystemError } from "../../system.error.js";
 @Injectable()
 export class FeatureReferenceRepository {
   public async lock(tx: TransactionContext, keys: string[]) {
@@ -14,6 +14,6 @@ export class FeatureReferenceRepository {
       [unique],
     );
     if (result.rows.length !== unique.length)
-      throw new OwnerError("INVALID_STATE", "Feature is unavailable", 409);
+      throw new SystemError("INVALID_STATE", "Feature is unavailable");
   }
 }

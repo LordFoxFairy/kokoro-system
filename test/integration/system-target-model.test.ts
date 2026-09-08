@@ -730,11 +730,11 @@ describe("real Nest Model catalog", () => {
     const db = new Client({ connectionString: databaseUrl.href });
     await db.connect();
     try {
-      const snapshot = async () =>
-        db.query(
+      const snapshot = () =>
+        db.query<{ global: string; tenant: string }>(
           "SELECT (SELECT generation FROM public.model_cache_generation WHERE scope='resolve') AS global,(SELECT generation FROM public.system_runtime_manifest_generation WHERE tenant_id='tenant-a') AS tenant",
         );
-      const before = (await snapshot()).rows[0];
+      const before = (await snapshot()).rows[0]!;
       const key = randomUUID(),
         body = {
           model_revision_id: rid,
@@ -749,7 +749,7 @@ describe("real Nest Model catalog", () => {
       ]);
       expect(results.map((r) => r.response.status)).toEqual([200, 200]);
       expect(results[0]?.json).toEqual(results[1]?.json);
-      const after = (await snapshot()).rows[0];
+      const after = (await snapshot()).rows[0]!;
       expect(after.global).toBe(before.global);
       expect(BigInt(after.tenant)).toBe(BigInt(before.tenant) + 1n);
       expect(
@@ -1002,11 +1002,11 @@ describe("real Nest Model catalog", () => {
             );
         let blocked = false;
         for (let attempt = 0; attempt < 80; attempt++) {
-          const result = await admin.query(
+          const result = await admin.query<{ blocked: boolean }>(
             "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=$1 AND cardinality(pg_blocking_pids(pid))>0) AS blocked",
             [databaseName],
           );
-          if (result.rows[0].blocked) {
+          if (result.rows[0]?.blocked) {
             blocked = true;
             break;
           }

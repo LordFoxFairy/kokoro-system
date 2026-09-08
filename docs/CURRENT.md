@@ -1,6 +1,6 @@
 # System 当前状态
 
-2026-09-08。G1 `f5702068d4416ad90b1bd02af57d2825c32be916`、G2 `d057deb706a34129e23bec5ec1f70e235ca1d4ce`、G3 `f13bb73dfe81c3d79036852d3d3cb7a6cbb1916d`、G4 `51bc22dac4b32da86984e7147caaae5e4db6a34a` 已由Root提交验收。当前为 **G5完整源码交付并验收**（代码提交 `d7257aa56632627fe0ba8ec4576c32c550a25c3d`，本次后续提交仅回填文档）；完整任务历史只维护 IMPLEMENTATION_PLAN。
+2026-09-08。G1 `f5702068d4416ad90b1bd02af57d2825c32be916`、G2 `d057deb706a34129e23bec5ec1f70e235ca1d4ce`、G3 `f13bb73dfe81c3d79036852d3d3cb7a6cbb1916d`、G4 `51bc22dac4b32da86984e7147caaae5e4db6a34a` 已由Root提交验收。当前为 **G5完整源码交付并验收**（代码提交 `d7257aa56632627fe0ba8ec4576c32c550a25c3d`，验收文档280d5d；R6工程边界已完成本仓验证，待Root审查提交）；完整任务历史只维护 IMPLEMENTATION_PLAN。
 
 ## 当前源码事实
 
@@ -10,7 +10,7 @@
 - 正式生命周期包括三个服务token必填、部分启动失败释放、请求budget/断连PGRedis取消、HTTP deadline无late commit、未完成PG握手socket有界drain、脱敏JSON一次日志。
 - Maintenance定时器已接线；7/30/90天、逐资源父锁/反查、永久identity tombstone、restore原子PG时钟30天截止、hold与orphan检测，默认每小时最多1000候选/查询与5s cycle预算。
 - 旧全局四层、旧Node router、RPC/Proto/generated、SDK/相关依赖、DOM lib已删除。旧有效安全/一致性行为测试映射在任务表；没有保留alias/fallback充数。
-- HTTP artifact仍2.0.0，SHA256 `f9ea76f107e1ea0fc19df20ee7c59032c0fbac66e640e9a16a1b770ab27c1f37`，18输入source digest不变；provenance只退出旧Proto metadata。
+- HTTP artifact仍2.0.0，SHA256 `f9ea76f107e1ea0fc19df20ee7c59032c0fbac66e640e9a16a1b770ab27c1f37`，R6保留原18输入并加Products public入口为第19源，源码digest真实更新，artifact字节不变。
 
 ## 验证与未闭环
 
@@ -19,3 +19,10 @@ G4 committed HEAD：51pass/0skip（7 focused files）；旧全量152pass/5legacy
 Root冻结源码跨仓live已PASS：System/BFF正式pnpm dev、发布binding覆盖、catalog/default/manifest、跨tenant404/空catalog、BFF resolve403、Agent真实default/explicit+factory映射；committed HEAD 重跑已PASS，记录见 Root CURRENT。BFF consumer `1e03b87` + dev `26eec011`，Agent `e24b4aa`已提交测试；Root拥有旧Model active退出/九active拓扑，不由System复制其文件。
 
 **环境阻断**：Docker Desktop后端存在但daemon API1.51/1.47 info均500、socket ping/version超时，Root独立复现；未重启/重置Docker或共享infra。镜像RC实跑及CI供应链扫描/SBOM/provenance未验；只配置门禁不宣称已通过。长期生产SLO/容量/灾备/secret轮换仍是部署环境证据，不以本轮System验收替代九仓生产验收。
+
+
+## R6 当前工作树（基线280d5d，待Root审查提交）
+
+第一轮及移除诊断后的完整verify均15files96pass0skip+fresh23/22通过（`/tmp/r6-final-clean-verify.log`）。中间一次model afterAll10s超时未复现，三轮诊断及后续完整门通过，风险如实记录ACCEPTANCE。真正typed lint已启用并清除81条原始诊断；SystemError无HTTP status、18码映射与完整envelope保持；四public入口与最小Nest exports、Repository零HTTP依赖、唯一DI配置已实现。真实生命周期6pass，含单次配置解析与部分失败两资源关闭。新增架构实际typed规则正反、公开面/消费者/循环/禁止依赖门。完整verify与最终文件清单见R6任务卡/ACCEPTANCE，本轮结果绑定280d5d+未提交变化树，Root提交后独立复验。
+
+R6-guard最终重冻结：Controller零database/cache直连（probe也无豁免），HealthService承接原ready聚合；手工Service/Repository含alias门已补。最终`/tmp/r6-guard-verify.log`16files97pass0skip+fresh23断言22表、全部质量/契约门通过；86文件待Root审查提交。原一次非复现hook风险记录继续保留。
