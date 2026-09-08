@@ -17,17 +17,11 @@
     "skipLibCheck": false,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
-    "lib": [
-      "ES2024",
-      "DOM"
-    ],
+    "lib": ["ES2024"],
     "noFallthroughCasesInSwitch": true,
     "noEmitOnError": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
-  "include": [
-    "src",
-    "test"
-  ]
+  "include": ["src", "test", "scripts"]
 }

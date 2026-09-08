@@ -18,7 +18,7 @@
 | Group | Operations |
 |---|---|
 | Runtime data plane | `GET /v1/system/runtime-manifest` |
-| Site resolution RPC | Connect `kokoro.site.v1.SiteService/ResolveSiteByHost` |
+| Model route resolution | `POST /v1/system/model-catalog/resolve` |
 | Control-plane reads | Site/Workspace/Policy/Config GET |
 | Control-plane commands | Site/Workspace/Policy/Config/Release mutation 与 transition |
 | Probes | `/healthz`、`/readyz`；单独告警，不计业务 SLO |
@@ -32,12 +32,12 @@ availability = good eligible requests / all eligible requests
 | Group | 30-day target | Good request |
 |---|---:|---|
 | Runtime data plane | 99.90% | 2xx 且 response 满足 contract |
-| Site resolution RPC | 99.90% | Connect success 且 generated type 可解析 |
+| Model route resolution | 99.90% | HTTP success 且固定route schema可解析 |
 | Control-plane reads | 99.90% | 2xx 且 response 满足 contract |
 | Control-plane commands | 99.50% | Contract 允许的 2xx；idempotent replay 返回首次结果也计 good |
 
 排除：caller 主动取消、确认的 caller network failure、400 validation/cursor/state、403 auth/permission、404 resource、409
-business/idempotency conflict。计 bad：服务端 5xx、Connect Internal/Unavailable、deadline、malformed success、ready instance
+business/idempotency conflict。计 bad：服务端 5xx、deadline、malformed success、ready instance
 仍接收并失败的业务流量。分类只能使用稳定 status/code，不按 message 文本。
 
 **目标缺口**：当前没有 metrics exporter，因而还不能按上述规则生成生产分子/分母。

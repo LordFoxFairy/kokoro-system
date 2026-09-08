@@ -1,3 +1,5 @@
+import { SiteMaintenanceRepository } from "./site-maintenance.repository.js";
+import { SiteMaintenanceService } from "./site-maintenance.service.js";
 import { Module } from "@nestjs/common";
 import { DatabaseModule } from "../../database/database.module.js";
 import { SiteRepository } from "./site.repository.js";
@@ -7,8 +9,15 @@ import { SitesService } from "./sites.service.js";
 import { SitesController } from "./sites.controller.js";
 @Module({
   imports: [DatabaseModule],
-  providers: [SiteRepository, DomainRepository, PolicyRepository, SitesService],
+  providers: [
+    SiteMaintenanceRepository,
+    SiteMaintenanceService,
+    SiteRepository,
+    DomainRepository,
+    PolicyRepository,
+    SitesService,
+  ],
   controllers: [SitesController],
-  exports: [SitesService],
+  exports: [SiteMaintenanceService, SitesService],
 })
 export class SitesModule {}

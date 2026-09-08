@@ -52,20 +52,37 @@ export class PresentationRepository {
     surface: string | null,
     input: z.infer<typeof presentationInputSchema>,
   ) {
-    const result = await tx.query(
-      `INSERT INTO system_presentation(id,tenant_id,application_id,locale,surface_id,schema_version,navigation,theme,locale_namespaces) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(tenant_id,application_id,locale,(COALESCE(surface_id,''))) DO UPDATE SET navigation=EXCLUDED.navigation,theme=EXCLUDED.theme,locale_namespaces=EXCLUDED.locale_namespaces,version=system_presentation.version+1,updated_at=CURRENT_TIMESTAMP(3) RETURNING ${columns}`,
-      [
-        randomUUID(),
-        tenant,
-        appId,
-        locale,
-        surface,
-        input.schema_version,
-        JSON.stringify(input.navigation),
-        JSON.stringify(input.theme),
-        JSON.stringify(input.locale_namespaces),
-      ],
-    );
+    const result = await tx
+      .query(
+        `INSERT INTO system_presentation(id,tenant_id,application_id,locale,surface_id,schema_version,navigation,theme,locale_namespaces) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(tenant_id,application_id,locale,(COALESCE(surface_id,''))) DO UPDATE SET navigation=EXCLUDED.navigation,theme=EXCLUDED.theme,locale_namespaces=EXCLUDED.locale_namespaces,version=system_presentation.version+1,updated_at=CURRENT_TIMESTAMP(3) RETURNING ${columns}`,
+        [
+          randomUUID(),
+          tenant,
+          appId,
+          locale,
+          surface,
+          input.schema_version,
+          JSON.stringify(input.navigation),
+          JSON.stringify(input.theme),
+          JSON.stringify(input.locale_namespaces),
+        ],
+      )
+      .catch((error: unknown) => {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "23514" &&
+          "constraint" in error &&
+          error.constraint === "ck_system_presentation_schema"
+        )
+          throw new OwnerError(
+            "INVALID_ARGUMENT",
+            "Input exceeds stored representation limits",
+            400,
+          );
+        throw error;
+      });
     return decodeRow(presentationSchema, result.rows[0]!);
   }
 }

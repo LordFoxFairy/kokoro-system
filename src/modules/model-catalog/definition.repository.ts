@@ -70,9 +70,15 @@ export class DefinitionRepository {
   }
   public async restore(tx: TransactionContext, id: string) {
     const result = await tx.query(
-      `UPDATE model_definition SET deleted_at=NULL,deleted_by=NULL,version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=$1 RETURNING ${columns}`,
+      `UPDATE model_definition SET deleted_at=NULL,deleted_by=NULL,version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=$1 AND deleted_at > clock_timestamp()-INTERVAL '30 days' RETURNING ${columns}`,
       [id],
     );
+    if (!result.rowCount)
+      throw new OwnerError(
+        "INVALID_STATE",
+        "Resource is outside its restore window",
+        409,
+      );
     return decodeRow(definitionSchema, result.rows[0]!);
   }
 }

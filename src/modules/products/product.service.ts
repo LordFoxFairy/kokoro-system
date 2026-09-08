@@ -3,7 +3,6 @@ import type { RequestContext } from "../../access/request-context.js";
 import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { ProductRepository } from "./product.repository.js";
@@ -51,8 +50,6 @@ export class ProductService {
     return this.receipts.run(context, null, productSchema, async (tx) => {
       const current = await this.products.find(tx, id, true, true);
       requireVersion(current.version, context.precondition);
-      if (!current.deleted_at)
-        throw new OwnerError("INVALID_STATE", "Product not deleted", 409);
       return this.products.restore(tx, id);
     });
   }

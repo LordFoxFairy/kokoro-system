@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { z } from "zod";
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true })
     .flatMap((entry) =>
@@ -26,10 +25,10 @@ const sources = [
 ].sort();
 const digest = (path: string): string =>
   createHash("sha256").update(readFileSync(path)).digest("hex");
-const parsed: unknown = JSON.parse(
-  readFileSync("contract/provenance.json", "utf8"),
-);
-const provenance = z.record(z.string(), z.unknown()).parse(parsed);
+const provenance: Record<string, unknown> = {
+  authority: "runtime Zod HTTP schemas",
+  version: 2,
+};
 provenance.openapi = {
   file: "openapi/system.openapi.json",
   sha256: digest("contract/openapi/system.openapi.json"),
@@ -48,22 +47,19 @@ provenance.consumers = [
   {
     consumer: "kokoro-bff",
     surface: "runtime-manifest/model-catalog",
-    disposition: "pending-owner-cutover-and-live-verification",
+    disposition:
+      "pinned-consumer-live-exploration-passed-final-commit-verification-pending",
   },
   {
     consumer: "kokoro-agent",
     surface: "model-catalog/resolve",
-    disposition: "pending-executable-route-wiring-and-live-verification",
+    disposition:
+      "pinned-factory-wiring-live-exploration-passed-final-commit-verification-pending",
   },
   {
     consumer: "control-plane-service-callers",
     surface: "system-control-http",
     disposition: "generate-from-final-v1-before-first-release",
-  },
-  {
-    consumer: "site-service-callers",
-    surface: "kokoro.site.v1",
-    disposition: "legacy-owner-tests-only-pending-removal",
   },
 ];
 const expected = `${JSON.stringify(provenance, null, 2)}\n`;

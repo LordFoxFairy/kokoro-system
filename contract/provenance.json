@@ -1,14 +1,6 @@
 {
-  "authority": "local contract sources",
-  "source": "contract/proto",
+  "authority": "runtime Zod HTTP schemas",
   "version": 2,
-  "files": [
-    "kokoro/site/v1/site.proto"
-  ],
-  "protoSha256": {
-    "kokoro/site/v1/site.proto": "e0a4c42cbf5403eddee62af2c40dfb1c055fa1153a0f3f2db79d5f591ad0cc2a"
-  },
-  "combinedSha256": "e0a4c42cbf5403eddee62af2c40dfb1c055fa1153a0f3f2db79d5f591ad0cc2a",
   "openapi": {
     "file": "openapi/system.openapi.json",
     "sha256": "f9ea76f107e1ea0fc19df20ee7c59032c0fbac66e640e9a16a1b770ab27c1f37",
@@ -34,17 +26,6 @@
       "src/modules/workspaces/schemas/workspace.schema.ts": "a52e63e9fc798eb25b2003830ad4fcebb7ce9edf0a06b90a5f3b72ad752bc16d"
     }
   },
-  "generated": {
-    "source": "contract/proto",
-    "output": "src/generated/proto",
-    "files": [
-      "kokoro/site/v1/site_pb.ts"
-    ],
-    "sha256": {
-      "kokoro/site/v1/site_pb.ts": "f6547c8cdc2a74fbecdfe59895a5a347ef2b0e1a2f765db8b0c4e2c2f08e8c23"
-    },
-    "combinedSha256": "f6547c8cdc2a74fbecdfe59895a5a347ef2b0e1a2f765db8b0c4e2c2f08e8c23"
-  },
   "releaseClassification": {
     "contractVersion": "2.0.0",
     "httpRouteGeneration": "v1",
@@ -57,22 +38,17 @@
     {
       "consumer": "kokoro-bff",
       "surface": "runtime-manifest/model-catalog",
-      "disposition": "pending-owner-cutover-and-live-verification"
+      "disposition": "pinned-consumer-live-exploration-passed-final-commit-verification-pending"
     },
     {
       "consumer": "kokoro-agent",
       "surface": "model-catalog/resolve",
-      "disposition": "pending-executable-route-wiring-and-live-verification"
+      "disposition": "pinned-factory-wiring-live-exploration-passed-final-commit-verification-pending"
     },
     {
       "consumer": "control-plane-service-callers",
       "surface": "system-control-http",
       "disposition": "generate-from-final-v1-before-first-release"
-    },
-    {
-      "consumer": "site-service-callers",
-      "surface": "kokoro.site.v1",
-      "disposition": "legacy-owner-tests-only-pending-removal"
     }
   ]
 }

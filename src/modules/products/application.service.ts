@@ -5,7 +5,6 @@ import { tenantScope } from "../../access/tenant-scope.js";
 import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { ApplicationRepository } from "./application.repository.js";
@@ -81,8 +80,6 @@ export class ApplicationService {
       await this.applications.lockProduct(tx, snapshot.product_id);
       const current = await this.applications.find(tx, tenant, id, true, true);
       requireVersion(current.version, context.precondition);
-      if (!current.deleted_at)
-        throw new OwnerError("INVALID_STATE", "Application not deleted", 409);
       return this.applications.restore(tx, tenant, id);
     });
   }

@@ -1,3 +1,4 @@
+import { SystemConfig } from "../config/system-config.js";
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import type { z } from "zod";
@@ -9,6 +10,7 @@ import { commandDigest } from "./command-digest.js";
 @Injectable()
 export class CommandReceipt {
   public constructor(
+    @Inject(SystemConfig) private readonly config: SystemConfig,
     @Inject(DatabaseService) private readonly database: DatabaseService,
   ) {}
   public async run<T>(
@@ -52,6 +54,18 @@ export class CommandReceipt {
                 409,
               );
             return schema.parse(prior.rows[0].response_json);
+          }
+          if (this.config.values.KOKORO_SYSTEM_RETENTION_HOLD) {
+            const held = await transaction.query(
+              "SELECT id FROM system_command_receipt WHERE scope_kind=$1 AND scope_id=$2 AND idempotency_key=$3",
+              [context.scope, scopeId, key],
+            );
+            if (held.rows.length)
+              throw new OwnerError(
+                "IDEMPOTENCY_KEY_REUSED",
+                "Expired key retained under hold",
+                409,
+              );
           }
           await transaction.query(
             "DELETE FROM system_command_receipt WHERE scope_kind=$1 AND scope_id=$2 AND idempotency_key=$3 AND expires_at<=CURRENT_TIMESTAMP(3)",

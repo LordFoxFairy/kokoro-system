@@ -9,7 +9,6 @@ import type { RequestContext } from "../../access/request-context.js";
 import { DatabaseService } from "../../database/database.service.js";
 import { CommandReceipt } from "../../database/command-receipt.js";
 import { requireVersion } from "../../http/conditional-request.js";
-import { OwnerError } from "../../http/owner-error.js";
 import { pageQuery, pageResult } from "../../http/pagination.js";
 import type { PageInput } from "../../http/pagination.js";
 import { ProviderRepository } from "./provider.repository.js";
@@ -71,8 +70,6 @@ export class ProviderService {
     return this.receipts.run(context, null, providerSchema, async (tx) => {
       const current = await this.providers.find(tx, id, true, true);
       requireVersion(current.version, context.precondition);
-      if (!current.deleted_at)
-        throw new OwnerError("INVALID_STATE", "Provider not deleted", 409);
       await this.generation.advance(tx);
       return this.providers.restore(tx, id);
     });

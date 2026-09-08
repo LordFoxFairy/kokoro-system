@@ -1,7 +1,7 @@
 # ADR-0001: System owner 与受信 BFF 边界
 
 - Status: Accepted
-- Date: 2026-09-03
+- Date: 2026-09-03; updated 2026-09-08 under Root ADR-031
 - Owners: kokoro-system
 
 ## Context
@@ -11,13 +11,13 @@ System，会产生多租户隔离、Host resolution 和发布状态的多事实�
 
 ## Decision
 
-1. `kokoro-system` 是 Site、Site Host、Workspace、Product/Profile、System Config、Config Release/Binding、Site Policy、
-   Runtime Manifest 与 System command receipt 的唯一 owner。
+1. `kokoro-system` 是 Site、Site Host、Workspace、Product/App/Feature、System Config、Config Release/Binding、Site Policy、
+   Runtime Manifest、Model catalog/routing/health 与 System command receipt 的唯一 owner。
 2. `tenant_id` 是跨仓 opaque isolation context；`site_id` 只在 System 内部作为资源 ID。
 3. 浏览器只访问 Web same-origin adapter；BFF 完成 session/CSRF/IAM admission，再向 System 发送受服务认证保护的
-   tenant/actor/organization/permission/Host context。
+   tenant/actor/permission/Host context。
 4. System 自己以 tenant + Host 查询本仓 Site/Host；不读取 IAM database，也不调用 IAM Host API。
-5. PostgreSQL 是 durable source；Redis 只缓存完整 Runtime Manifest。依赖或 identity 不一致时 fail closed，不建立进程内
+5. PostgreSQL 是 durable source；Redis 只缓存完整 Runtime Manifest 和已授权Model route。依赖或 identity 不一致时 fail closed，不建立进程内
    第二事实源。
 
 ## Consequences
@@ -26,7 +26,7 @@ System，会产生多租户隔离、Host resolution 和发布状态的多事实�
 - System 可在自己的 database 内维护 Site lineage 与 tenant-safe JOIN；跨 owner 只保存 opaque reference。
 - Redis outage 会降低 Runtime Manifest availability，但不会造成 stale fallback 与 PostgreSQL 分叉。
 - IAM 不需要复制 Site/Host 模型；System 也不存储 IAM permission facts。
-- 当前 release binding、policy enforcement、credential rotation 等缺口仍需独立实现，见 `../CURRENT.md`。
+- release binding和Policy enforcement已实现；Agent仅catalog/resolve，global mutation仅system-admin；credential rotation与部署证据仍由平台闭环，见 `../CURRENT.md`。
 
 ## Alternatives rejected
 
@@ -37,5 +37,5 @@ System，会产生多租户隔离、Host resolution 和发布状态的多事实�
 
 ## Verification
 
-架构、HTTP、Runtime Manifest、Site Connect 与 tenant isolation tests 验证仓库内约束；是否在生产网络中真正隔离，仍需
+架构、HTTP、Runtime Manifest、Model route 与 tenant isolation tests 验证仓库内约束；是否在生产网络中真正隔离，仍需
 deployment/network evidence。

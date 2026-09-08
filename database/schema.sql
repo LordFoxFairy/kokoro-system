@@ -463,3 +463,13 @@ END;
 $$;
 CREATE TRIGGER trg_system_feature_identity_guard BEFORE UPDATE OR DELETE ON system_feature_definition
   FOR EACH ROW EXECUTE FUNCTION system_feature_identity_guard();
+
+-- Owner maintenance scans: time predicates match bounded retention queries.
+CREATE INDEX IF NOT EXISTS ix_system_site_retention ON system_site (deleted_at,id) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_system_workspace_retention ON system_workspace (deleted_at,site_id,id) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_system_application_retention ON system_application (deleted_at,site_id,product_id,id) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_system_host_retention ON system_site_host (updated_at,site_id,id) WHERE status='archived';
+CREATE INDEX IF NOT EXISTS ix_system_config_retention ON system_config_record (deleted_at,site_id,product_id,id) WHERE deleted_at IS NOT NULL AND release_id IS NULL;
+CREATE INDEX IF NOT EXISTS ix_system_binding_retention ON system_release_binding (updated_at,site_id,product_id,release_id,id) WHERE status='archived';
+CREATE INDEX IF NOT EXISTS ix_system_release_retention ON system_config_release (updated_at,id) WHERE status='retired';
+CREATE INDEX IF NOT EXISTS ix_model_provider_retention ON model_provider (deleted_at,id) WHERE deleted_at IS NOT NULL AND secret_handle_ref<>'';

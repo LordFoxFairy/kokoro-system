@@ -1,3 +1,4 @@
+import { MaintenanceModule } from "./maintenance/maintenance.module.js";
 import { Module } from "@nestjs/common";
 import type { DynamicModule } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
@@ -22,6 +23,7 @@ export class AppModule {
         ProductsModule,
         RuntimeManifestsModule,
         ModelCatalogModule,
+        MaintenanceModule,
       ],
       providers: [{ provide: APP_GUARD, useClass: AccessGuard }],
     };

@@ -1,6 +1,6 @@
 # System 数据模型
 
-状态：G1 目标 fresh SQL，业务 writer 尚未实现。唯一 canonical schema：database/schema.sql；SQL-first + pg，禁止 Prisma/第二schema/历史 migrations。
+状态：2026-09-08，五模块业务writer已实现；G5维护/生命周期工作树等待最终验收。唯一 canonical schema：database/schema.sql；SQL-first + pg，禁止 Prisma/第二schema/历史 migrations。
 基线7dde8e7；保留已有真实 Site/Workspace/Policy/Config/Release/Binding/Receipt/fence 表，增补产品与Model业务结构，不迁移开发数据。
 
 ## 表、索引、约束与生命周期
@@ -41,7 +41,7 @@ Site→Host/Workspace/App/Policy；Product→App/Feature/Config/Binding；App→
 跨tenant父ID统一NOT_FOUND，活依赖删除RESOURCE_IN_USE；Provider unhealthy仅影响resolve不影响基础CRUD。恢复重新校验自然键与所有父引用；冲突409不抢占其他资源。
 全局Feature/Provider/Model删除或retire与tenant引用新增共锁同global父行，防跨tenant竞态。
 
-Reconciliation（目标每小时批量1000行，当前尚未接线）由各module owner执行显式列LEFT JOIN/NOT EXISTS：
+Reconciliation（已接MaintenanceModule定时器，默认每小时，各查询上限1000行）由各module owner执行显式列LEFT JOIN/NOT EXISTS：
 
 ```sql
 SELECT w.id, w.tenant_id, w.site_id FROM system_workspace w
@@ -54,8 +54,8 @@ WHERE NOT EXISTS (SELECT 1 FROM model_definition m WHERE m.id=r.model_id)
    OR NOT EXISTS (SELECT 1 FROM model_provider p WHERE p.id=r.provider_id);
 ```
 
-其余关系采用同样tenant复合谓词，交付须逐关系测试；发现orphan写结构化错误/告警，投影fail-closed，不自动删除不可变快照。
-GC以expires_at或deleted_at批量索引查询，SKIP LOCKED限制批次，父清理重新检查引用，7/30/90天目标需实际测试时钟与恢复证明。法律留存不归本仓自动决策，有hold请求时暂停对应purge。
+其余关系采用同样tenant复合谓词，真实PG按各关系逐项插入orphan并验证检测；发现orphan写结构化错误/告警，投影fail-closed，不自动删除不可变快照。
+GC以expires_at或deleted_at批量索引查询，SKIP LOCKED限制批次，父清理重新检查引用，7/30/90天由真实PG年龄种子验证，含hold、近期child阻止父清理、timer实际触发。法律留存不归本仓自动决策，有hold请求时暂停对应purge。
 
 ## 验证门
 
@@ -70,3 +70,9 @@ model_revision_immutable_guard承接旧Model数据库安全不变量，拒绝所
 Binding不提供global release/API；tenant scope要求scope_id=tenant、site空，product scope要求scope_id=product UUID、site空，surface要求site+非空surface；均必需product，服务端同tenant校验published release。全局普通Config仍支持，无global release发布路径。
 
 Global Config release_id强制NULL；system_config_release.tenant_id NOT NULL；Config读写conditional scope的认证、查询选择见API_CONTRACT，不能用COALESCE回退全局release。
+
+
+### G5实际维护查询
+
+新增8个retention部分索引匹配deleted_at/updated_at、scope父ID和id；receipt使用既有expires_at部分索引。真实EXPLAIN(ANALYZE,BUFFERS,FORMAT JSON)检查执行计划可用，微量fixture下planner可选seq scan，不把此当容量证明。
+Site/Workspace/Products每候选独立事务；Site物理清理反查所有仍保留的Workspace/App/Config/Binding（含未满30天softdeleted），不留下悬空历史身份。Release仅已retired满90天且无任何binding，连自身config快照清理；Feature/ModelRevision SQL guard与Product/Model自然keytombstone永不删除。Provider满30天只擦除secret_handle_ref。hold为进程级保守暂停所有自动purge；不阻止业务创建但过期receipt key仍占用。

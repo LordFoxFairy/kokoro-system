@@ -343,6 +343,84 @@ describe("real Nest Product control", () => {
         .status,
     ).toBe(200);
     expect((await request(pp)).json.data?.navigation).toEqual(body.navigation);
+    const sizeDb = new Client({ connectionString: databaseUrl.href });
+    await sizeDb.connect();
+    await sizeDb.query("SET search_path TO public,pg_catalog");
+    try {
+      const before = (
+        await sizeDb.query(
+          "SELECT generation::text FROM system_catalog_generation UNION ALL SELECT generation::text FROM system_runtime_manifest_generation WHERE tenant_id='tenant-a'",
+        )
+      ).rows;
+      const presentationKey = randomUUID(),
+        featureKey = randomUUID();
+      const oversized = await request(
+        pp,
+        "PUT",
+        {
+          ...body,
+          navigation: Array.from({ length: 100 }, (_, index) => ({
+            key: `item${index}`,
+            label: "Item",
+            href: `/${"a".repeat(1000)}`,
+            feature_key: null,
+          })),
+        },
+        { "if-match": '"1"', "idempotency-key": presentationKey },
+      );
+      expect(oversized.response.status).toBe(400);
+      expect(oversized.json.error).toMatchObject({
+        code: "INVALID_ARGUMENT",
+        retryable: false,
+      });
+      const largeFeature = await request(
+        "features",
+        "POST",
+        {
+          global_feature_key: "present.oversized",
+          product_id: product.json.data?.id,
+          display_name: "Oversized",
+          result_contract: {
+            schema_version: 1,
+            outcome_kind: "structured",
+            media_types: Array(32).fill("界".repeat(128)),
+            required_fields: Array(64).fill("界".repeat(128)),
+          },
+        },
+        { ...ah, "idempotency-key": featureKey },
+      );
+      expect(largeFeature.response.status).toBe(400);
+      expect(largeFeature.json.error).toMatchObject({
+        code: "INVALID_ARGUMENT",
+        retryable: false,
+      });
+      expect((await request(pp)).json.data?.version).toBe("1");
+      expect(
+        (
+          await sizeDb.query(
+            "SELECT generation::text FROM system_catalog_generation UNION ALL SELECT generation::text FROM system_runtime_manifest_generation WHERE tenant_id='tenant-a'",
+          )
+        ).rows,
+      ).toEqual(before);
+      expect(
+        (
+          await sizeDb.query(
+            "SELECT id FROM system_command_receipt WHERE idempotency_key=ANY($1::text[])",
+            [[presentationKey, featureKey]],
+          )
+        ).rowCount,
+      ).toBe(0);
+      expect(
+        (
+          await sizeDb.query(
+            "SELECT id FROM system_feature_definition WHERE global_feature_key='present.oversized'",
+          )
+        ).rowCount,
+      ).toBe(0);
+    } finally {
+      await sizeDb.end();
+    }
+
     expect(
       (await request(pp, "PUT", body, { "if-none-match": "*" })).response
         .status,

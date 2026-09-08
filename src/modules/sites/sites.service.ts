@@ -109,8 +109,6 @@ export class SitesService {
       const tenant = tenantScope(context);
       const site = await this.sites.find(tx, tenant, id, true, true);
       requireVersion(site.version, context.precondition);
-      if (!site.deleted_at)
-        throw new OwnerError("INVALID_STATE", "Site is not deleted", 409);
       return this.sites.restore(tx, tenant, id);
     });
   }

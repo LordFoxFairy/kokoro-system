@@ -1,3 +1,5 @@
+import { ProductMaintenanceRepository } from "./product-maintenance.repository.js";
+import { ProductMaintenanceService } from "./product-maintenance.service.js";
 import { ProductProjectionRepository } from "./product-projection.repository.js";
 import { ProductProjectionService } from "./product-projection.service.js";
 import { BindingService } from "./binding.service.js";
@@ -29,6 +31,8 @@ import { ProductController } from "./product.controller.js";
 @Module({
   imports: [DatabaseModule],
   providers: [
+    ProductMaintenanceRepository,
+    ProductMaintenanceService,
     ProductProjectionRepository,
     ProductProjectionService,
     BindingService,
@@ -59,6 +63,7 @@ import { ProductController } from "./product.controller.js";
     ApplicationController,
   ],
   exports: [
+    ProductMaintenanceService,
     ProductProjectionService,
     BindingService,
     ReleaseService,

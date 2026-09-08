@@ -11,7 +11,10 @@ const connection = new Client({ connectionString: url });
 try {
   await connection.connect();
   await connection.query("BEGIN");
-  await connection.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", ["kokoro-system:canonical-schema"]);
+  await connection.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    ["kokoro-system:canonical-schema"],
+  );
   const tables = await connection.query<Record<string, unknown>>(`
     SELECT tablename AS table_name
     FROM pg_catalog.pg_tables
@@ -26,7 +29,9 @@ try {
         );
       return table.table_name;
     });
-    throw new Error(`db:apply-schema requires a blank database; found tables: ${tableNames.join(", ")}`);
+    throw new Error(
+      `db:apply-schema requires a blank database; found tables: ${tableNames.join(", ")}`,
+    );
   }
   await connection.query("SET LOCAL search_path TO public, pg_catalog");
   await connection.query(sql);

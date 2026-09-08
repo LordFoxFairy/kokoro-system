@@ -11,6 +11,8 @@ export class OwnerErrorFilter implements ExceptionFilter {
   public catch(error: unknown, host: ArgumentsHost): void {
     const request = host.switchToHttp().getRequest<OwnerRequest>();
     const response = host.switchToHttp().getResponse<Response>();
+    if (response.headersSent || response.writableEnded || response.destroyed)
+      return;
     const parsed = requestIdSchema.safeParse(request.headers["x-request-id"]);
     response.setHeader(
       "x-request-id",

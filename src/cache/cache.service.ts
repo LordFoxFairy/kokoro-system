@@ -1,3 +1,4 @@
+import { requestBudget } from "../http/request-budget.js";
 import { Inject, Injectable } from "@nestjs/common";
 import type { OnModuleInit, OnApplicationShutdown } from "@nestjs/common";
 import { createClient } from "redis";
@@ -26,23 +27,43 @@ export class CacheService implements OnModuleInit, OnApplicationShutdown {
   public async ready(): Promise<boolean> {
     return (
       (await this.client
-        .withCommandOptions({ abortSignal: AbortSignal.timeout(2000) })
+        .withCommandOptions({
+          abortSignal: AbortSignal.any([
+            AbortSignal.timeout(2000),
+            ...(requestBudget() ? [requestBudget()!.signal] : []),
+          ]),
+        })
         .ping()) === "PONG"
     );
   }
   public async get(key: string): Promise<string | null> {
     return this.client
-      .withCommandOptions({ abortSignal: AbortSignal.timeout(2000) })
+      .withCommandOptions({
+        abortSignal: AbortSignal.any([
+          AbortSignal.timeout(2000),
+          ...(requestBudget() ? [requestBudget()!.signal] : []),
+        ]),
+      })
       .get(`${this.namespace}:${key}`);
   }
   public async set(key: string, value: string, seconds = 30): Promise<void> {
     await this.client
-      .withCommandOptions({ abortSignal: AbortSignal.timeout(2000) })
+      .withCommandOptions({
+        abortSignal: AbortSignal.any([
+          AbortSignal.timeout(2000),
+          ...(requestBudget() ? [requestBudget()!.signal] : []),
+        ]),
+      })
       .set(`${this.namespace}:${key}`, value, { EX: seconds });
   }
   public async remove(key: string): Promise<void> {
     await this.client
-      .withCommandOptions({ abortSignal: AbortSignal.timeout(2000) })
+      .withCommandOptions({
+        abortSignal: AbortSignal.any([
+          AbortSignal.timeout(2000),
+          ...(requestBudget() ? [requestBudget()!.signal] : []),
+        ]),
+      })
       .del(`${this.namespace}:${key}`);
   }
   public async onApplicationShutdown(): Promise<void> {

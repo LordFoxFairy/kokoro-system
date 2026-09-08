@@ -43,16 +43,33 @@ export class FeatureRepository {
     tx: TransactionContext,
     input: z.infer<typeof featureInputSchema>,
   ) {
-    const result = await tx.query(
-      `INSERT INTO system_feature_definition(id,product_id,global_feature_key,display_name,result_contract) VALUES($1,$2,$3,$4,$5) RETURNING ${columns}`,
-      [
-        randomUUID(),
-        input.product_id,
-        input.global_feature_key,
-        input.display_name,
-        JSON.stringify(input.result_contract),
-      ],
-    );
+    const result = await tx
+      .query(
+        `INSERT INTO system_feature_definition(id,product_id,global_feature_key,display_name,result_contract) VALUES($1,$2,$3,$4,$5) RETURNING ${columns}`,
+        [
+          randomUUID(),
+          input.product_id,
+          input.global_feature_key,
+          input.display_name,
+          JSON.stringify(input.result_contract),
+        ],
+      )
+      .catch((error: unknown) => {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "23514" &&
+          "constraint" in error &&
+          error.constraint === "ck_system_feature_contract"
+        )
+          throw new OwnerError(
+            "INVALID_ARGUMENT",
+            "Input exceeds stored representation limits",
+            400,
+          );
+        throw error;
+      });
     return decodeRow(featureSchema, result.rows[0]!);
   }
   public async retire(tx: TransactionContext, id: string) {

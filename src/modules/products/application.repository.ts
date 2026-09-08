@@ -121,9 +121,15 @@ export class ApplicationRepository {
         409,
       );
     const result = await tx.query(
-      `UPDATE system_application SET deleted_at=NULL,deleted_by=NULL,version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE tenant_id=$1 AND id=$2 RETURNING ${columns}`,
+      `UPDATE system_application SET deleted_at=NULL,deleted_by=NULL,version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE tenant_id=$1 AND id=$2 AND deleted_at > clock_timestamp()-INTERVAL '30 days' RETURNING ${columns}`,
       [tenant, id],
     );
+    if (!result.rowCount)
+      throw new OwnerError(
+        "INVALID_STATE",
+        "Resource is outside its restore window",
+        409,
+      );
     return decodeRow(applicationSchema, result.rows[0]!);
   }
 }

@@ -1,7 +1,7 @@
 # System API 契约
 
-状态：G1 目标 internal-owner HTTP，2026-09-07。运行时仍为旧 Node HTTP + Site Connect，新增 contract 不代表端点已上线。
-Root ADR-031 取代 ADR-029 的 Proto 保留要求。唯一字段事实源 src/modules/*/**/*.schema.ts，单向生成只读
+状态：2026-09-08，当前唯一Nest internal-owner HTTP，83业务操作+2probes；G5提交/环境验收见CURRENT。
+Root ADR-031 取代 ADR-029 的 Proto 保留要求。唯一字段事实源 src/modules/*/schemas/**/*.schema.ts，单向生成只读
 contract/openapi/system.openapi.json；操作 inventory 位于 scripts/system-openapi-operations.ts；无第二手写 DTO/JSON schema。
 
 ## 边界
@@ -53,9 +53,9 @@ Model旧ensure/admin/resolve路径统一替换为model-catalog资源化HTTP，�
 
 ## 消费者与 cutover
 
-BFF生产源码当前请求 /system/runtime-manifest 与 /bff/model-catalog（均缺/v1），后续Root在System contract提交后派BFF更新。
-Agent当前无接线Model client，后续须真实resolve调用及owner集成测试，不以新建client文件算完成。
-Site Connect仅owner测试调用；旧Model/Site Proto及generated在业务切片一次删除，G1保留尚在运行的旧handler以免提前破坏基线。
+BFF consumer已提交1e03b87、source runner修复26eec011，固定G1 artifact；真实live由Root G6验证。
+Agent consumer已提交e24b4aa，System resolve已接入真实factory/worker；live由Root G6验证。
+旧Site Connect/Proto/generated/SDK已删除，所有调用使用唯一HTTP；没有兼容alias。
 contract版本2.0.0标记v1-fresh-cutover（未发布基线），生成artifact digest和source commit由发布任务记录；不让artifact自引用未知commit。
 
 ### Agent executable route
@@ -70,8 +70,10 @@ POST /config只创建；PATCH /config/{config_id}只更新value且If-Match必需
 | product | 等于product_id | 必需UUID | null | trusted tenant |
 | surface | 非空surface标识 | 必需UUID | 必需Site UUID | trusted tenant |
 SQL CHECK与Zod负例共同覆盖结构；tenant等值校验在可信上下文业务入口。
-当前envelope替换旧JSON meta及x-kokoro-request-id为x-request-id，是明确fresh-cut breaking，不保留双轨。retryable对400/403/404/409/428为false，对瞬时503依赖/模型不可用为true；credential未配置503为false。响应资源含ID即201资源标识。
+当前envelope替换旧JSON meta及x-kokoro-request-id为x-request-id，是明确fresh-cut breaking，不保留双轨。retryable对400/403/404/409/428为false，对瞬时503依赖/模型不可用为true；credential未配置在启动时失败。响应资源含ID即201资源标识。
 
 ### Conditional Config scope（最终G1裁决）
 operation metadata使用x-kokoro-scope=tenant/global/conditional。Config全部conditional：POST按body.scope_type，list/get/PATCH/DELETE按query.scope=tenant|global（省略tenant）。Global必须认证system-admin，不要求tenant header且忽略其值；tenant必须trusted header。写仍system:write，global不能用tenant字符串升级。Global Config强制release_id=null；release.tenant_id必需，绝无global release路径。
 错误status按操作适用：GET/resolve不带CAS则无428；mutation带409；有CAS才428。PATCH value先shape校验再按存量module校验，不匹配=INVALID_CONFIG_SCHEMA。
+
+运维hold下已有过期receipt key复用返回409 IDEMPOTENCY_KEY_REUSED并保留原receipt；解除hold后恢复7天到期复用。无新wire字段/错误码。

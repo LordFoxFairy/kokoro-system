@@ -1,7 +1,7 @@
 # System 技术设计
 
-状态：G1 目标设计，2026-09-07；业务入口仍是 7dde8e7683ad4c9a3a35bc3681bf44b523eea574 的 Node HTTP 实现。
-Root ADR-031 冻结本设计；G1 仅实现机器 schema、生成器与 fresh SQL，尚未实现以下 Nest 业务。
+状态：2026-09-08，G1–G4 已提交验收，G5 当前工作树已切唯一 Nest HTTP 入口；最终 commit/门禁与外部阻断见 CURRENT/ACCEPTANCE。
+Root ADR-031 冻结本设计；五模块、83业务操作及2probes已实现，不保留旧Node router/RPC。
 唯一任务表：[IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md)。完整 System 为交付范围，Site 不是最终范围。
 
 ## 放置门
@@ -9,14 +9,14 @@ Root ADR-031 冻结本设计；G1 仅实现机器 schema、生成器与 fresh SQ
 | 项 | 决定 |
 |---|---|
 | Owner | System；sites、workspaces、products、runtime-manifests、model-catalog；本轮 system_owner 唯一 writer，Root 提交 |
-| 当前事实 | 干净基线 7dde8e7；src/interfaces/http/server.ts、application、domain、infrastructure；13 个非 probe HTTP operation，Site Connect；SQL-first；Model 仍独立 Prisma 服务 |
+| 当前事实 | G4基线51bc22d；main→start-system→AppModule，五业务模块及access/http/database/cache/maintenance技术支持；83业务HTTP+2probes，SQL-first唯一22表；Root负责旧Model active退出 |
 | 目标职责 | 五个业务模块的 HTTP 控制面与配置投影；模型不推理、价格不归本仓、Workspace 不复制 IAM 组织/BFF Project |
 | 目录比较 | src/<feature> 可行；采用 src/modules/<feature> 配合已有 config 与后续 database/access/http，避免业务/技术入口混杂；拒绝全局四层与独立 releases/configs |
-| 粒度 | G1 每个能力若干 *.schema.ts；Root追加批准src/http/protocol.schema.ts仅承载共享HTTP envelope/error/request-id/probe/page schema，generator与后续运行时共同消费，无I/O；一个文件只定义同一资源 wire schema；schema 集合按 schemas/ 聚合。scripts 仅生成、test/contract 仅断言，不引入 Service/Controller |
+| 粒度 | 每个能力的运行时 wire schema 位于 schemas/；Root追加批准src/http/protocol.schema.ts仅承载共享HTTP envelope/error/request-id/probe/page schema，generator与运行时共同消费，无I/O；一个文件只定义同一资源 wire schema；schema 集合按 schemas/ 聚合。scripts 只做契约/隔离验证；同模块Controller/Service/Repository按变化原因分开 |
 | 依赖 | schema 只依赖 Zod；模块公开 Service 通过 Nest imports/exports 调用；禁止跨模块 Repository/Row deep-import及跨仓源码/ORM import；进程只持一个 pg Pool 和一种 redis client |
 | 数据/API | SQL-first 唯一 database/schema.sql；运行时 Zod 单向生成 contract/openapi/system.openapi.json；HTTP internal-owner /v1，公开产品 API 留 BFF |
-| 删除 | 实现切片删除旧全局四层、RPC/Proto/generated、手写 parser/SDK alias；G1 删除无 writer 的 profile/audit SQL，不删除旧业务安全实现；Model 退出由 Root 跨仓集成 |
-| 验证 | G1 contract:generate:openapi、test:contract:target、typecheck、fresh db:apply-schema；后续完整 lint/format/typecheck/unit/integration/contract/architecture/build/smoke |
+| 删除 | 已删除旧全局四层、RPC/Proto/generated、手写 parser/SDK alias；G1 删除无 writer 的 profile/audit SQL，不删除旧业务安全实现；Model 退出由 Root 跨仓集成 |
+| 验证 | pnpm verify：format/lint/typecheck/build/contract/unit/真实integration/architecture/fresh-schema/source smoke；镜像RC单独门 |
 
 ## 业务与模块公开面
 
@@ -51,14 +51,21 @@ Model 的业务故障不能使 Site/Workspace read 做 provider health 网络探
 ## 栈与来源
 
 Node 24.13.0 LTS；NestJS 12.0.1 + Express；Zod 运行时 schema（不维护 class DTO 副本）；pg SQL-first，Redis node-redis。
-SQL-first 保留已验锁/表达式唯一索引；Prisma-first 会要求重写 System 锁与 schema，因此不采用。Model Prisma adapter 在后续同一模块重写，不留两种生产写栈。
-G1 使用 Zod 自带 toJSONSchema 生成 OpenAPI schema；生成器仅编排 path/operation metadata，不写另一份字段结构。后续 Controller 直接引用同一 schema，用 Nest StandardSchemaValidationPipe；route inventory 测试校验 Nest routes 与 contract 完整对应。
+SQL-first 保留已验锁/表达式唯一索引；Prisma-first 会要求重写 System 锁与 schema，因此不采用。Model能力已由model-catalog pg实现，不留第二生产写栈。
+G1 使用 Zod 自带 toJSONSchema 生成 OpenAPI schema；生成器仅编排 path/operation metadata，不写另一份字段结构。Controller 直接引用同一 schema，用 Nest StandardSchemaValidationPipe；route inventory 测试校验 Nest routes 与 contract 完整对应。
 精确 dependency/peer/license/install/compile 证据写在 IMPLEMENTATION_PLAN；安装成功不是 Nest 业务验收。
 
 ### 默认模型路由
-resolve label_key可省、feature_key必填。省略时仅查询tenant/feature下is_default=true的routing policy（数据库partial unique）；它确定default label，不猜第一个模型。无默认ROUTE_NOT_FOUND；hidden POLICY_DENIED；无published且healthy provider候选MODEL_UNAVAILABLE。候选按policy指定revision或label默认revision，缺失时按同feature的published revision priority ASC,id ASC；default label不回退。目标执行transport仅litellm，direct/internal明确未支持，不返回endpoint/secret。
+resolve label_key可省、feature_key必填。省略时仅查询tenant/feature下is_default=true的routing policy（数据库partial unique）；它确定default label，不猜第一个模型。无默认ROUTE_NOT_FOUND；hidden POLICY_DENIED；无published且healthy provider候选MODEL_UNAVAILABLE。候选按policy指定revision或label默认revision，缺失时按同feature的published revision priority ASC,id ASC；default label不回退。执行transport仅litellm，direct/internal明确未支持，不返回endpoint/secret。
 
 ### 同数据库完整性边界（Root G1裁决）
 五模块是同一System数据库内writer边界，不是独立数据库。用例Repository可在同checked-out client对其他System模块表执行具名参数化只读完整性SQL：父SELECT FOR UPDATE并重验tenant/status/deleted，反向SELECT EXISTS；只返回bool/ID，不映射对方对象。禁止跨module INSERT/UPDATE/DELETE以及Repository/Row deep-import。子创建与父删除共锁同一父，无需循环Nest import或通用coordinator。Manifest业务投影仍走公开Service；架构测试固定写表owner矩阵，两种父删除/子创建先锁顺序均用真实双连接测试。
 ### 当前HTTP envelope
-目标成功仅{data}，错误{error:{code,message,retryable}}；request ID只在所有响应x-request-id，不写JSON。请求x-request-id允许安全opaque 1..128字符[A-Za-z0-9._:-]，缺省UUID，非法400。Root当前API手册§2优先于旧基线；G2删除旧meta及x-kokoro-request-id，无alias。
+成功仅{data}，错误{error:{code,message,retryable}}；request ID只在所有响应x-request-id，不写JSON。请求x-request-id允许安全opaque 1..128字符[A-Za-z0-9._:-]，缺省UUID，非法400。Root当前API手册§2优先于旧基线；G2删除旧meta及x-kokoro-request-id，无alias。
+
+
+## 运行职责与维护边界
+
+main调用startSystem：配置先验、Nest DI初始化、PG/Redis readiness后listen；失败释放已构造资源。request-lifecycle将10s请求预算与断连传播至PG/Redis，日志只写结构化白名单；强制drain覆盖未完成PG握手socket。正式源码子进程/HTTP锁超时无late commit/黑洞握手取消有真实测试。
+
+MaintenanceModule仅定时调用各owner公开维护Service，默认每小时；单cycle最多5s（不超过shutdown配置），禁止重叠，shutdown取消并等待。每种候选查询上限1000；Site/Workspace/Products逐资源独立事务，先固定父锁顺序、锁内重验年龄/状态与所有保留引用，再删自身表；不会将前一候选的父锁带入下一候选。Model自然key与immutable revision身份永久保留，仅清过期Provider credential handle。Receipt7天、普通软删30天、无binding退役release90天；每次restore以PG clock_timestamp原子UPDATE谓词检查30天截止。hold暂停维护purge且阻止过期receipt key复用删除（409现有码），不延长恢复时间。异常cycle结构化报告并由下一周期重试，不自动修复immutable orphan。

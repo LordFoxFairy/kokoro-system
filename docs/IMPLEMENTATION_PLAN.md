@@ -1,7 +1,7 @@
 # System 完整交付唯一实施计划
 
-当前：G1目标设计/机器契约/SQL门；Root ADR031已批准完整System，system_owner唯一writer，Root提交审查。
-第0–1节是G0历史证据，旧“仅文档/未冻结”只说明当时授权，不覆盖第2节当前任务卡。业务实施待G1放行。
+当前：G1–G4已由Root提交验收；G5完整源码/测试/运行闭环及最后脚本窄修收尾，基线51bc22dac4b32da86984e7147caaae5e4db6a34a，等待Root最终提交/committed验证。system_owner唯一System writer，Root独占Git index/提交。完整五模块业务均已实现，非仅Site交付。
+第0–1节及G1–G4早期卡是历史授权/证据，不覆盖末尾G5稳定交付状态。最新本仓门、Root跨仓live、Docker环境未验项以末尾G5记录及CURRENT/ACCEPTANCE为准。
 
 ## 0. G0历史基线与范围
 
@@ -36,7 +36,7 @@
 选择本位置而非 Root 新 spec 的理由见 TECHNICAL_DESIGN G0.3。旧 2026-09-03 文档计划已完成，保留为历史记录，
 本文件接管后续任务，不继续用旧计划的四层/工具链要求授权重构。
 
-## 1. 当前任务卡
+## 1. G0历史任务卡
 
 | ID/优先级 | 业务目标与完成条件 | Agent/审查/权限 | 范围与依赖 | 状态/提交责任 |
 |---|---|---|---|---|
@@ -354,3 +354,46 @@ Resolve caller仅kokoro-agent；Agent operation allowlist只catalog/resolve，�
 
 Root在f13bb73+交接40文件复跑7files/51pass/0skip（真实独立PG/Redis）；typecheck/build/lint/Redocly/drift/18source provenance与38TS格式、diffcheck全部通过。全量152pass/5既有fail/8旧skip，日志/tmp/kokoro-system-g4-root-all.log；未放宽遗留断言。独立system_capability_review确认健康deadline P2及provenance边界闭环、未见新阻断。Root串行提交后同负责人立即续G5全部运行职责、生产main和旧树退出。
 Root latest focused71pass（governance46/topology4/smoke21）；lexical门禁仅根database Service允许pg及技术SQL、根cache Service仅redis，业务/Controller和异种provider反例仍拦截，独立审查通过。G6 live仍未执行，不作完成证据。
+
+### G4 Root验收与G5进行中
+
+G4 51bc22dac4b32da86984e7147caaae5e4db6a34a（40files），Root稳定树/committed HEAD均51pass0skip，typecheck/build/lint/contract/provenance/38TS格式通过；全test152pass/5既有fail/8skip，独立review无阻断，起始clean。
+G5按executing-plans/TDD推进完整运行面；不增加一级业务模块。准确放置：src/http/request-budget.ts（AsyncLocalStorage请求预算）、request-lifecycle.middleware.ts（断线/deadline/请求日志）、structured-logger.ts（进程脱敏JSON日志）；src/start-system.ts（Nest启动/失败清理/有界close，main唯一启动），src/database现有连接生命周期接取消与drain；src/maintenance/{maintenance.module,maintenance.service,restore-window}.ts（定时触发各owner公开维护Service与统一30天恢复门，不执行业务跨module事务/SQL）。四owner sites/workspaces/products/model-catalog各maintenance.service/repository，独占写表，跨module只读反查；technical receipt sweep在database内。相比旧bootstrap/application全局四层，采用已批准技术目录及模块内维护职责，不建立通用CRUD/coordinator。
+取消信号仅技术层使用，业务Service/Repository不依赖Express；定时维护每个owner独立事务，hold配置暂停purge但保留检测，批次1000。新增test/integration/system-lifecycle.test.ts、system-maintenance.test.ts和对应unit/architecture，保留全部G2–G4行为；旧测试按有效行为映射后退场。package/scripts/CI/Docker/docs/AGENTS/INDEX统一切唯一HTTP-only运行与门禁，artifact保持冻结。
+
+G5 legacy退出保留行为映射（删除前登记）：旧http-control/http-boundary/http-config-release-guard/system-control→target-control+target-products真实HTTP权限/严格schema/条件scope/CAS/receipt；旧release/config/postgres-repository/failure-recovery→target-products真实PG发布/锁序/回滚；旧runtime-manifest/cache-fence/redis-key→target-products真实Redis双fence/隔离/poison/outage；旧SiteConnect/Proto→83原生HTTP inventory+http-owner-boundary单协议退出；旧shutdown/structured-logging/env→system-kernel+system-lifecycle+system-request-lifecycle；旧model语义已G4 target-model。旧3个无配置skip集成及in-memory doubles随旧实现删除，不把其数量并入当前证据。G5新增maintenance真实PG检查、30天恢复门与生命周期负例；完整矩阵继续验证。
+G5运行smoke准确文件补：scripts/system-runtime-smoke.ts（仅隔离资源/源码或已构建镜像编排，无业务SQL除本仓fresh schema安装）、test/integration/system-source-start.test.ts（真实pnpm dev子进程启动与信号退出）；Dockerfile/.github/workflows/ci.yml调用相同隔离smoke。Node24.13.0-bookworm-slim registry manifest digest 4660b1ca8b28d6d1906fd644abe34b2ed81d15434d26d845ef0aced307cf4b6f 已imagetools核验。当前Docker info API1.51与降级1.47均500，Root独立确认socket直连timeout，不重置用户daemon；RC镜像实跑暂未验。
+
+G5源码暂停窗口：Root准备探索live时system_owner暂停src/package/lock/schema/contract写入，仅收敛文档。实际pnpm dev isolated smoke1pass，lifecycle5pass，maintenance3pass；Root探索不当未提交最终验收。维护逐候选独立事务避免跨候选父锁反转；hold receipt过期key保留409已RED201→GREEN。完整gate最后复跑与只读审查仍待。
+G6-Root文档范围补docs/INDEX.md；Root focused71pass，全scripts/tests72pass/2既有手册baselinefail。Docker Root独立复核两个context同socket、API1.51/1.47 500、无版本ping/version timeout，daemon未重置，镜像RC环境阻断如实保留。
+G5最终窄修复（Root裁决）：restore统一PG clock_timestamp原子UPDATE谓词，删除应用Date.now权威门；七类owner Repository各自写SQL、0row映射现有INVALID_STATE409。新增test/integration/system-restore-window.test.ts（独立随机库/namespace，7类29/30/31天+应用时钟偏移+跨事务截止、失败generation/version/receipt不变）。不改变API/schema/artifact。
+
+
+### G5最终收敛/交接准备
+
+完整12files/80pass/0skip，日志/tmp/system-g5-owner-final-tests.log；format/typecheck（含scripts）/lint/build/Redocly/83+2drift/18source provenance/contract11pass；fresh schema23断言22表通过。七类restore去应用时钟，Repo clock_timestamp原子UPDATE，22矩阵全pass；两个具名JSON大小约束HTTP503 RED→400非retryable GREEN，无version/generation/receipt副作用；maintenance4pass含删除Label快照不误报。任务状态待Root最终审查/提交，不是已提交。
+Root探索live PASS：System/BFF正式源码、release发布绑定覆盖、BFFcatalog/default/manifest与tenant隔离、BFFresolve403、Agent真实默认/显式route与factory映射；Root自行清理独立DB/prefix/group。最新Root smoke单测22、combined72pass；未提交dirty标识已加入smoke证据。最终Root committed HEAD复验仍待；镜像Docker API500环境阻断不变。
+
+
+### G5稳定交付：待Root串行提交（writer停写）
+最终format/typecheck（含scripts）/lint/build/contract:check全pass，contract12pass；完整12files/81pass/0skip，日志/tmp/system-g5-owner-final-tests.log。frozen install319项supply-chain policy通过，pnpm audit --prod --audit-level high无已知漏洞，fresh再验23断言22表。两个workflow均Node24.13.0/pnpm12.3.4与隔离smoke，不再引用删除脚本；build先清自身dist避免旧编译残留。
+独立审查：system_capability_review仅生命周期两P2闭环；system_consumer_plan维护/restore/两个JSON大小约束最终无阻断（只读未跑）；Root负责最终集成验证与commit。完整源码/配置/SQL/测试/文档在System唯一writer范围，无Root/BFF/Agent/Model跨仓写，未操作Git index。冻结artifact及18source输入无diff。
+明确未验：Docker daemon API500阻断RC镜像本机执行，CI尚未运行的OS/secret扫描/SBOM/provenance；生产SLO/容量/灾备与轮换外部证据。本轮不得称九仓生产验收。
+
+### G5 Root最终脚本审查窄修
+
+Root `pnpm verify` 已81pass+fresh23/22；另prod/full pnpm audit均0漏洞，gitleaks/trivy/syft/semgrep本机不可用未运行。Root新增范围：typescript_checks.py与对应tests递归识别真实pnpm脚本链/schema fresh门、main/bootstrap环境边界（业务反例不放宽），Root唯一writer；System不改Root。
+System仅解冻scripts/system-runtime-smoke.ts、scripts/smoke-process.ts（专属PGID TERM/KILL与存活）、scripts/smoke-cleanup.ts（独立清理聚合失败）、精确unit/source-start测试、CI/release workflows与本节/contract README。真实leader先退后代仍活回归通过；真实spawn ENOENT与docker rm失败status均保证自建DB清理，无成功文字。成功仅在全部清理后宣布。
+Release改同一runner构建一次→smoke/scan/SBOM→校验原image ID→tag/push同一image，无第二build。原build-provenance attestation保留；SBOM用GitHub维护的actions/attest4.2.2固定1e69f48acb82d1966a394da916b4c1698aa569d6，2026-09-08 git ls-remote核验，官方action.yml确认subject-name/digest、sbom-path、push-to-registry输入（https://github.com/actions/attest；MIT）；旧attest-sbom已deprecated因此不新增它。CI/RC实际Docker阻断仍未解除，静态回归不冒称发布执行。
+
+Root最新独立证据：BFF26eec011 lint/typecheck/build/152pass；Agente24b4aa uvlock/ruff/pyright0error0warning/611pass6skip77deselected；Root focused80pass（54治理+4拓扑+22smoke），SystemRoot static仅contract README generation/breaking说明后已补，其余200条属其他仓，未宣称全仓通过。Root第二轮稳定dirty G5跨仓HTTP PASS，最终脚本commit后仍复跑。
+
+脚本窄修最终完整pnpm verify通过：13files86pass0skip+fresh23断言22表，/tmp/system-g5-owner-postreview-verify.log。新增focused unit3pass/source-start3pass。唯一System writer重新冻结，Root独占提交/committed复验；HTTP artifact仍冻结digest，无业务源码/SQL新增变更。
+Root delivery lexical窄修范围再补 scripts/governance/delivery_checks.py 与既有scripts/tests/test_ten_repository_standard.py：仅识别sbom-path与attest-build-provenance正式action语义，Root唯一writer；不为旧词法门添加无效sbom/provenance YAML字段。Root已开始本次脚本窄修后的完整verify，System源码仍冻结。
+
+### G5 Root 最终冻结树放行
+
+Root 接管提交，system_owner 已停止所有写入。最终190文件；Root `pnpm verify` 实跑13files/86pass/0skip，format/lint/typecheck/clean build/contract/fresh23断言22表全部exit0，日志 `/tmp/kokoro-system-g5-root-final-verify.log`。
+Root稳定源码跨仓隔离HTTP已PASS，独立PG/prefix/process全部清理；最终提交后复验及G6 Root提交由Root CURRENT绑定SHA。完整源代码能力不是只有Site CRUD，五模块83业务operation+2probes均接正式Nest入口。Docker daemon环境阻断RC实跑、CI未执行扫描/attestation、生产SLO/灾备与推理不冒称已验。
+
+独立最终review：system_capability_review已确认PGID/cleanup/同镜像推广三P2闭环，无新增相关阻断；actions/attest v4.2.2 SHA `1e69f48acb82d1966a394da916b4c1698aa569d6`已核官方commit/action.yml。Root治理最后55tests、focused81pass；System Root静态预检0违规（全9仓仍200条其他仓未收敛项）。

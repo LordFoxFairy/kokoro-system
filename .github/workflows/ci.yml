@@ -36,22 +36,22 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:kokoro_ci@127.0.0.1:55432/kokoro_system
       REDIS_URL: redis://127.0.0.1:56379
-      TEST_DATABASE_URL: postgresql://postgres:kokoro_ci@127.0.0.1:55432/kokoro_system
+      TEST_ADMIN_DATABASE_URL: postgresql://postgres:kokoro_ci@127.0.0.1:55432/postgres
       TEST_REDIS_URL: redis://127.0.0.1:56379
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
-          version: 11.25.0
+          version: 12.3.4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: 24.13.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm db:apply-schema
-      - run: pnpm verify
-      - run: pnpm test:runtime-real-system
-      - run: pnpm test:integration
+      - run: pnpm check
+      - run: pnpm contract:check
+      - run: pnpm test
+      - run: pnpm test:schema:fresh
       - name: Scan source, dependencies, and secrets
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
@@ -59,7 +59,29 @@ jobs:
           scan-ref: .
           scanners: vuln,secret,misconfig
           format: table
-          exit-code: '1'
+          exit-code: "1"
           ignore-unfixed: true
           severity: CRITICAL,HIGH
       - run: docker build --tag kokoro-system:ci .
+      - run: pnpm exec tsx scripts/system-runtime-smoke.ts --image
+        env:
+          SYSTEM_SMOKE_IMAGE: kokoro-system:ci
+      - name: Scan release candidate
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8
+        with:
+          scan-type: image
+          image-ref: kokoro-system:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Emit release SBOM
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8
+        with:
+          scan-type: image
+          image-ref: kokoro-system:ci
+          format: cyclonedx
+          output: system-sbom.json
+      - name: Build OCI provenance artifact
+        run: |
+          docker buildx create --use --driver docker-container
+          docker buildx build --provenance=mode=max --sbom=true --output=type=oci,dest=system-image.tar .

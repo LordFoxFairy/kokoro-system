@@ -1,159 +1,50 @@
-# kokoro-system 验收矩阵
+# System 验收证据
 
-状态：Phase 1 工程治理与当前 runtime 的可执行验收，2026-09-04。每次结论必须绑定当前 commit、命令、exit code 和
-依赖环境；本文件中的“预期”不是历史或生产通过证明。
+提交前基线：`51bc22dac4b32da86984e7147caaae5e4db6a34a`。本文件随 G5 完整源码交付；Root committed HEAD 跨仓证据在 Root `docs/CURRENT.md` 绑定最终 SHA。历史G1–G4完整证据见唯一 IMPLEMENTATION_PLAN，不与当前结果混用。
 
-## 1. Phase 1 完成条件
+## 已执行的G5聚焦证据
 
-| ID | 验收项 | 自动证据 | 预期 |
-|---|---|---|---|
-| GOV-01 | 精确大小写的 canonical README/INDEX/CURRENT/TECHNICAL_DESIGN/API_CONTRACT/DATA_MODEL/SECURITY/RELIABILITY/ACCEPTANCE/SLO/RUNBOOK 存在 | architecture test + Root slice | 无缺失 |
-| GOV-02 | `docs/ADR/` 至少有一个 accepted ADR，旧 lowercase/duplicate docs 不存在 | architecture test | 通过 |
-| GOV-03 | `contract/README.md` 含 owner/visibility/version/generation/breaking/provenance/consumer workflow | architecture + Root slice | 通过 |
-| GOV-04 | 每个 direct/reusable OpenAPI operation 有 5 个 governance extensions | contract test + verifier + Root slice | 通过 |
-| GOV-05 | 顶层 tsconfig 显式 `useUnknownInCatchVariables=true` | architecture + Root slice + typecheck | 通过 |
-| GOV-06 | Generated、runtime、Schema 与跨仓边界 | owner contract test + `git diff` scope review | 仅 `kokoro.site.v1`；generated 由隔离重生成逐字节验证；Schema 只新增 tenant manifest generation；OpenAPI 只收敛 BIGINT string wire；其他仓不变 |
-| GOV-07 | lint/typecheck/test/build/contract 均在 committed tree 重跑 | 第 5 节 | 全部 exit 0 |
+| 门 | 实际结果 |
+| --- | --- |
+| `test/integration/system-lifecycle.test.ts` | 5pass：正式Nest启动/partial failure、HTTP锁deadline503无late commit、PG黑洞握手drain、restore原子PG时钟30天、request-id/probe |
+| `test/integration/system-maintenance.test.ts` | 4pass：hold（含过期receipt key拒绝复用）、7/30/90天、近期child阻止父清理、timer真实触发、逐类orphan与EXPLAIN、deletedLabel保留retiredRevision不误报 |
+| `test/integration/system-source-start.test.ts` | 3pass：真实pnpm dev与退出、spawn ENOENT注册DB清理、docker rm失败后独立DB清理 |
+| `test/unit/system-request-lifecycle.test.ts` | 1pass：close/finish仅一条cancelled脱敏日志 |
+| `test/contract/http-owner-boundary.test.ts` | 2pass：旧层/RPC/SDK/DOM退出、CI/release Node24与隔离smoke入口 |
 
-## 2. Runtime behavior matrix
+TDD具体失败：restore期限原200→期望409后修；PG握手drain原2951ms→要求<800ms后追踪全部socket修；断连原success→cancelled once-finalizer修；hold receipt原201→409保留修；旧树存在→HTTPonly退出门修。source smoke初始误用401与launcher全进程组SIGTERM导致null退出，按冻结403契约及日志中的真实runtime PID信号修，未放宽实际runtime exit0。
 
-| ID | 行为 | 当前自动证据 |
-|---|---|---|
-| SYS-01 | Site、Workspace、Policy、Config、Release application happy path | `test/system-control.test.ts` |
-| SYS-02 | tenant A/B 的 Site/Workspace/Config/Policy/Manifest/Redis key 隔离 | system-control/runtime-manifest/runtime smoke |
-| SYS-03 | tenant + Host 在业务数据/cache 读取前验证 | runtime-manifest、HTTP、Connect、real smoke |
-| SYS-04 | runtime/control/Connect 要求 BFF service auth，probe 公开 | HTTP/Connect tests |
-| SYS-05 | read/write/publish permission 边界 | system-control + HTTP control tests |
-| SYS-06 | JSON 未声明字段、错误类型、缺 header/query、非法 cursor 被拒绝 | HTTP control/server tests |
-| SYS-07 | Digest 使用 operation + canonical wire command，不含当前/合成 version；同 key/hash 跨状态 replay，同 key不同 hash 409 | system-control + PostgreSQL concurrency |
-| SYS-08 | 同 key 并发只产生一条 Site/Host/receipt | `pnpm test:postgres-concurrency` |
-| SYS-09 | release 只按 draft->validated->published->retired 前进 | system-control tests |
-| SYS-10 | Config precedence：surface/tenant/product/global、locale、release、version | postgres repository + runtime smoke |
-| SYS-11 | Redis/PostgreSQL failure fail closed，恢复后可再次读取 | failure-recovery tests |
-| SYS-12 | malformed Redis/PostgreSQL value 不以 assertion 穿透 boundary | boundary decoder + architecture tests |
-| SYS-13 | health/readiness/request id/envelope 与 structured log | HTTP/structured logging tests |
-| SYS-14 | Connect handler 来自 generated SiteService descriptor | Site Connect + real smoke |
-| SYS-15 | shutdown 总 deadline 与正常关闭 | shutdown tests |
-| SYS-16 | canonical schema 使用 UTC、CHECK/UNIQUE 命名、无 FK/migration | schema + architecture + Root slice |
-| SYS-17 | Manifest 只解析 active binding 指向的同 tenant published release；draft/retired/foreign tenant fail closed | postgres repository + real runtime smoke |
-| SYS-18 | publish/retire 后按 tenant 失效 cache，失效失败可用同 key replay 重试 | runtime-manifest + real runtime smoke |
-| SYS-19 | Manifest `config_version` 按 BIGINT 数值语义求最大值 | postgres repository + real runtime smoke |
-| SYS-20 | publish/retire 与 durable tenant generation 同事务；真实 Redis `SET` 在 cleanup 后完成且停于二次检查前时，旧回填被 fence 删除并重读 | release repository + real PostgreSQL/Redis consistency tests |
-| SYS-21 | 旧 deployment namespace/restart 不命中旧 generation；冒号 tenant 精确失效，null surface 与字符串 `default` 不碰撞 | Redis key unit + real consistency tests |
-| SYS-22 | Config release 以 tenant 锁行且仅 draft/validated 可写；两个独立 PG backend 对 Config-first、publish-first、retire-first 均观测真实 row-lock wait | config repository/application/HTTP + real consistency tests |
-| SYS-23 | 所有 control-plane BIGINT 以十进制字符串穿过 DB/domain/receipt/HTTP，覆盖 9007199254740993 与递增顺序 | boundary/contract/repository + real consistency tests |
-
-## 3. Contract acceptance
+## 完整门（当前工作树实际结果）
 
 ```bash
-pnpm contract:lint
-pnpm contract:generate
-pnpm verify:contract-provenance
-pnpm test:contract
-pnpm contract:check
-```
-
-验收时检查：
-
-- OpenAPI 3.1、仅显式 V1/Probe path、snake_case、common envelope；
-- HTTP response 中 Site/Workspace/Policy/Config/Release 的 BIGINT 字段使用 canonical positive decimal string；Runtime Manifest
-  `config_version` 允许字符串 `0`；
-- 13 个 direct/reusable operation definition 的治理 metadata；
-- Buf lint；
-- Proto source、OpenAPI source 与 generated output inventory/digest 均与 `contract/provenance.json` 一致，且不声明
-  `kokoro.common.v1`；
-- `src/generated/proto/` 只由 generator 产生，并与隔离重生成结果逐字节一致；
-- `v1-fresh-cutover` 明确记录无 published baseline、integer-to-decimal-string 分类与消费者 disposition，不创建虚构 V2。
-
-**未自动证明**：OpenAPI semantic breaking diff、proto 对固定上一发布版本的 `buf breaking`、source commit/发布 artifact
-provenance，以及首次发布后的自动 consumer matrix。详见 [`../contract/README.md`](../contract/README.md)。
-
-## 4. Real-infrastructure prerequisites
-
-- 复用 Root 已有 PostgreSQL 与 Redis，不启动仓库私有依赖。
-- Redis URL 使用 logical DB 2。
-- Base PostgreSQL 账号可创建/删除隔离测试 database；并发测试使用已安装 canonical schema 的 base database。
-- 不对包含业务数据的 database 运行 `pnpm db:apply-schema`；该命令发现任意现有 table 会失败。
-
-```bash
-export TEST_DATABASE_URL='postgresql://USER:PASSWORD@127.0.0.1:55433/kokoro_system_test'
-export TEST_REDIS_URL='redis://127.0.0.1:56380/2'
-
-pnpm db:apply-schema
-pnpm test:runtime-real-system
-pnpm test:integration
-```
-
-`test:runtime-smoke`/`test:runtime-real-system` 创建并删除带随机名的隔离 database，使用进程唯一 Redis namespace；
-Vitest real consistency tests 创建并删除随机 PostgreSQL schema/Redis namespace；`test:postgres-concurrency` 在 base database
-写入随机 tenant fixture 并在 finally 清理。
-
-## 5. Required local gate
-
-在 `kokoro-system` 当前 committed tree：
-
-```bash
+pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test
 pnpm build
 pnpm contract:check
-git diff --check
-git status --short --branch
+TEST_ADMIN_DATABASE_URL=postgresql://USER@localhost/postgres pnpm test
+TEST_ADMIN_DATABASE_URL=postgresql://USER@localhost/postgres pnpm test:schema:fresh
 ```
 
-在 contract 变更提交后的 committed tree，`pnpm contract:check` 后还要求：
+最新执行：format/typecheck（含scripts）/lint/build全pass；contract:check含Redocly合法性、83+2 drift、18source provenance、12contract tests全pass；完整13files/86pass/0skip，日志`/tmp/system-g5-owner-postreview-verify.log`；fresh安装23断言22表pass。新增restore矩阵22pass，七类29/30/31天、应用时钟偏移与PG事务内跨截止，失败不推进version/generation/receipt；成功Model两global generation各+1。Presentation/Feature >64KiB/32KiB真实HTTP由503 RED修为具名约束400非retryable，版本/generation/receipt无副作用。
 
-```bash
-git diff --exit-code HEAD -- contract/proto contract/provenance.json src/generated/proto
-git diff --exit-code HEAD -- database/schema.sql src/application src/domain src/infrastructure src/interfaces src/bootstrap src/config src/main.ts src/index.ts
-```
+测试无配置直接失败，不静默skip。每次只创建自身system_g*随机库并清理，cache只独立namespace与TTL，不FLUSHDB。83method/path/CAS/permission/scope由架构测试与真实HTTP矩阵核对，Redocly独立规范校验，18source与artifact drift/provenance分别验证。
 
-第一条证明 committed owner source、provenance 与 generated 在重生成后无 drift；第二条不允许 runtime/Schema diff。
+## 未验/外部事项
 
-## 6. Root 十仓静态审计的本仓切片
+Docker daemon当前API500/无版本socket请求超时，Root独立确认环境故障；Node24.13.0-bookworm-slim registry digest已核得，但镜像build/RC实跑未验，未重置daemon。CI源码/依赖/secret/镜像scan、SBOM/provenance是配置，不是已执行证明。Root BFF/Agent live及active topology切换需在G5最终提交后复验；生产备份恢复/容量/长窗口SLO/告警投递另验。
 
-从 Root `/Users/nako/WebstormProjects/github/thefoxfairy/Kokoro` 执行：
 
-```bash
-python3 - <<'PY'
-from scripts.governance.repository_checks import check_common
-from scripts.governance.delivery_checks import check_delivery
-from scripts.governance.typescript_checks import check_typescript
+Root探索跨仓live已PASS（基线51bc22d+未提交G5树，显式dirty）：System/BFF正式source、发布binding结果、BFFcatalog/default/manifest、跨tenant隔离、BFFresolve403、Agent真实SystemModelClient默认/显式/factory映射；自建DB/prefix/process group全部清理。消费者BFF26eec011、Agente24b4aa。仅探索证据，最终仍需Root提交及committed HEAD重跑。
 
-failures = []
-check_common("kokoro-system", failures)
-check_delivery("kokoro-system", failures)
-check_typescript("kokoro-system", failures)
-for failure in sorted(failures, key=lambda item: (item.rule, item.detail)):
-    print(f"[{failure.repository}] {failure.rule}: {failure.detail}")
-print(f"violation_count={len(failures)}")
-raise SystemExit(1 if failures else 0)
-PY
-```
+最终frozen install通过（319项supply-chain policy，15.2s），pnpm audit --prod --audit-level high：No known vulnerabilities found；这不是OS镜像/secret scan结果。fresh安装再次23断言22表通过，随机库均清理。
 
-预期 `violation_count=0`。这只是结构性审计，不替代本仓 lint/typecheck/test/build/contract/integration。
+Root最终脚本窄修已复跑完整pnpm verify：13files86pass0skip+fresh23/22，日志/tmp/system-g5-owner-postreview-verify.log。unit进程组leader先退仍清后代、清理聚合失败、单build同image发布静态门3pass；实际source/ENOENT/docker失败fixture3pass。发布使用同runner一次构建→smoke/scan/SBOM→比对image ID→tag/push，不重建；Docker rm/stop的status/error均显式判定。所有cleanup独立执行，成功在cleanup全部完成后输出。Root prod/full pnpm audit均无已知漏洞；其他本地scan工具未装，镜像RC未验不变。
 
-## 7. Production candidate gate
+## Root 最终冻结树复验
 
-CI/tag release workflow 定义了 schema、unit、real integration、source scan、image build/smoke/scan、SBOM、provenance 与
-attestation。手工复现 image smoke：
-
-```bash
-IMAGE_TAG=kokoro-system:release-smoke \
-  bash scripts/test/production-image-smoke.sh
-```
-
-需要 Docker 以及容器可访问的 `DATABASE_URL`/`REDIS_URL`。生产候选验收必须保存 commit、workflow run、image immutable
-digest、scanner result、SBOM/attestation 和 smoke output。
-
-## 8. 明确未验收
-
-以下项目仍是缺口，不因本阶段通过而改变：
-
-- Product/Profile/Release Binding 的完整 application/API 生命周期，以及 Config/Policy/未来 Binding mutation cache invalidation；
-- Config product-reference/schema validation、不同 key 并发唯一性、Policy enforcement；
-- 生产 TLS/network policy/secret rotation、rate limit、capacity/load/failover/restore exercise；
-- metrics/traces/dashboard/alerts 与 30 天 SLI/SLO；
-- 首次发布后的 OpenAPI breaking baseline、artifact provenance 与 consumer matrix 自动化；
-- `server.ts` 400 行评审项与 SDK compatibility alias 清理。
+2026-09-08，Node24.13.0/pnpm12.3.4，独立PG数据库/Redis namespace：
+`TEST_ADMIN_DATABASE_URL=postgresql://nako@localhost/postgres TEST_REDIS_URL=redis://localhost:6379/2 pnpm verify`
+→ format/lint/typecheck/build/contract 全通过；13 files / 86 tests passed / 0 skipped；fresh 23 断言、22 表。
+日志 `/tmp/kokoro-system-g5-root-final-verify.log`；没有将测试删除前的 legacy 结果混入此数。
+Root `pnpm audit --prod --audit-level=high` 与 `pnpm audit --audit-level=high` 均无已知漏洞；OS/secret/image扫描不在此结论内。

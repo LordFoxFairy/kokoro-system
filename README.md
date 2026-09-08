@@ -1,114 +1,34 @@
 # kokoro-system
 
-**G1过渡工作树：目标contract/schema已先行，旧业务尚未替换，不作为可部署版本；以下启动命令待G2承接，勿对已有数据库应用schema。**
+Kokoro 内部控制面：Site/域名/Policy、Workspace、Product/App/Feature、配置发布与 Runtime Manifest、模型目录与可执行路由。只返回路由，不执行推理、不拥有价格、IAM 或 BFF 公共 API。
 
-`kokoro-system` 是 Kokoro 的 System owner，负责 Site、Host、Workspace、Runtime Manifest、System Config、
-Config Release、Release Binding 与 System Policy 事实。它是内部服务，不是浏览器 API；调用方向固定为
-`Browser -> Web same-origin adapter -> BFF -> System`。
+当前实现：Node **24.13.0**、pnpm **12.3.4**、Nest **12.0.1** Express、Zod→OpenAPI、PostgreSQL SQL-first、Redis。83 业务操作与 2 probes；唯一入口 `src/main.ts`。阶段证据及未验项见 [CURRENT](docs/CURRENT.md)、[ACCEPTANCE](docs/ACCEPTANCE.md)。
 
-当前实现、目标状态和已知缺口见 [`docs/CURRENT.md`](docs/CURRENT.md)。代码与文档入口见
-[`INDEX.md`](INDEX.md) 和 [`docs/INDEX.md`](docs/INDEX.md)。字段级 HTTP/Connect 事实源位于
-[`contract/`](contract/README.md)，数据库事实源是 [`database/schema.sql`](database/schema.sql)。
+## 本地源码启动
 
-## Owner 边界
-
-**已实现**
-
-- PostgreSQL 保存 System-owned durable facts 与 tenant manifest generation；Redis logical DB 2 只用于带 generation fence 的
-  Runtime Manifest 热缓存和可回收副本。
-- System 通过 `tenant_id + normalized host` 查询本仓 Site/Host，既不读取 IAM 数据库，也不调用 IAM Host API。
-- `/v1/system/*` 与 SiteService Connect RPC 要求 `web-bff` service identity 和共享 service token；
-  `/healthz`、`/readyz` 保持公开。
-- Control-plane 权限来自通过服务认证后的受信上下文：`system:read`、`system:write`、`system:publish`。
-- Mutation 使用 tenant-scoped `Idempotency-Key` receipt；release 只允许
-  `draft -> validated -> published -> retired`。
-- publish/retire 在同一 PostgreSQL transaction 推进 tenant manifest generation，再清理 Redis；并发 miss 通过写后 fence
-  丢弃旧 generation，进程崩溃或旧 cache namespace 不会把旧 manifest 重新变成当前事实。
-- Config 只可写入 caller tenant 的 `draft`/`validated` release；HTTP 中所有 PostgreSQL `BIGINT` response 均使用十进制字符串。
-
-**不属于本仓**
-
-- IAM 的 Tenant、Identity、AuthN/AuthZ、Role、Permission 与 Audit 事实；
-- BFF 的 Conversation、Message、Share、Project、ScheduledTask 与 public Product API；
-- Billing、Capability、Storage、Agent 或 Scheduler 的业务事实；Model目标按ADR031合入，当前仍独立运行；
-- 浏览器 session、CSRF admission、服务发现、TLS 终止与生产 secret 分发。
-
-## 五分钟本地启动
-
-前置条件：Node.js `>=24 <25`、`pnpm@12.3.4`、共享 PostgreSQL 16+、共享 Redis 7。System 使用独立
-PostgreSQL database/schema 与 Redis logical DB 2；不要为本仓重复启动一套依赖。
+复用已有 PostgreSQL/Redis，只为 System 创建独立空数据库；不覆盖已有数据。
 
 ```bash
 pnpm install --frozen-lockfile
-
-export DATABASE_URL='postgresql://USER:PASSWORD@127.0.0.1:55433/kokoro_worker_system'
-export REDIS_URL='redis://127.0.0.1:56380/2'
-export KOKORO_SYSTEM_BFF_SERVICE_TOKEN='LOCAL_SYSTEM_BFF_TOKEN'
-
-# 只允许空数据库；它不是 migration 或 drift repair。
-pnpm db:apply-schema
+cp .env.example .env
+# 填入本机独立 DATABASE_URL、REDIS_URL 与三个不同随机 service token
+set -a; source .env; set +a
+pnpm db:apply-schema  # 仅空库，已有表明确拒绝
 pnpm dev
 ```
 
-默认监听 `127.0.0.1:4240`。源码启动后检查：
+`GET /healthz` 为进程存活，`GET /readyz` 检查本仓 PG/Redis。默认 `127.0.0.1:4240`；容器外部访问显式设置 HOST。业务请求需可信 service 身份；字段以 [只读 HTTP contract](contract/README.md) 为准，无 RPC/SDK 第二协议。
+
+## 完整本仓门禁
 
 ```bash
-curl -fsS http://127.0.0.1:4240/healthz
-curl -fsS http://127.0.0.1:4240/readyz
+export TEST_ADMIN_DATABASE_URL='postgresql://USER@localhost/postgres'
+export TEST_REDIS_URL='redis://localhost:6379/2'
+pnpm verify
 ```
 
-`KOKORO_SYSTEM_BFF_SERVICE_TOKEN` 在解析层是可选配置，但运行业务 surface 时是必需的；缺失时业务路由以
-`service_auth_not_configured` fail closed。完整环境变量见 [`.env.example`](.env.example)，故障排查见
-[`docs/RUNBOOK.md`](docs/RUNBOOK.md)。
+测试创建/删除自己随机命名数据库，不清共享 Redis；namespace 中 cache 自然 TTL 回收。缺配置不跳过。`pnpm test:unit` 不依赖外部服务；`pnpm test:integration` 需要真实 PG/Redis。
 
-## 验证
+镜像 RC：`docker build -t kokoro-system:rc .`，随后 `SYSTEM_SMOKE_IMAGE=kokoro-system:rc pnpm exec tsx scripts/system-runtime-smoke.ts --image`（Linux host network，独立数据库/namespace）。本机 Docker daemon 当前异常，RC 实跑仍未验；不把 CI 配置当执行结果。
 
-不依赖外部基础设施的基础门禁：
-
-```bash
-pnpm contract:check
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-```
-
-真实基础设施门禁需要 `TEST_DATABASE_URL`/`DATABASE_URL`、`TEST_REDIS_URL`/`REDIS_URL`，且数据库账号能够
-创建和删除隔离测试数据库：
-
-```bash
-pnpm db:apply-schema
-pnpm test:runtime-real-system
-pnpm test:integration
-```
-
-命令结果只证明执行时的 checkout 和本地/CI 环境，不代表生产 SLO、容量、安全评估或灾备演练已达标。
-
-## Contract 与 generated code
-
-```bash
-pnpm contract:lint
-pnpm contract:generate
-pnpm verify:contract-provenance
-pnpm contract:check
-```
-
-目标HTTP字段source是src/modules/*/schemas/*.schema.ts，contract/openapi/system.openapi.json只读生成；contract/proto/仅旧运行基线待移除。
-`src/generated/proto/` 只能由 Buf/protoc 插件生成，禁止手改。版本、breaking policy、provenance 限制与 consumer
-升级步骤见 [`contract/README.md`](contract/README.md)。
-
-## Production image
-
-```bash
-docker build -t kokoro-system:local .
-docker run --rm -p 127.0.0.1:4240:4240 \
-  -e DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DB' \
-  -e REDIS_URL='redis://HOST:6379/2' \
-  -e KOKORO_SYSTEM_BFF_SERVICE_TOKEN='TOKEN' \
-  -e KOKORO_SYSTEM_HOST='0.0.0.0' \
-  kokoro-system:local
-```
-
-镜像以非 root `node` 用户运行，入口为 `node dist/main.js`，`HEALTHCHECK` 调用 `/readyz`。Tag release workflow
-构建并 smoke/scan 本地候选镜像后才推送，并请求 SBOM、max provenance 与 digest attestation；是否在某次远端运行中
-成功，以该 workflow run 的证据为准。
+代码地图 [INDEX](INDEX.md)，运行维护 [RUNBOOK](docs/RUNBOOK.md)，唯一完整任务表 [IMPLEMENTATION_PLAN](docs/IMPLEMENTATION_PLAN.md)。

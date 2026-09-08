@@ -1,3 +1,5 @@
+import { ModelMaintenanceRepository } from "./model-maintenance.repository.js";
+import { ModelMaintenanceService } from "./model-maintenance.service.js";
 import { CatalogService } from "./catalog.service.js";
 import { CatalogController } from "./catalog.controller.js";
 import { CatalogRepository } from "./catalog.repository.js";
@@ -28,8 +30,11 @@ import { HealthController } from "./health.controller.js";
 import { HealthService } from "./health.service.js";
 import { HealthRepository } from "./health.repository.js";
 @Module({
+  exports: [ModelMaintenanceService],
   imports: [DatabaseModule, CacheModule],
   providers: [
+    ModelMaintenanceRepository,
+    ModelMaintenanceService,
     CatalogRepository,
     CatalogService,
     ResolveRepository,

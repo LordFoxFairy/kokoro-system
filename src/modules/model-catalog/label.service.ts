@@ -108,8 +108,6 @@ export class LabelService {
       await this.features.lock(tx, [snapshot.feature_key]);
       const current = await this.labels.find(tx, id, true, true);
       requireVersion(current.version, context.precondition);
-      if (!current.deleted_at)
-        throw new OwnerError("INVALID_STATE", "Label not deleted", 409);
       await this.validateDefault(
         tx,
         current.feature_key,
