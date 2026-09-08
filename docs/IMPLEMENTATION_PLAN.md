@@ -1,6 +1,6 @@
 # System 完整交付唯一实施计划
 
-当前：R6工程收敛已完成本仓验证，待Root审查提交，唯一System writer/system_owner，Root审查提交；G1–G5完整源码与G6消费者HTTP已由Root验收；System代码提交 `d7257aa56632627fe0ba8ec4576c32c550a25c3d`，committed clean HEAD全量86pass/0skip+fresh23断言22表，跨仓live PASS。Root负责最终文档/拓扑提交；Docker RC、CI扫描/attestation与部署环境证据单独待验，不把它们标为通过。完整五模块83业务操作，非仅Site交付。
+当前：R6工程收敛已由Root提交并在clean HEAD验收，提交 `dcfa8468446108c17cd65b32fc028af261472c99`；G1–G5完整源码与G6消费者HTTP均已验收。R6 committed HEAD全量97pass/0skip+fresh23断言22表，跨仓live PASS，System结构门0违规。Docker RC、CI扫描/attestation与部署环境证据单独待验，不把它们标为通过。完整五模块83业务操作，非仅Site交付。
 第0–1节及G1–G4早期卡是历史授权/证据，不覆盖末尾G5稳定交付状态。最新本仓门、Root跨仓live、Docker环境未验项以末尾G5记录及CURRENT/ACCEPTANCE为准。
 
 ## 0. G0历史基线与范围
@@ -403,7 +403,7 @@ Root稳定源码跨仓隔离HTTP已PASS，独立PG/prefix/process全部清理；
 System `d7257aa56632627fe0ba8ec4576c32c550a25c3d` clean；Node24 `pnpm verify`完整86pass/0skip，fresh23断言22表，全质量/契约门pass。Root隔离 `run_system_owner_smoke.py` 在该commit真实运行System+BFF、发布绑定与配置覆盖、目录/default/manifest、tenant隔离和Agent默认/显式resolve/factory全部PASS，owned resources removed。日志 `/tmp/kokoro-system-g5-committed-verify.log`、`/tmp/kokoro-system-g6-committed-live.log`。
 BFF26eec011实际152pass，Agent e24b4aa实际611pass/6skip/77deselected；BFF两个任务外dirty保留不暂存。Root focused81pass、全tests82pass/2手册基线fail，System静态0违规/其他仓200条，topology九active与manifest-only通过。Root仅后续提交本计划/CURRENT/ACCEPTANCE验收记录，不改上述已验业务源码；Docker引擎500的RC、未运行CI扫描/attestation和生产SLO/灾备保留后续owner System/Root。
 
-## R6 — NestJS typed lint、错误与模块公开面收敛（待Root审查提交）
+## R6 — NestJS typed lint、错误与模块公开面收敛（已验收）
 
 - Owner：kokoro-system；唯一 writer system_owner；Root 审查、串行提交。基线 `/Users/nako/WebstormProjects/github/thefoxfairy/Kokoro/kokoro-system`，分支 codex/production-closure-docs，clean `280d5d0567c94de33e32f0e85f163fbcf75ede20`。无 Git index/commit/branch 权限。
 - 范围：eslint.config.js、必要 src/test、既有契约 provenance 记录与检查、CURRENT/ACCEPTANCE/TECHNICAL_DESIGN/INDEX/本计划；不改 canonical SQL、HTTP shape、83 operation、package/lock（确需先报 Root）。冻结 artifact SHA256 `f9ea76f107e1ea0fc19df20ee7c59032c0fbac66e640e9a16a1b770ab27c1f37`。

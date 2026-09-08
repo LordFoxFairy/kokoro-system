@@ -1,6 +1,6 @@
 # System 验收证据
 
-当前 R6 基线：`280d5d0567c94de33e32f0e85f163fbcf75ede20`，下述G5为已验历史，末尾R6为本次工作树证据。G5代码起始基线`51bc22dac4b32da86984e7147caaae5e4db6a34a`；Root committed HEAD 跨仓证据在 Root `docs/CURRENT.md` 绑定最终 SHA。历史G1–G4完整证据见唯一 IMPLEMENTATION_PLAN，不与当前结果混用。
+当前 R6 交付：`dcfa8468446108c17cd65b32fc028af261472c99`（起始基线 `280d5d0567c94de33e32f0e85f163fbcf75ede20`）。下述G5为已验历史，末尾R6为当前提交证据。G5代码起始基线`51bc22dac4b32da86984e7147caaae5e4db6a34a`；Root committed HEAD 跨仓证据在 Root `docs/CURRENT.md` 绑定最终 SHA。历史G1–G4完整证据见唯一 IMPLEMENTATION_PLAN，不与当前结果混用。
 
 ## 已执行的G5聚焦证据
 
@@ -54,7 +54,7 @@ Root `pnpm audit --prod --audit-level=high` 与 `pnpm audit --audit-level=high` 
 Root已在 `d7257aa56632627fe0ba8ec4576c32c550a25c3d` clean HEAD 重跑同一 `pnpm verify`，86pass/0skip、fresh23/22、所有质量/contract门通过。随后真实 System/BFF source HTTP 与 Agent resolve/factory跨仓smoke PASS，全部owned资源清理。证据日志 `/tmp/kokoro-system-g5-committed-verify.log`、`/tmp/kokoro-system-g6-committed-live.log`；此后本提交仅回填三份验收文档，不修改源码。Docker/未跑CI项如上保留，不作发布全绿声明。
 
 
-## R6 typed lint / 中性错误 / Nest 公开面（待Root提交）
+## R6 typed lint / 中性错误 / Nest 公开面（已提交）
 
 Node24.13.0，基线280d5d clean后唯一writer实施；无package/lock/SQL/OpenAPI artifact变更。真实type-aware recommendedTypeChecked+projectService，8条显式Promise/unsafe/switch规则由实际ESLint正反fixture验证。原始81条typed诊断逐项修复，无eslint-disable、规则降低、断言弱化；多数源码变更为中性错误import/删除status实参及pg/unknown类型收紧。
 
@@ -72,3 +72,7 @@ R6最终冻结复跑：`/tmp/r6-freeze-verify.log`完整15files96pass0skip+fresh
 ### R6-guard 最终窄修与重冻结
 
 Controller相对database/cache依赖四负例（含直接/alias手工Repository）先RED1fail6pass；实现严格规则后真实HealthController两依赖触发RED，未加豁免。Root批准同目录HealthService聚合readiness，Controller仅委托，Module注册；Health单测证明live不触依赖、ready成功与两依赖失败语义不变。focused架构7+Health1共8pass。最终`/tmp/r6-guard-verify.log`完整16files97pass0skip+fresh23断言22表，全部format/lint/typecheck/build/契约门通过；未扩大timeout，未删业务断言，artifact/SQL/package/lock无diff。唯一writer再次停写，Root审查提交。
+
+### Root committed HEAD 复验
+
+Root 将经双只读审查且与86文件manifest完全一致的交付提交为 `dcfa8468446108c17cd65b32fc028af261472c99`。随后在clean HEAD独立执行完整 `pnpm verify`：16files/97pass/0skip、fresh PostgreSQL 23断言/22表；83业务operation+2probes drift、19source provenance、12contract tests均通过。跨仓System/BFF/Agent source HTTP smoke PASS并清理全部owned资源；Root结构门对System为0违规。日志 `/tmp/r6-root-verify-committed.log`、`/tmp/r6-root-smoke-committed.log`、`/tmp/r6-root-structural-committed.json`。OpenAPI artifact、canonical SQL、package与lock仍无变化。

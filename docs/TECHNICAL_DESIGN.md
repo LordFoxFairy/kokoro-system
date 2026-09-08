@@ -1,6 +1,6 @@
 # System 技术设计
 
-状态：2026-09-08，G1–G5 已提交验收（最终文档基线280d5d），R6当前工作树收敛typed lint/中性错误/模块公开面；最终 commit/门禁与外部阻断见 CURRENT/ACCEPTANCE。
+状态：2026-09-08，G1–G5 已提交验收；R6 typed lint/中性错误/模块公开面已提交为 `dcfa8468446108c17cd65b32fc028af261472c99` 并由Root在clean HEAD复验；外部阻断见 CURRENT/ACCEPTANCE。
 Root ADR-031 冻结本设计；五模块、83业务操作及2probes已实现，不保留旧Node router/RPC。
 唯一任务表：[IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md)。完整 System 为交付范围，Site 不是最终范围。
 
@@ -9,7 +9,7 @@ Root ADR-031 冻结本设计；五模块、83业务操作及2probes已实现，�
 | 项 | 决定 |
 |---|---|
 | Owner | System；sites、workspaces、products、runtime-manifests、model-catalog；本轮 system_owner 唯一 writer，Root 提交 |
-| 当前事实 | R6基线280d5d；main→start-system→AppModule，五业务模块及access/http/database/cache/maintenance技术支持；83业务HTTP+2probes，SQL-first唯一22表；Root负责旧Model active退出 |
+| 当前事实 | R6交付dcfa846；main→start-system→AppModule，五业务模块及access/http/database/cache/maintenance技术支持；83业务HTTP+2probes，SQL-first唯一22表；Root负责旧Model active退出 |
 | 目标职责 | 五个业务模块的 HTTP 控制面与配置投影；模型不推理、价格不归本仓、Workspace 不复制 IAM 组织/BFF Project |
 | 目录比较 | src/<feature> 可行；采用 src/modules/<feature> 配合已有 config 与后续 database/access/http，避免业务/技术入口混杂；拒绝全局四层与独立 releases/configs |
 | 粒度 | 每个能力的运行时 wire schema 位于 schemas/；Root追加批准src/http/protocol.schema.ts仅承载共享HTTP envelope/error/request-id/probe/page schema，generator与运行时共同消费，无I/O；一个文件只定义同一资源 wire schema；schema 集合按 schemas/ 聚合。scripts 只做契约/隔离验证；同模块Controller/Service/Repository按变化原因分开 |

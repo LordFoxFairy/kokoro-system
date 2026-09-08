@@ -1,6 +1,6 @@
 # System 当前状态
 
-2026-09-08。G1 `f5702068d4416ad90b1bd02af57d2825c32be916`、G2 `d057deb706a34129e23bec5ec1f70e235ca1d4ce`、G3 `f13bb73dfe81c3d79036852d3d3cb7a6cbb1916d`、G4 `51bc22dac4b32da86984e7147caaae5e4db6a34a` 已由Root提交验收。当前为 **G5完整源码交付并验收**（代码提交 `d7257aa56632627fe0ba8ec4576c32c550a25c3d`，验收文档280d5d；R6工程边界已完成本仓验证，待Root审查提交）；完整任务历史只维护 IMPLEMENTATION_PLAN。
+2026-09-08。G1 `f5702068d4416ad90b1bd02af57d2825c32be916`、G2 `d057deb706a34129e23bec5ec1f70e235ca1d4ce`、G3 `f13bb73dfe81c3d79036852d3d3cb7a6cbb1916d`、G4 `51bc22dac4b32da86984e7147caaae5e4db6a34a` 已由Root提交验收。当前为 **完整 System 源码、消费者 HTTP 与 NestJS 工程边界均已提交验收**：G5业务代码 `d7257aa56632627fe0ba8ec4576c32c550a25c3d`，R6工程收敛 `dcfa8468446108c17cd65b32fc028af261472c99`；完整任务历史只维护 IMPLEMENTATION_PLAN。
 
 ## 当前源码事实
 
@@ -21,8 +21,8 @@ Root冻结源码跨仓live已PASS：System/BFF正式pnpm dev、发布binding覆�
 **环境阻断**：Docker Desktop后端存在但daemon API1.51/1.47 info均500、socket ping/version超时，Root独立复现；未重启/重置Docker或共享infra。镜像RC实跑及CI供应链扫描/SBOM/provenance未验；只配置门禁不宣称已通过。长期生产SLO/容量/灾备/secret轮换仍是部署环境证据，不以本轮System验收替代九仓生产验收。
 
 
-## R6 当前工作树（基线280d5d，待Root审查提交）
+## R6 已提交工程收敛（`dcfa8468446108c17cd65b32fc028af261472c99`）
 
-第一轮及移除诊断后的完整verify均15files96pass0skip+fresh23/22通过（`/tmp/r6-final-clean-verify.log`）。中间一次model afterAll10s超时未复现，三轮诊断及后续完整门通过，风险如实记录ACCEPTANCE。真正typed lint已启用并清除81条原始诊断；SystemError无HTTP status、18码映射与完整envelope保持；四public入口与最小Nest exports、Repository零HTTP依赖、唯一DI配置已实现。真实生命周期6pass，含单次配置解析与部分失败两资源关闭。新增架构实际typed规则正反、公开面/消费者/循环/禁止依赖门。完整verify与最终文件清单见R6任务卡/ACCEPTANCE，本轮结果绑定280d5d+未提交变化树，Root提交后独立复验。
+第一轮及移除诊断后的完整verify均15files96pass0skip+fresh23/22通过（`/tmp/r6-final-clean-verify.log`）。中间一次model afterAll10s超时未复现，三轮诊断及后续完整门通过，风险如实记录ACCEPTANCE。真正typed lint已启用并清除81条原始诊断；SystemError无HTTP status、18码映射与完整envelope保持；四public入口与最小Nest exports、Repository零HTTP依赖、唯一DI配置已实现。真实生命周期6pass，含单次配置解析与部分失败两资源关闭。新增架构实际typed规则正反、公开面/消费者/循环/禁止依赖门。
 
-R6-guard最终重冻结：Controller零database/cache直连（probe也无豁免），HealthService承接原ready聚合；手工Service/Repository含alias门已补。最终`/tmp/r6-guard-verify.log`16files97pass0skip+fresh23断言22表、全部质量/契约门通过；86文件待Root审查提交。原一次非复现hook风险记录继续保留。
+R6-guard最终提交后，Root 在 clean `dcfa8468446108c17cd65b32fc028af261472c99` 独立复跑 `pnpm verify`：16files/97pass/0skip、fresh23断言/22表，全部质量与契约门通过；跨仓 source HTTP smoke PASS 且 owned resources removed；Root结构门对System为0违规。Controller零database/cache直连（probe也无豁免），HealthService承接原ready聚合，手工Service/Repository含alias门已补。日志 `/tmp/r6-root-verify-committed.log`、`/tmp/r6-root-smoke-committed.log`。原一次非复现hook风险继续保留。
