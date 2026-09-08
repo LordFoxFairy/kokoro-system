@@ -28,6 +28,24 @@ export class SitesService {
     @Inject(DomainRepository) private readonly domains: DomainRepository,
     @Inject(PolicyRepository) private readonly policies: PolicyRepository,
   ) {}
+  public resolveManifestSite(context: RequestContext, host: string) {
+    let normalized: string;
+    try {
+      normalized = normalizeHost(host);
+    } catch {
+      throw new OwnerError("INVALID_ARGUMENT", "Invalid hostname");
+    }
+    return this.database.read(async (tx) => {
+      const tenant = tenantScope(context);
+      const site = await this.sites.findByHost(tx, tenant, normalized);
+      if (site.status !== "active")
+        throw new OwnerError("POLICY_DENIED", "Site unavailable", 403);
+      const policy = await this.policies.find(tx, tenant, site.id);
+      if (!policy)
+        throw new OwnerError("POLICY_DENIED", "Site policy required", 403);
+      return { site, policy };
+    });
+  }
   public async list(context: RequestContext, input: PageInput) {
     const tenant = tenantScope(context);
     const query = pageQuery(input, "sites", tenant);

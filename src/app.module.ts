@@ -6,6 +6,8 @@ import { AccessGuard } from "./access/access.guard.js";
 import { HealthModule } from "./health/health.module.js";
 import { SitesModule } from "./modules/sites/sites.module.js";
 import { WorkspacesModule } from "./modules/workspaces/workspaces.module.js";
+import { ProductsModule } from "./modules/products/products.module.js";
+import { RuntimeManifestsModule } from "./modules/runtime-manifests/runtime-manifests.module.js";
 @Module({})
 export class AppModule {
   public static forRoot(environment: NodeJS.ProcessEnv): DynamicModule {
@@ -16,6 +18,8 @@ export class AppModule {
         HealthModule,
         SitesModule,
         WorkspacesModule,
+        ProductsModule,
+        RuntimeManifestsModule,
       ],
       providers: [{ provide: APP_GUARD, useClass: AccessGuard }],
     };

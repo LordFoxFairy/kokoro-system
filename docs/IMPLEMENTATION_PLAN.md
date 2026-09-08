@@ -281,3 +281,41 @@ typecheck/build/lint/Redocly规范校验/83operation drift/18source provenance�
 全test复现127pass/5既有fail/8旧integration skip，日志/tmp/kokoro-system-g2-root-all.log；没有放宽旧断言。
 Root已检查Access/Service/Repository/receipt锁与生命周期、确认隔离system_g2数据库清理；独立只读审查未发现P1/P2。
 此提交仍非生产入口cutover；G3–G5完整能力和G6 live验收继续由同负责人推进。
+
+### G2 Root验收与G3进行中
+
+G2提交d057deb706a34129e23bec5ec1f70e235ca1d4ce（43文件）；Root修正error.filter.ts唯一格式问题后39TS格式通过，committed HEAD 26pass/0skip；typecheck/build/lint/contract/provenance通过，全test127pass/5既有fail/8skip。G3立即续接，唯一writer不变。
+G3具名文件：products模块下product/application/feature/exposure/presentation/config/release/binding各资源的controller/service/repository（简单资源不建mapper）；products.module.ts注册。Manifest模块controller/service/repository/cache承担策略投影与双generation校验；公开模块Services提供投影数据，不deep-import Repository。先Product目录CRUD与失败路径，再App/Feature/Presentation、Config/Release/Binding与Manifest。测试新增test/integration/system-target-products.test.ts；现有G2隔离集成保留独立运行。
+
+G6-Root-Smoke卡：Root唯一Root仓writer，基线Root36c9e779（后续并行commit可变）；范围scripts/e2e/run_system_owner_smoke.py、scripts/tests/test_system_owner_smoke.py，新增独立Agent调用脚本须先补范围。Root审查提交；依赖G1冻结artifact、System完整G5启动、BFF1e03b87、Agente24b4aa。只编排正常HTTP、不跨repo import；随机独立PG DB与System Redis namespace，复用infra、不FLUSHDB、仅drop自己创建资源。覆盖正式启动/readiness→BFFcatalog/manifest→Agent真实resolve；安全隔离unit先RED/GREEN，完整live待G5。System writer不修改Root脚本。
+G6-BFF-dev子项：BFF同owner唯一writer，基线1e03b87；仅package/lock/test/docs修复Node22 pnpm dev对src .js specifier的ERR_MODULE_NOT_FOUND。采用精确tsx源码runner，不全量改import；Root验证提交，System writer不修改BFF。
+
+G6补充Root实交付：BFF-dev 26eec0112c83ea98aa045896d385c89ad88b45d2，5文件package/lock/workspace/test/ACCEPTANCE，Node22 frozen install/lint/typecheck/build/test152pass，committed source-start2pass；前一consumer仍1e03b87。Root隔离smoke安全测试17pass，live仍待G5；Root topology机器cutover仅工作树准备，Model checkout/remote/历史保留、DB3空置，未冒称active退出验收。
+
+### G3 行为与放置收敛
+
+35 Products + 1 Manifest全部显式Nest方法；累计53业务操作+2 probes，生产main仍未cutover。新增Products八资源controller/service/repository及product-projection.service/repository；Manifest四具名文件（controller/service/repository/module），轻量缓存协调归ManifestService，复用CacheService，不为单例cache再加空层。HTTP新增forwarded-host.ts纯transport解析，SitesService公开resolveManifestSite返回本module对象；Manifest只用Sites/Products公开Services，不deep-import Repository。
+
+配置选择：global→tenant→product→surface，global通用product_id NULL在product-specific之前；同scope中精确locale高于NULL，选中published release高于普通NULL release，再按version/id确定同identity次序。按module_key/config_key挑选有效项，集合按业务key合并；App presentation覆盖相应呈现项，未exposed/retired feature导航不可执行。完整缓存identity包含tenant/site/product/locale/surface与global/tenant两个generation；GET、投影前后及SET后复核，三次有界重试，poison/digest不符/Redis故障fail closed，TTL30s。
+
+Config PATCH只改value、按存量module二次schema验证，CAS使用config_version并发出ETag；全局scope服务端固定，不从tenant伪装。Release validate重新校验内容schema/引用并计算canonical digest，修改validated release退draft，published配置保持不可变；retire同事务归档binding。绑定要求同tenant published release。删除Config/Binding/Exposure仅锁父存在，不要求Site active，创建/修改仍要求active。Site删除新增active surface Config反查与同父锁。
+
+G3审查修复证据：发布优先级逆UUID先RED→GREEN；suspended Site清理Config/Binding/Exposure先RED409→GREEN并最终删Site；surface Config父锁两序，临时移除反查使测试RED（Site删200应409），恢复源码后验证。普通业务TDD按Product/App/Feature/Exposure/Presentation/Config/Release/Manifest逐项先404 RED后实现。测试只操作system_g3随机DB与namespace，未动共享服务或其他仓。
+
+### G3 稳定交接与实际门禁（2026-09-08）
+
+基线d057deb706a34129e23bec5ec1f70e235ca1d4ce；状态待Root审查/串行提交。System唯一writer停止写入；Root提交后立即续G4/G5完整范围，不以阶段结果结束总任务。
+文件集合：当前git diff --name-only与git ls-files --others --exclude-standard，共40文件（38 TS + CURRENT/IMPLEMENTATION_PLAN）；没有package/schema/contract变化或任务外dirty。Sites两现有文件仅公开Manifest查询、Config反向引用；HTTP interceptor补config_version ETag；AppModule挂新模块，测试架构门扩到53操作。
+
+- `TEST_ADMIN_DATABASE_URL=postgresql://nako@localhost/postgres pnpm exec vitest run --no-file-parallelism test/integration/system-target-control.test.ts test/integration/system-target-products.test.ts test/architecture/system-target-boundary.test.ts test/unit/system-kernel.test.ts test/contract/system-target-contract.test.ts test/contract/proto-owner-boundary.test.ts` →6files/39pass/0skip。G3真实集成13项，包含所有36方法路径的真实Nest负向身份请求；G2集成7项保留。
+- `pnpm typecheck && pnpm build && pnpm lint && pnpm contract:lint && pnpm verify:contract-provenance` →全部exit0；Redocly有效、83+2 frozen inventory、18source provenance不变。
+- 本切片38个新增/修改TS `pnpm exec prettier --check <精确路径>` →全通过；git diff --check通过。
+- `TEST_ADMIN_DATABASE_URL=postgresql://nako@localhost/postgres pnpm test` →30files：25pass/2fail/3skip；153tests：140pass/5既有fail/8旧integration skip。日志/tmp/system-g3-owner-all-tests.log。旧HTTP/全局四层测试仍待G5随cutover承接，不删除或放宽冒充全绿。
+- schema未改，本轮集成各次均fresh应用canonicalSQL；本次未重新执行G1独立23项schema断言。Redis故障测试仅关闭本测试应用自己的client，不重启或破坏共享服务。
+
+尚未交付：G4全部Model Catalog；G5生产main/旧树与Proto/SDK/libDOM退出、retention/reconciliation、完整startup/drain/观测/CI/smoke；Root G6真实消费者联调。现有测试证明当前切片，不宣称完整生产验收。
+
+### G3 Root 稳定树复验与放行
+
+Root在d057deb+交接40文件复跑6files/39pass/0skip（真实独立PG/Redis）；typecheck/build/lint/Redocly/drift/18source provenance全部通过；38TS格式与diff check通过。全量140pass/5既有fail/8旧skip，日志/tmp/kokoro-system-g3-root-all.log。独立system_capability_review静态复查三项P2均关闭、未见新增P1/P2。Root串行提交后同负责人立即继续G4/G5，不以此宣布完整完成。
+Root隔离跨仓smoke单测20pass，与topology/governance合计59pass；BFF真实源码启动+fresh PG/Redis readiness已通过，但完整System消费者smoke仍待G5。

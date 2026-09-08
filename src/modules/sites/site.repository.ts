@@ -14,6 +14,19 @@ const columns =
   "s.id,s.tenant_id,s.site_key,s.display_name,s.timezone,s.status,s.version,s.created_at,s.updated_at,s.deleted_at,ARRAY(SELECT h.hostname FROM system_site_host h WHERE h.tenant_id=s.tenant_id AND h.site_id=s.id AND h.status='active' ORDER BY h.hostname) AS hostnames";
 @Injectable()
 export class SiteRepository {
+  public async findByHost(
+    tx: TransactionContext,
+    tenant: string,
+    host: string,
+  ) {
+    const result = await tx.query(
+      `SELECT ${columns} FROM system_site s JOIN system_site_host h ON h.site_id=s.id AND h.tenant_id=s.tenant_id WHERE s.tenant_id=$1 AND h.hostname=$2 AND h.status='active' AND s.deleted_at IS NULL`,
+      [tenant, host],
+    );
+    if (!result.rows[0])
+      throw new OwnerError("NOT_FOUND", "Site not found", 404);
+    return decodeRow(siteSchema, result.rows[0]);
+  }
   public async find(
     tx: TransactionContext,
     tenant: string,
@@ -97,7 +110,7 @@ export class SiteRepository {
     actor: string,
   ) {
     const references = await tx.query<{ used: boolean }>(
-      "SELECT EXISTS(SELECT 1 FROM system_workspace WHERE tenant_id=$1 AND site_id=$2 AND deleted_at IS NULL) OR EXISTS(SELECT 1 FROM system_application WHERE tenant_id=$1 AND site_id=$2 AND deleted_at IS NULL) OR EXISTS(SELECT 1 FROM system_release_binding WHERE tenant_id=$1 AND site_id=$2 AND status='active') AS used",
+      "SELECT EXISTS(SELECT 1 FROM system_workspace WHERE tenant_id=$1 AND site_id=$2 AND deleted_at IS NULL) OR EXISTS(SELECT 1 FROM system_application WHERE tenant_id=$1 AND site_id=$2 AND deleted_at IS NULL) OR EXISTS(SELECT 1 FROM system_release_binding WHERE tenant_id=$1 AND site_id=$2 AND status='active') OR EXISTS(SELECT 1 FROM system_config_record WHERE tenant_id=$1 AND site_id=$2 AND status='active') AS used",
       [tenant, id],
     );
     if (references.rows[0]?.used)

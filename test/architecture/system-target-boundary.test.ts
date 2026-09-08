@@ -1,3 +1,12 @@
+import { RuntimeManifestController } from "../../src/modules/runtime-manifests/runtime-manifest.controller.js";
+import { BindingController } from "../../src/modules/products/binding.controller.js";
+import { ReleaseController } from "../../src/modules/products/release.controller.js";
+import { ConfigController } from "../../src/modules/products/config.controller.js";
+import { PresentationController } from "../../src/modules/products/presentation.controller.js";
+import { ExposureController } from "../../src/modules/products/exposure.controller.js";
+import { FeatureController } from "../../src/modules/products/feature.controller.js";
+import { ApplicationController } from "../../src/modules/products/application.controller.js";
+import { ProductController } from "../../src/modules/products/product.controller.js";
 import "reflect-metadata";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -19,9 +28,21 @@ function files(directory: string): string[] {
   );
 }
 describe("System target native Nest boundaries", () => {
-  it("matches every Sites/Workspace native method/path/access rule against frozen owner contract", () => {
+  it("matches every G2/G3 native method/path/access rule against frozen owner contract", () => {
     const actual: string[] = [];
-    for (const controller of [SitesController, WorkspacesController]) {
+    for (const controller of [
+      SitesController,
+      WorkspacesController,
+      ProductController,
+      ApplicationController,
+      FeatureController,
+      ExposureController,
+      PresentationController,
+      ConfigController,
+      ReleaseController,
+      BindingController,
+      RuntimeManifestController,
+    ]) {
       const prefix = Reflect.getMetadata(PATH_METADATA, controller) as string;
       for (const name of Object.getOwnPropertyNames(controller.prototype)) {
         const handler: unknown = Reflect.get(controller.prototype, name);
@@ -52,17 +73,30 @@ describe("System target native Nest boundaries", () => {
     expect(actual.sort()).toEqual(
       systemOperations
         .filter((operation) =>
-          ["sites", "workspaces"].includes(operation.module),
+          ["sites", "workspaces", "products", "runtime-manifests"].includes(
+            operation.module,
+          ),
         )
         .map((operation) => `${operation.method} ${operation.path}`)
         .sort(),
     );
-    expect(new Set(actual).size).toBe(17);
+    expect(new Set(actual).size).toBe(53);
   });
   it("keeps SQL in owner repositories and forbids cross-module writes/deep imports", () => {
     const owners: Record<string, readonly string[]> = {
       sites: ["system_site", "system_site_host", "system_site_policy"],
       workspaces: ["system_workspace"],
+      products: [
+        "system_product",
+        "system_application",
+        "system_feature_definition",
+        "system_app_feature_exposure",
+        "system_presentation",
+        "system_config_record",
+        "system_config_release",
+        "system_release_binding",
+      ],
+      "runtime-manifests": [],
     };
     for (const [module, tables] of Object.entries(owners)) {
       for (const file of files(`src/modules/${module}`)) {
