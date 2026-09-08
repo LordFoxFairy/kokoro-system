@@ -197,7 +197,7 @@ Root唯一writer；基线Root 7aaf211f（并行提交可变）；仅scripts/gove
 | reflect-metadata / rxjs |0.2.2 /7.8.2|满足Nest ^0.1.12或^0.2.0 / ^7.1.0 peers；不安装可选class-validator/transformer重复DTO |
 | Zod |4.5.4|MIT；实际runtime parse、toJSONSchema、Nest Pipe、tsc/build验证；退出可用Standard Schema但需重新生成contract |
 | pg / redis |8.23.0 /6.2.1|MIT；npm engines分别>=16/>=20；实际freshPG23断言；Redis新client运行连接/fence在G2真实集成待验，退出通过模块cache API不泄露驱动类型 |
-| TS / @types/node |6.0.3 /24.13.3|TS Apache-2.0；strict+ES2024+noEmitOnError/noFallthrough+skipLibCheck=false；当前Connect2声明依赖HeadersInit，暂保留lib DOM，仅G1过渡，G2删除RPC后必须移除DOM，不创建类型alias |
+| TS / @types/node |6.0.3 /24.13.3|TS Apache-2.0；strict+ES2024+noEmitOnError/noFallthrough+skipLibCheck=false；当前Connect2声明依赖HeadersInit，暂保留lib DOM，仅G1过渡，G5删除RPC后必须移除DOM，不创建类型alias |
 | Redocly CLI |2.46.1|MIT；Node>=22.12.0或20.19，固定已在BFF核验的版本；独立OpenAPI3.1规范lint通过0warning，不以自身generator比较代替规范验证；工具提示2.51.2升级留独立审查，不改变当前锁 |
 | Prettier |3.9.6|MIT；仅格式化本G1新增/修改TS，不批量改旧业务；全仓format门留G2清除旧树时闭环 |
 
@@ -210,7 +210,7 @@ Root唯一writer；基线Root 7aaf211f（并行提交可变）；仅scripts/gove
 - contract:lint：Buf旧Proto+Redocly2.46.1 OpenAPI3.1规范校验0warning+drift/metadata通过；verify:contract-provenance校验runtime source/OpenAPI及仍保留旧Proto digest。
 - typecheck/build/lint：当前G1全部通过；这只证明schema/旧进程编译，不证明Nest业务已实现。
 - TEST_ADMIN_DATABASE_URL=postgresql://nako@localhost/postgres pnpm test:schema:fresh：PG18.4 fresh安装+非空重装拒绝+23项断言，22张表；最近隔离库system_g1_1804aa10dff54a99a7fdbca895f53ee2已清理。首次脚本发现管理员search_path非public，显式设public,pg_catalog与UTC后重跑通过；不是修改共享PG参数。
-- 最终全量test：26files，21pass/2fail/3skip；128tests，115pass/5fail/8skip。5fail为如下旧契约/目录代际断言，业务保留测试未见额外失败；不称全绿。G1新增目标artifact与保留的旧runtime测试有明确代际冲突；test/http-contract-source.test.ts旧固定13 operation/旧meta/旧schema名字断言，以及test/architecture/layer-boundary.test.ts禁modules/http仍待G2替换，未放宽或删除这些测试。
+- 最终全量test：26files，21pass/2fail/3skip；128tests，115pass/5fail/8skip。5fail为如下旧契约/目录代际断言，业务保留测试未见额外失败；不称全绿。G1新增目标artifact与保留的旧runtime测试有明确代际冲突；test/http-contract-source.test.ts旧固定13 operation/旧meta/旧schema名字断言，以及test/architecture/layer-boundary.test.ts禁modules/http仍待G5替换，未放宽或删除这些测试。
 - 当前HTTP业务源码未写，canonicalSQL receipt/scope/表与旧Service不兼容；禁止部署G1或在旧业务上冒称fresh smoke。真实CRUD/父删除竞态/retention/Redisfence/consumer/CI均G2–G6待验。
 - Root审查前保持工作树，不git add/commit/checkout；交付SHA由Root串行提交后记录。Root追加准许src/http/protocol.schema.ts仅HTTP wire schema及生成器共用，无I/O。
 
@@ -226,3 +226,58 @@ Root在7dde8e7+交接40文件的稳定工作树重跑：target 9pass、旧Proto 
 Root全量test复现115pass/5fail/8skip；5项为已声明旧契约/旧目录断言，日志/tmp/kokoro-system-g1-root-tests.log。它们必须在源码切换时用目标行为测试替换，未标记完整验收。
 system_consumer_plan只读最终复核无阻断：conditional Config、tenant-only Release、全局Config禁止release、83操作分布、错误状态、receipt作用域与跨module只读完整性规则一致。
 G1设计/机器门通过；本提交为不可部署的设计先行过渡点。Root提交后同负责人获准连续实施G2–G5全部业务与门禁；G6消费者以此已提交owner契约为依赖，最终验收仍包括完整cutover。
+
+## 3. G2–G5 放行与准确实施集（基线f570206）
+
+Root已提交并复验G1 f5702068d4416ad90b1bd02af57d2825c32be916，批准完整实施。同仓唯一writer仍system_owner，Root串行提交。
+执行executing-plans与TDD：先记录失败断言，再实现；不另建任务中心、不生成外部worker。
+
+| 项 | 放置结论 |
+|---|---|
+| Owner/current | System五模块；f570206干净基线；旧main仍启动旧进程，目标schema已先行 |
+| 职责 | Nest显式Module/DI、唯一pg/Redis连接、可信HTTP上下文、sites/workspaces真实CRUD/CAS/幂等/生命周期 |
+| 位置比较 | 复用旧bootstrap/application会延续全局四层；采用src/{database,cache,access,http,health,config}技术职责及既定modules，旧树在主入口cutover时删除 |
+| 粒度 | 具名Service决定用例/事务，Repository写SQL；不建通用CRUD/BaseRepository/coordinator。技术transaction/receipt只处理原子性，不分派业务命令 |
+| 依赖 | 模块独占写表；同client跨module只读父锁/引用检查；Service不写SQL，Controller不持久化 |
+| API/data | 严格使用已冻结runtime schema；保持83业务+2probe目标，G2先挂载17操作的测试应用，不把未挂载G3/G4标成可部署完整System |
+| 删除 | G5一次切换main并删除旧树/RPC/SDK；G2不加兼容路由/501，旧与目标不会同时启动 |
+| 验证 | G2真实PG/Redis隔离测试+Nest HTTP+unit/contract/typecheck/build/lint；G5完整route inventory与全门禁 |
+
+| 切片 | 精确写入集（均System根下） | 验收/状态 |
+|---|---|---|
+| G2 | src/config/{config.module,system-config,system-env.schema}.ts；src/database/{database.module,database.service,transaction-context,command-receipt,command-digest,row-decoder}.ts；src/cache/{cache.module,cache.service}.ts；src/access/{request-context,request-context.decorator,tenant-scope,access.decorator,access.guard}.ts；src/http/{owner-error,error.filter,response.interceptor,conditional-request,pagination,configure-http}.ts；src/health/{health.module,health.controller}.ts；src/app.module.ts；src/modules/sites/{sites.module,sites.controller,sites.service,site.repository,domain.repository,policy.repository,host-normalizer}.ts；src/modules/workspaces/{workspaces.module,workspaces.controller,workspaces.service,workspace.repository}.ts；test/{unit,integration,architecture}新增对应目标测试；必要package/tsconfig与当前计划 | 进行中；源码测试组合根不替代生产完成；Root提交 |
+| G3 | src/modules/products/{products.module及各资源controller/service/repository/mapper}、runtime-manifests/{runtime-manifests.module/controller/service/repository/cache}；对应test/{unit,integration,contract,architecture}；app.module；必要schema/contract变化先报Root | 待G2；完整产品、发布binding、policy和双fence |
+| G4 | src/modules/model-catalog/{model-catalog.module、catalog/provider/label/revision/routing/health/resolve具名controller/service/repository}、对应测试、app.module | 待G3；不改已派consumer的catalog/resolve契约，必要变化先报Root |
+| G5 | src/main.ts、src/config、src/health、必要retention/reconciliation具名worker；删除src/{application,domain,infrastructure,interfaces,bootstrap,generated}/旧树、src/index.ts旧导出、sdk旧客户端、Proto工具；更新test/scripts/CI/Docker/README/INDEX/docs/package/tsconfig | 完整83操作/2probe、旧有效测试由目标测试承接、lib DOM移除、全门禁与真实smoke |
+| G6-BFF | system_consumer_plan / sol唯一BFF writer，Root提交；基线2d1dd0a；排除dirty docs/api/v1/agui-chat.md、test/lifecycle.test.ts | 依赖System f570206、artifact2.0.0 / f9ea76f107e1ea0fc19df20ee7c59032c0fbac66e640e9a16a1b770ab27c1f37；Root回填SHA/证据 |
+| G6-Agent | Root唯一Agent writer，基线70a3813 clean；窄resolve客户端、factory实际接线与测试文档；不重构全Agent | 同artifact依赖；不改System源码；Root回填SHA/证据 |
+
+### G2 可审查切片交接（2026-09-08，基线f570206）
+
+状态：待Root审查/串行提交；system_owner停止写入供提交，放行后立即续G3，不缩减G2–G5总范围。
+本切片实现真实Nest AppModule、17业务操作与2 probes；生产main未切换，不是完整System可部署状态。
+新增技术支持文件以本节上表准确集合为准；未创建site.mapper，简单Row转换归src/database/row-decoder.ts。
+仅新增开发声明依赖@types/express 5.0.6（MIT），与现有Nest Express12精确安装、strict typecheck/build实测兼容；无运行依赖升级。
+
+实跑（Node24.13.0/Pnpm12.3.4）：
+
+- `TEST_ADMIN_DATABASE_URL=postgresql://nako@localhost/postgres pnpm exec vitest run --no-file-parallelism test/integration/system-target-control.test.ts test/unit/system-kernel.test.ts test/architecture/system-target-boundary.test.ts test/contract/system-target-contract.test.ts test/contract/proto-owner-boundary.test.ts` →5files/26pass/0skip。
+- G2新增12项：真实集成7、unit3、architecture2。隔离system_g2随机数据库应用canonicalSQL、真实Redis随机namespace；结束关闭Nest连接并删除自己的数据库。测试缺管理员配置直接报错，不静默skip。
+- 覆盖Sites/Workspace CRUD、domain/policy、可信身份/permission/tenant隔离、未知输入/JSON/1MB边界、request-id、CAS含超JS安全整数、同键并发重放/摘要冲突/actor隔离、global与名为global的tenant receipt隔离、事务回滚、双连接父删除/子创建两个锁顺序、真实readiness、17路由与写表owner矩阵。
+- `pnpm typecheck && pnpm build && pnpm lint && pnpm contract:lint && pnpm verify:contract-provenance` →全部exit0；Redocly有效，83+2目标inventory与18source provenance不变。数据库schema和consumer artifact未修改。
+- `TEST_ADMIN_DATABASE_URL=postgresql://nako@localhost/postgres pnpm test` →29files：24pass/2fail/3skip；140tests：127pass/5fail/8skip。5项仍是G1已记录旧HTTP契约4项与旧目录1项，不新增失败；旧8项真实集成仍skip，未当作已验。完整日志/tmp/system-g2-owner-all-tests.log。
+
+明确后续：G3全部Products/Manifest；G4全部Model；G5生产入口及旧树/Proto/SDK/libDOM清理、完整route/permission/CAS矩阵、retention/reconciliation、deadline/drain、观测与完整CI/smoke。30天restore窗口尚待G5落实；当前恢复Site不自动恢复已删除域名，避免抢回他人占用host。G2局部真实门通过不等于完整运行职责验收。
+
+### G6 消费者源码切片实交付（Root提供，2026-09-08）
+
+- BFF：1e03b87da55c41e256cf625a8cb7829ded7bba81；Root Node22 lint/typecheck/build/test150pass、contract63operations/15tests全pass，committed HEAD150pass；16精确文件，未触碰他人dirty。
+- Agent：e24b4aab05ee6df811c21089effbe1f91d7c2f2c；Root uv lock/sync、ruff/pyright/contract/build通过，全pytest611pass/6skip/77deselect，focused38pass。独立review无P1/P2，UUID/int边界已修；全仓format仍80个未触碰baseline失败，archive基线81，不宣称全仓format通过。
+- 两消费者源码切片已验收；live System联调smoke仍依赖G5/G6，不能据此宣布完整cutover。
+
+### G2 Root 稳定工作树复验
+Root在f570206 + 交接43文件上重新运行26个聚焦测试（含真实隔离PG/Redis与HTTP），0fail/0skip；
+typecheck/build/lint/Redocly规范校验/83operation drift/18source provenance全部通过。
+全test复现127pass/5既有fail/8旧integration skip，日志/tmp/kokoro-system-g2-root-all.log；没有放宽旧断言。
+Root已检查Access/Service/Repository/receipt锁与生命周期、确认隔离system_g2数据库清理；独立只读审查未发现P1/P2。
+此提交仍非生产入口cutover；G3–G5完整能力和G6 live验收继续由同负责人推进。
