@@ -1,15 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { Client } from "pg";
+import { parseSystemDatabaseUrl } from "../src/config/database-url.js";
+import { snapshotSystemSchemaCatalog } from "./system-schema-catalog.js";
+import { readFileSync } from "node:fs";
+import { isDeepStrictEqual } from "node:util";
 
 const administratorUrl = process.env.TEST_ADMIN_DATABASE_URL;
 if (!administratorUrl)
   throw new Error("TEST_ADMIN_DATABASE_URL is required; no integration skip");
 const databaseName = `system_g1_${randomUUID().replaceAll("-", "")}`;
+const referenceSchema = `system_ref_${randomUUID().replaceAll("-", "")}`;
 const admin = new Client({ connectionString: administratorUrl });
 const databaseUrl = new URL(administratorUrl);
 databaseUrl.pathname = `/${databaseName}`;
-const database = new Client({ connectionString: databaseUrl.href });
+databaseUrl.searchParams.set("schema", "system_fresh");
+const database = new Client(parseSystemDatabaseUrl(databaseUrl.href));
 let created = false;
 let connected = false;
 let assertions = 0;
@@ -47,20 +53,41 @@ try {
   });
   if (
     repeat.status === 0 ||
-    !repeat.stderr.includes("requires a blank database")
+    !repeat.stderr.includes("requires an empty owner schema")
   )
-    throw new Error("Nonempty database was not rejected");
+    throw new Error("Nonempty owner schema was not rejected");
   assertions++;
   await database.connect();
   connected = true;
-  await database.query("SET search_path TO public, pg_catalog");
+  await database.query("SET search_path TO system_fresh, pg_catalog");
   await database.query("SET TIME ZONE 'UTC'");
   const tables = await database.query<{ count: string }>(
-    "SELECT COUNT(*)::text AS count FROM pg_tables WHERE schemaname = 'public'",
+    "SELECT COUNT(*)::text AS count FROM pg_tables WHERE schemaname = 'system_fresh'",
   );
   if (tables.rows[0]?.count !== "22")
     throw new Error(`Unexpected target table count: ${tables.rows[0]?.count}`);
   assertions++;
+  // Root-owned reference DDL is confined to this isolated fresh fixture.
+  await database.query("BEGIN");
+  try {
+    await database.query(`CREATE SCHEMA "${referenceSchema}"`);
+    await database.query(
+      `SET LOCAL search_path TO "${referenceSchema}",pg_catalog`,
+    );
+    await database.query("SET LOCAL TIME ZONE 'UTC'");
+    await database.query(readFileSync("database/schema.sql", "utf8"));
+    await database.query("COMMIT");
+  } catch (error) {
+    await database.query("ROLLBACK");
+    throw error;
+  }
+  if (
+    !isDeepStrictEqual(
+      await snapshotSystemSchemaCatalog(database, "system_fresh"),
+      await snapshotSystemSchemaCatalog(database, referenceSchema),
+    )
+  )
+    throw new Error("Owner schema catalog differs from canonical reference");
   const receipt =
     "INSERT INTO system_command_receipt (id,scope_kind,scope_id,idempotency_key,request_hash,status) VALUES ($1,$2,$3,$4,$5,'pending')";
   await database.query(receipt, [
@@ -187,7 +214,7 @@ try {
     "23514",
   );
   console.log(
-    `Fresh PostgreSQL schema verified: ${assertions} assertions, 22 tables; isolated ${databaseName}; business HTTP not tested`,
+    `Fresh PostgreSQL schema verified: ${assertions} assertions, 22 tables; complete canonical catalog match; isolated ${databaseName}; business HTTP not tested`,
   );
 } finally {
   if (connected) await database.end();

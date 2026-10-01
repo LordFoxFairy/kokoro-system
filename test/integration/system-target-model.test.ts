@@ -1,3 +1,4 @@
+import { parseSystemDatabaseUrl } from "../../src/config/database-url.js";
 import { ModelGenerationRepository } from "../../src/modules/model-catalog/model-generation.repository.js";
 import { CacheService } from "../../src/cache/cache.service.js";
 import { systemOperations } from "../../scripts/system-openapi-operations.js";
@@ -19,6 +20,7 @@ const databaseName = `system_g4_${randomUUID().replaceAll("-", "")}`;
 const admin = new Client({ connectionString: adminUrl });
 const databaseUrl = new URL(adminUrl);
 databaseUrl.pathname = `/${databaseName}`;
+databaseUrl.searchParams.set("schema", "system_fixture");
 let app: NestExpressApplication;
 let base: string;
 const token = "system-test-bff-credential";
@@ -65,10 +67,11 @@ async function request(
 beforeAll(async () => {
   await admin.connect();
   await admin.query(`CREATE DATABASE "${databaseName}"`);
-  const schema = new Client({ connectionString: databaseUrl.href });
+  const schema = new Client(parseSystemDatabaseUrl(databaseUrl.href));
   await schema.connect();
   try {
-    await schema.query("SET search_path TO public,pg_catalog");
+    await schema.query("CREATE SCHEMA system_fixture");
+    await schema.query("SET search_path TO system_fixture,pg_catalog");
     await schema.query(readFileSync("database/schema.sql", "utf8"));
   } finally {
     await schema.end();
@@ -406,17 +409,19 @@ describe("real Nest Model catalog", () => {
         )
       ).json.error?.code,
     ).toBe("RESOURCE_IN_USE");
-    const db = new Client({ connectionString: databaseUrl.href });
+    const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
     await db.connect();
     try {
       await expect(
         db.query(
-          "UPDATE public.model_revision SET provider_model_name='tampered' WHERE id=$1",
+          "UPDATE system_fixture.model_revision SET provider_model_name='tampered' WHERE id=$1",
           [rid],
         ),
       ).rejects.toMatchObject({ code: "23514" });
       await expect(
-        db.query("DELETE FROM public.model_revision WHERE id=$1", [rid]),
+        db.query("DELETE FROM system_fixture.model_revision WHERE id=$1", [
+          rid,
+        ]),
       ).rejects.toMatchObject({ code: "23514" });
     } finally {
       await db.end();
@@ -727,12 +732,12 @@ describe("real Nest Model catalog", () => {
         )
       ).response.status,
     ).toBe(409);
-    const db = new Client({ connectionString: databaseUrl.href });
+    const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
     await db.connect();
     try {
       const snapshot = () =>
         db.query<{ global: string; tenant: string }>(
-          "SELECT (SELECT generation FROM public.model_cache_generation WHERE scope='resolve') AS global,(SELECT generation FROM public.system_runtime_manifest_generation WHERE tenant_id='tenant-a') AS tenant",
+          "SELECT (SELECT generation FROM system_fixture.model_cache_generation WHERE scope='resolve') AS global,(SELECT generation FROM system_fixture.system_runtime_manifest_generation WHERE tenant_id='tenant-a') AS tenant",
         );
       const before = (await snapshot()).rows[0]!;
       const key = randomUUID(),
@@ -974,12 +979,12 @@ describe("real Nest Model catalog", () => {
         ...adminHeaders,
         "if-match": '"1"',
       });
-      const lock = new Client({ connectionString: databaseUrl.href });
+      const lock = new Client(parseSystemDatabaseUrl(databaseUrl.href));
       await lock.connect();
       await lock.query("BEGIN");
       try {
         await lock.query(
-          "SELECT id FROM public.model_revision WHERE id=$1 FOR UPDATE",
+          "SELECT id FROM system_fixture.model_revision WHERE id=$1 FOR UPDATE",
           [rid],
         );
         const waiting = parentFirst
@@ -1015,12 +1020,12 @@ describe("real Nest Model catalog", () => {
         expect(blocked).toBe(true);
         if (parentFirst)
           await lock.query(
-            "UPDATE public.model_revision SET retired_at=CURRENT_TIMESTAMP(3),version=version+1 WHERE id=$1",
+            "UPDATE system_fixture.model_revision SET retired_at=CURRENT_TIMESTAMP(3),version=version+1 WHERE id=$1",
             [rid],
           );
         else
           await lock.query(
-            "INSERT INTO public.model_label(id,label_key,display_name,feature_key,default_revision_id) VALUES($1,$2,'Race',$3,$4)",
+            "INSERT INTO system_fixture.model_label(id,label_key,display_name,feature_key,default_revision_id) VALUES($1,$2,'Race',$3,$4)",
             [randomUUID(), randomUUID(), feature, rid],
           );
         await lock.query("COMMIT");

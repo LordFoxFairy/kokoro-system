@@ -12,10 +12,12 @@ export class DatabaseService implements OnApplicationShutdown {
   private readonly sockets = new Set<Socket>();
   private readonly connections = new Set<() => void>();
   private readonly shutdownMs: number;
+  private readonly schema: string;
   public constructor(@Inject(SystemConfig) config: SystemConfig) {
     this.shutdownMs = config.values.KOKORO_SYSTEM_SHUTDOWN_DEADLINE_MS;
+    this.schema = config.database.schema;
     this.pool = new Pool({
-      connectionString: config.values.DATABASE_URL,
+      connectionString: config.database.connectionString,
       max: 10,
       stream: () => {
         const socket = new Socket();
@@ -27,8 +29,7 @@ export class DatabaseService implements OnApplicationShutdown {
       idleTimeoutMillis: 10000,
       statement_timeout: 5000,
       query_timeout: 6000,
-      options:
-        "-c timezone=UTC -c search_path=public,pg_catalog -c lock_timeout=3000",
+      options: config.database.options,
     });
     this.pool.on("error", () => {
       /* Sanitized request/dependency paths report the failure. */
@@ -75,8 +76,20 @@ export class DatabaseService implements OnApplicationShutdown {
   }
   public ready(): Promise<boolean> {
     return this.read(async (tx) => {
-      await tx.query("SELECT 1 AS healthy");
-      return true;
+      const result = await tx.query<{
+        namespace_exists: boolean;
+        schema: string | null;
+        timezone: string;
+      }>(
+        "SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname=$1) AS namespace_exists,current_schema() AS schema,current_setting('TimeZone') AS timezone",
+        [this.schema],
+      );
+      const session = result.rows[0];
+      return (
+        session?.namespace_exists === true &&
+        session.schema === this.schema &&
+        session.timezone === "UTC"
+      );
     });
   }
   public forceClose(): void {

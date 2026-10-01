@@ -1,3 +1,4 @@
+import { parseSystemDatabaseUrl } from "../../src/config/database-url.js";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Client } from "pg";
@@ -19,6 +20,7 @@ const databaseName = `system_g2_${randomUUID().replaceAll("-", "")}`;
 const admin = new Client({ connectionString: adminUrl });
 const databaseUrl = new URL(adminUrl);
 databaseUrl.pathname = `/${databaseName}`;
+databaseUrl.searchParams.set("schema", "system_fixture");
 let app: NestExpressApplication;
 let base: string;
 const token = "system-test-bff-credential";
@@ -61,10 +63,11 @@ async function request(
 beforeAll(async () => {
   await admin.connect();
   await admin.query(`CREATE DATABASE "${databaseName}"`);
-  const schema = new Client({ connectionString: databaseUrl.href });
+  const schema = new Client(parseSystemDatabaseUrl(databaseUrl.href));
   await schema.connect();
   try {
-    await schema.query("SET search_path TO public,pg_catalog");
+    await schema.query("CREATE SCHEMA system_fixture");
+    await schema.query("SET search_path TO system_fixture,pg_catalog");
     await schema.query(readFileSync("database/schema.sql", "utf8"));
   } finally {
     await schema.end();
@@ -301,16 +304,16 @@ describe("real Nest Sites/Workspace control", () => {
       { "idempotency-key": failedKey, "if-none-match": "*" },
     );
     expect(denied.json.error?.code).toBe("POLICY_INVALID");
-    const db = new Client({ connectionString: databaseUrl.href });
+    const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
     await db.connect();
     try {
       const receipt = await db.query<{ count: number }>(
-        "SELECT COUNT(*)::int AS count FROM public.system_command_receipt WHERE idempotency_key=$1",
+        "SELECT COUNT(*)::int AS count FROM system_fixture.system_command_receipt WHERE idempotency_key=$1",
         [failedKey],
       );
       expect(receipt.rows[0]?.count).toBe(0);
       const policy = await db.query<{ count: number }>(
-        "SELECT COUNT(*)::int AS count FROM public.system_site_policy WHERE site_id=$1",
+        "SELECT COUNT(*)::int AS count FROM system_fixture.system_site_policy WHERE site_id=$1",
         [siteId],
       );
       expect(policy.rows[0]?.count).toBe(0);
@@ -425,11 +428,11 @@ describe("real Nest Sites/Workspace control", () => {
         display_name: "Race",
       });
       const site = created.json.data!;
-      const first = new Client({ connectionString: databaseUrl.href });
+      const first = new Client(parseSystemDatabaseUrl(databaseUrl.href));
       await first.connect();
       await first.query("BEGIN");
       await first.query(
-        "SELECT id FROM public.system_site WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
+        "SELECT id FROM system_fixture.system_site WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
         ["tenant-a", site.id],
       );
       let responseDone = false;
@@ -463,12 +466,12 @@ describe("real Nest Sites/Workspace control", () => {
       expect(responseDone).toBe(false);
       if (parentDeletesFirst)
         await first.query(
-          "UPDATE public.system_site SET deleted_at=CURRENT_TIMESTAMP(3),status='archived',version=version+1 WHERE id=$1",
+          "UPDATE system_fixture.system_site SET deleted_at=CURRENT_TIMESTAMP(3),status='archived',version=version+1 WHERE id=$1",
           [site.id],
         );
       else
         await first.query(
-          "INSERT INTO public.system_workspace (id,tenant_id,site_id,workspace_key,name,status) VALUES ($1,'tenant-a',$2,'race','Race','active')",
+          "INSERT INTO system_fixture.system_workspace (id,tenant_id,site_id,workspace_key,name,status) VALUES ($1,'tenant-a',$2,'race','Race','active')",
           [randomUUID(), site.id],
         );
       await first.query("COMMIT");
@@ -486,13 +489,13 @@ describe("real Nest Sites/Workspace control", () => {
       display_name: "Bigint",
     });
     const id = created.json.data!.id;
-    const db = new Client({ connectionString: databaseUrl.href });
+    const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
     await db.connect();
     try {
-      await db.query("UPDATE public.system_site SET version=$1 WHERE id=$2", [
-        "9007199254740993123",
-        id,
-      ]);
+      await db.query(
+        "UPDATE system_fixture.system_site SET version=$1 WHERE id=$2",
+        ["9007199254740993123", id],
+      );
     } finally {
       await db.end();
     }

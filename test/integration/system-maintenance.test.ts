@@ -1,3 +1,4 @@
+import { parseSystemDatabaseUrl } from "../../src/config/database-url.js";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Client } from "pg";
@@ -12,8 +13,9 @@ if (!adminUrl)
 const name = `system_g5_maintenance_${randomUUID().replaceAll("-", "")}`;
 const url = new URL(adminUrl);
 url.pathname = `/${name}`;
+url.searchParams.set("schema", "system_fixture");
 const admin = new Client({ connectionString: adminUrl });
-const db = new Client({ connectionString: url.href });
+const db = new Client(parseSystemDatabaseUrl(url.href));
 const env = {
   DATABASE_URL: url.href,
   REDIS_URL: process.env.TEST_REDIS_URL ?? "redis://localhost:6379/2",
@@ -28,7 +30,8 @@ beforeAll(async () => {
   await admin.connect();
   await admin.query(`CREATE DATABASE "${name}"`);
   await db.connect();
-  await db.query("SET search_path TO public,pg_catalog");
+  await db.query("CREATE SCHEMA system_fixture");
+  await db.query("SET search_path TO system_fixture,pg_catalog");
   await db.query(readFileSync("database/schema.sql", "utf8"));
 });
 afterAll(async () => {

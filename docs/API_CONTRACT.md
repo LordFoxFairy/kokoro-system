@@ -1,7 +1,27 @@
 # System API 契约
 
+## R40 实施候选：wire 不变，资源验收未完成
+
+Root 已通过下文 R39 文档门并取得真实配置/安装/路由 RED。当前候选改动只涉及连接与 probe 内部依赖判断：统一 owner selector 与 UTC，拒绝 options/应用驱动覆盖，缺失或错路由使用既有 readiness 503 路径；无新 HTTP 字段、错误码、操作、schema/provenance 输入或 artifact 版本。schema 不来自 tenant/header/body，运行时没有建 schema 或参考 DDL 接口。
+
+Root 已真实执行 catalog RED（7 fail/6 pass/6 旧例筛选 skip），后继候选已补只读完整 snapshot 与 fresh 隔离 reference gate；这些不是 HTTP 新操作，不进入 runtime/probe，也不改变 wire 或认证。候选尚待 Root 真实 PG/fresh/全 owner 门，本段不是资源门、消费者或发布验收。基线 `c0a76a3a7614bf46ea6e665e523f24261862436f`，Root 独占资源及最终提交。
+
+## R39 D0：连接边界与 readiness（待 Root 文档门验收）
+
+2026-10-01，源码基线 `c0a76a3a7614bf46ea6e665e523f24261862436f`。本轮只收敛部署连接语义，不新增或复制机器契约：83 业务操作、2 probes、internal-owner `/v1`、运行时 Zod→只读 OpenAPI 的单向生成保持不变；无 HTTP 字段、错误码或 artifact 版本变化。
+
+- 启动 `DATABASE_URL` 必须显式包含唯一 schema selector；原始控制字符在 URL parser 前拒绝，任意 URL options 拒绝。规则、规范化输出和受控 UTC/search_path 见 TECHNICAL_DESIGN；不将 schema 暴露为业务 query/body/header，不按 tenant 动态切换 namespace。
+- `/healthz` 保持进程存活语义；`/readyz` 的既有响应形状、成功/失败状态及 retryable dependency-unavailable 错误语义不变。目标 readiness 要在同一数据库 session 确认配置 namespace 存在、`current_schema()` 与之相同、timezone 为 UTC；缺失或错路由走既有 503 依赖失败路径。仅 `SELECT 1` 的现行实现不满足该目标。
+- 配置非法在资源启动前失败，日志/错误不回显 DATABASE_URL 或凭据。运行时没有建 schema、参考 DDL、public fallback 或自动修复接口；完整 catalog drift 属于隔离 fresh 验收，而非每次 probe。
+- 受信 tenant/actor/service identity、权限、CAS、幂等 receipt、分页、cursor、缓存 fence 及业务失败恢复保持原语义；同库 namespace 不授权跨 owner SQL、JOIN 或访问其他 owner 数据。
+- D0 仅文档候选；机器契约、生成物、源码和测试尚未修改。Root 文档门后，两份既有测试的 RED 仍需单独授权；GREEN、fixtures/CI/消费者连接更新也须后续授权。现有 contract 验证与真实 readiness smoke 由 Root 在冻结切片上执行。
+
+## 既有 wire 契约与历史证据
+
+以下 wire 规则继续有效；历史验收不证明 R39 的部署连接/readiness 目标已实现。
+
 状态：2026-09-08，当前唯一Nest internal-owner HTTP，83业务操作+2probes；G5提交/环境验收见CURRENT。
-Root ADR-031 取代 ADR-029 的 Proto 保留要求。唯一字段事实源 src/modules/*/schemas/**/*.schema.ts，单向生成只读
+Root ADR-031 取代 ADR-029 的 Proto 保留要求。唯一字段事实源 src/modules/_/schemas/\**/_.schema.ts，单向生成只读
 contract/openapi/system.openapi.json；操作 inventory 位于 scripts/system-openapi-operations.ts；无第二手写 DTO/JSON schema。
 
 ## 边界
@@ -18,26 +38,26 @@ contract/openapi/system.openapi.json；操作 inventory 位于 scripts/system-op
 
 ## 完整 scope 映射
 
-| owner | 路径（均 /v1/system 下） | 方法与状态 | 表 | 权限/主要错误 |
-|---|---|---|---|---|
-| sites | sites；sites/{site_id}；sites/{site_id}/restore | POST/GET；GET/PATCH/DELETE；POST | system_site | read/write；NOT_FOUND、HOST_CONFLICT、RESOURCE_IN_USE |
-| sites | sites/{site_id}/domains；…/domains/{domain_id} | GET/POST；DELETE | system_site_host | read/write；HOST_CONFLICT、INVALID_STATE |
-| sites | sites/{site_id}/policy | GET/PUT | system_site_policy | read/write；POLICY_INVALID、NOT_FOUND |
-| workspaces | workspaces；workspaces/{workspace_id}；…/restore | GET/POST；GET/PATCH/DELETE；POST | system_workspace | read/write；SITE_UNAVAILABLE、RESOURCE_IN_USE |
-| products | products；products/{product_id}；…/restore | GET/POST；GET/PATCH/DELETE；POST | system_product | read；global write；RESOURCE_IN_USE |
-| products | applications；applications/{application_id}；…/restore | GET/POST；GET/PATCH/DELETE；POST | system_application | read/write；SITE_UNAVAILABLE、PRODUCT_UNAVAILABLE |
-| products | features；features/{feature_id}；…/retire | GET/POST；GET；POST | system_feature_definition | read；global publish；IMMUTABLE_RESOURCE、RESOURCE_IN_USE |
-| products | applications/{application_id}/exposures；…/{feature_id} | GET；PUT/DELETE | system_app_feature_exposure | read/write；FEATURE_UNAVAILABLE |
-| products | applications/{application_id}/presentation | GET/PUT（locale+surface query） | system_presentation | read/write；INVALID_ARGUMENT |
-| products | config；config/{config_id} | GET/POST；GET/PATCH/DELETE | system_config_record | read/write，global另publish；INVALID_STATE、INVALID_CONFIG_SCHEMA |
-| products | releases；releases/{release_id}；…/validate、publish、retire | GET/POST；GET；POST | system_config_release | read/write/publish；INVALID_STATE、DIGEST_MISMATCH |
-| products | release-bindings；release-bindings/{binding_id} | GET/POST；DELETE | system_release_binding | read/publish；INVALID_STATE、RESOURCE_IN_USE |
-| runtime-manifests | runtime-manifest | GET product_id/locale/surface_id；host→site | system_runtime_manifest_generation；system_catalog_generation | service context，非public需read；POLICY_DENIED、SYSTEM_UNAVAILABLE |
-| model-catalog | model-catalog/definitions、providers、labels；各/{id}；…/restore | GET/POST；GET/PATCH/DELETE；POST | model_definition/provider/label | read；global write；RESOURCE_IN_USE |
-| model-catalog | model-catalog/revisions；…/{revision_id}；…/publish、retire | GET/POST；GET/PATCH（draft）；POST | model_revision | read；global publish；IMMUTABLE_RESOURCE、INVALID_STATE |
-| model-catalog | model-catalog/routing-policies；…/{label_id} | GET；PUT/DELETE | model_routing_policy | read/write；NO_AVAILABLE_MODEL、LABEL_UNAVAILABLE |
-| model-catalog | model-catalog/providers/{provider_id}/health | PUT | model_provider_health_state | global write；VERSION_CONFLICT |
-| model-catalog | model-catalog/catalog、model-catalog/resolve | GET；POST（无写入，无幂等key） | model_* published/healthy snapshot | BFF/Agent tenant context；NO_AVAILABLE_MODEL、POLICY_DENIED |
+| owner             | 路径（均 /v1/system 下）                                         | 方法与状态                                  | 表                                                            | 权限/主要错误                                                      |
+| ----------------- | ---------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------ |
+| sites             | sites；sites/{site_id}；sites/{site_id}/restore                  | POST/GET；GET/PATCH/DELETE；POST            | system_site                                                   | read/write；NOT_FOUND、HOST_CONFLICT、RESOURCE_IN_USE              |
+| sites             | sites/{site_id}/domains；…/domains/{domain_id}                   | GET/POST；DELETE                            | system_site_host                                              | read/write；HOST_CONFLICT、INVALID_STATE                           |
+| sites             | sites/{site_id}/policy                                           | GET/PUT                                     | system_site_policy                                            | read/write；POLICY_INVALID、NOT_FOUND                              |
+| workspaces        | workspaces；workspaces/{workspace_id}；…/restore                 | GET/POST；GET/PATCH/DELETE；POST            | system_workspace                                              | read/write；SITE_UNAVAILABLE、RESOURCE_IN_USE                      |
+| products          | products；products/{product_id}；…/restore                       | GET/POST；GET/PATCH/DELETE；POST            | system_product                                                | read；global write；RESOURCE_IN_USE                                |
+| products          | applications；applications/{application_id}；…/restore           | GET/POST；GET/PATCH/DELETE；POST            | system_application                                            | read/write；SITE_UNAVAILABLE、PRODUCT_UNAVAILABLE                  |
+| products          | features；features/{feature_id}；…/retire                        | GET/POST；GET；POST                         | system_feature_definition                                     | read；global publish；IMMUTABLE_RESOURCE、RESOURCE_IN_USE          |
+| products          | applications/{application_id}/exposures；…/{feature_id}          | GET；PUT/DELETE                             | system_app_feature_exposure                                   | read/write；FEATURE_UNAVAILABLE                                    |
+| products          | applications/{application_id}/presentation                       | GET/PUT（locale+surface query）             | system_presentation                                           | read/write；INVALID_ARGUMENT                                       |
+| products          | config；config/{config_id}                                       | GET/POST；GET/PATCH/DELETE                  | system_config_record                                          | read/write，global另publish；INVALID_STATE、INVALID_CONFIG_SCHEMA  |
+| products          | releases；releases/{release_id}；…/validate、publish、retire     | GET/POST；GET；POST                         | system_config_release                                         | read/write/publish；INVALID_STATE、DIGEST_MISMATCH                 |
+| products          | release-bindings；release-bindings/{binding_id}                  | GET/POST；DELETE                            | system_release_binding                                        | read/publish；INVALID_STATE、RESOURCE_IN_USE                       |
+| runtime-manifests | runtime-manifest                                                 | GET product_id/locale/surface_id；host→site | system_runtime_manifest_generation；system_catalog_generation | service context，非public需read；POLICY_DENIED、SYSTEM_UNAVAILABLE |
+| model-catalog     | model-catalog/definitions、providers、labels；各/{id}；…/restore | GET/POST；GET/PATCH/DELETE；POST            | model_definition/provider/label                               | read；global write；RESOURCE_IN_USE                                |
+| model-catalog     | model-catalog/revisions；…/{revision_id}；…/publish、retire      | GET/POST；GET/PATCH（draft）；POST          | model_revision                                                | read；global publish；IMMUTABLE_RESOURCE、INVALID_STATE            |
+| model-catalog     | model-catalog/routing-policies；…/{label_id}                     | GET；PUT/DELETE                             | model_routing_policy                                          | read/write；NO_AVAILABLE_MODEL、LABEL_UNAVAILABLE                  |
+| model-catalog     | model-catalog/providers/{provider_id}/health                     | PUT                                         | model_provider_health_state                                   | global write；VERSION_CONFLICT                                     |
+| model-catalog     | model-catalog/catalog、model-catalog/resolve                     | GET；POST（无写入，无幂等key）              | model_* published/healthy snapshot                            | BFF/Agent tenant context；NO_AVAILABLE_MODEL、POLICY_DENIED        |
 
 具体 request/response、parameter、permission 和 idempotency metadata 在生成 artifact；文档表为业务映射而非字段副本。
 共通错误：400 INVALID_ARGUMENT/INVALID_CURSOR，403 service_auth_failed/FORBIDDEN，404 NOT_FOUND，409 VERSION_CONFLICT/IDEMPOTENCY_KEY_REUSED/RESOURCE_IN_USE/INVALID_STATE，428 PRECONDITION_REQUIRED，503 service_auth_not_configured/SYSTEM_UNAVAILABLE。
@@ -59,20 +79,24 @@ Agent consumer已提交e24b4aa，System resolve已接入真实factory/worker；l
 contract版本2.0.0标记v1-fresh-cutover（未发布基线），生成artifact digest和source commit由发布任务记录；不让artifact自引用未知commit。
 
 ### Agent executable route
+
 POST /v1/system/model-catalog/resolve：caller=kokoro-agent，trusted x-kokoro-tenant-id；body feature_key必填，label_key可省。省略label按tenant/feature显式默认routing policy选择；无默认404 ROUTE_NOT_FOUND，hidden403 POLICY_DENIED，无可用published/healthy模型503 MODEL_UNAVAILABLE。只支持litellm；输出revision/digest/global及tenant generation、provider_model_name与gateway_model_name，不返回endpoint/凭据。BFF目录GET /v1/system/model-catalog/catalog返回items(key,display_name,feature_key,default_revision_id)+next_cursor，由BFF做public投影。
 
 ### Config scope / CAS补充
+
 POST /config只创建；PATCH /config/{config_id}只更新value且If-Match必需，所有identity不可变，由存量module schema再验证value；validated release退回draft。删除软删后可重建同identity，不提供restore。
-| scope_type | scope_id | product_id | site_id | stored tenant_id |
-|---|---|---|---|---|
-| global | null | null或Product UUID | null | null，只有admin可写 |
-| tenant | 等于trusted tenant | null | null | trusted tenant |
-| product | 等于product_id | 必需UUID | null | trusted tenant |
-| surface | 非空surface标识 | 必需UUID | 必需Site UUID | trusted tenant |
-SQL CHECK与Zod负例共同覆盖结构；tenant等值校验在可信上下文业务入口。
-当前envelope替换旧JSON meta及x-kokoro-request-id为x-request-id，是明确fresh-cut breaking，不保留双轨。retryable对400/403/404/409/428为false，对瞬时503依赖/模型不可用为true；credential未配置在启动时失败。响应资源含ID即201资源标识。
+
+| scope_type                                                                                                                                                                                                                             | scope_id           | product_id         | site_id       | stored tenant_id    |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------ | ------------- | ------------------- |
+| global                                                                                                                                                                                                                                 | null               | null或Product UUID | null          | null，只有admin可写 |
+| tenant                                                                                                                                                                                                                                 | 等于trusted tenant | null               | null          | trusted tenant      |
+| product                                                                                                                                                                                                                                | 等于product_id     | 必需UUID           | null          | trusted tenant      |
+| surface                                                                                                                                                                                                                                | 非空surface标识    | 必需UUID           | 必需Site UUID | trusted tenant      |
+| SQL CHECK与Zod负例共同覆盖结构；tenant等值校验在可信上下文业务入口。                                                                                                                                                                   |
+| 当前envelope替换旧JSON meta及x-kokoro-request-id为x-request-id，是明确fresh-cut breaking，不保留双轨。retryable对400/403/404/409/428为false，对瞬时503依赖/模型不可用为true；credential未配置在启动时失败。响应资源含ID即201资源标识。 |
 
 ### Conditional Config scope（最终G1裁决）
+
 operation metadata使用x-kokoro-scope=tenant/global/conditional。Config全部conditional：POST按body.scope_type，list/get/PATCH/DELETE按query.scope=tenant|global（省略tenant）。Global必须认证system-admin，不要求tenant header且忽略其值；tenant必须trusted header。写仍system:write，global不能用tenant字符串升级。Global Config强制release_id=null；release.tenant_id必需，绝无global release路径。
 错误status按操作适用：GET/resolve不带CAS则无428；mutation带409；有CAS才428。PATCH value先shape校验再按存量module校验，不匹配=INVALID_CONFIG_SCHEMA。
 

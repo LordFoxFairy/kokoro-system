@@ -1,3 +1,4 @@
+import { parseSystemDatabaseUrl } from "../../src/config/database-url.js";
 import { z } from "zod";
 import { CacheService } from "../../src/cache/cache.service.js";
 import { systemOperations } from "../../scripts/system-openapi-operations.js";
@@ -19,6 +20,7 @@ const databaseName = `system_g3_${randomUUID().replaceAll("-", "")}`;
 const admin = new Client({ connectionString: adminUrl });
 const databaseUrl = new URL(adminUrl);
 databaseUrl.pathname = `/${databaseName}`;
+databaseUrl.searchParams.set("schema", "system_fixture");
 let app: NestExpressApplication;
 let base: string;
 const token = "system-test-bff-credential";
@@ -65,10 +67,11 @@ async function request(
 beforeAll(async () => {
   await admin.connect();
   await admin.query(`CREATE DATABASE "${databaseName}"`);
-  const schema = new Client({ connectionString: databaseUrl.href });
+  const schema = new Client(parseSystemDatabaseUrl(databaseUrl.href));
   await schema.connect();
   try {
-    await schema.query("SET search_path TO public,pg_catalog");
+    await schema.query("CREATE SCHEMA system_fixture");
+    await schema.query("SET search_path TO system_fixture,pg_catalog");
     await schema.query(readFileSync("database/schema.sql", "utf8"));
   } finally {
     await schema.end();
@@ -349,9 +352,9 @@ describe("real Nest Product control", () => {
         .status,
     ).toBe(200);
     expect((await request(pp)).json.data?.navigation).toEqual(body.navigation);
-    const sizeDb = new Client({ connectionString: databaseUrl.href });
+    const sizeDb = new Client(parseSystemDatabaseUrl(databaseUrl.href));
     await sizeDb.connect();
-    await sizeDb.query("SET search_path TO public,pg_catalog");
+    await sizeDb.query("SET search_path TO system_fixture,pg_catalog");
     try {
       const before = (
         await sizeDb.query(
@@ -691,12 +694,12 @@ describe("real Nest Product control", () => {
       });
       const pid = String(product.json.data?.id),
         sid = String(site.json.data?.id);
-      const lock = new Client({ connectionString: databaseUrl.href });
+      const lock = new Client(parseSystemDatabaseUrl(databaseUrl.href));
       await lock.connect();
       await lock.query("BEGIN");
       try {
         await lock.query(
-          "SELECT id FROM public.system_product WHERE id=$1 FOR UPDATE",
+          "SELECT id FROM system_fixture.system_product WHERE id=$1 FOR UPDATE",
           [pid],
         );
         const waiting = parentFirst
@@ -725,12 +728,12 @@ describe("real Nest Product control", () => {
         expect(blocked).toBe(true);
         if (parentFirst)
           await lock.query(
-            "UPDATE public.system_product SET deleted_at=CURRENT_TIMESTAMP(3),status='archived',version=version+1 WHERE id=$1",
+            "UPDATE system_fixture.system_product SET deleted_at=CURRENT_TIMESTAMP(3),status='archived',version=version+1 WHERE id=$1",
             [pid],
           );
         else
           await lock.query(
-            "INSERT INTO public.system_application(id,tenant_id,site_id,product_id,app_key,display_name) VALUES($1,'tenant-a',$2,$3,'race','Race')",
+            "INSERT INTO system_fixture.system_application(id,tenant_id,site_id,product_id,app_key,display_name) VALUES($1,'tenant-a',$2,$3,'race','Race')",
             [randomUUID(), sid, pid],
           );
         await lock.query("COMMIT");
@@ -797,11 +800,11 @@ describe("real Nest Product control", () => {
           release_id: null,
           value: { ...input.value, mode: "light" },
         });
-      const db = new Client({ connectionString: databaseUrl.href });
+      const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
       await db.connect();
       try {
         await db.query(
-          "UPDATE public.system_config_record SET id=$1 WHERE id=$2",
+          "UPDATE system_fixture.system_config_record SET id=$1 WHERE id=$2",
           [
             publishedFirst
               ? "00000000-0000-4000-8000-000000000001"
@@ -810,7 +813,7 @@ describe("real Nest Product control", () => {
           ],
         );
         await db.query(
-          "UPDATE public.system_config_record SET id=$1 WHERE id=$2",
+          "UPDATE system_fixture.system_config_record SET id=$1 WHERE id=$2",
           [
             publishedFirst
               ? "ffffffff-ffff-4fff-8fff-fffffffffffe"
@@ -1007,12 +1010,12 @@ describe("real Nest Product control", () => {
         module_key: "theme",
         value,
       };
-      const lock = new Client({ connectionString: databaseUrl.href });
+      const lock = new Client(parseSystemDatabaseUrl(databaseUrl.href));
       await lock.connect();
       await lock.query("BEGIN");
       try {
         await lock.query(
-          "SELECT id FROM public.system_site WHERE id=$1 AND tenant_id='tenant-a' FOR UPDATE",
+          "SELECT id FROM system_fixture.system_site WHERE id=$1 AND tenant_id='tenant-a' FOR UPDATE",
           [sid],
         );
         const waiting = parentFirst
@@ -1033,12 +1036,12 @@ describe("real Nest Product control", () => {
         expect(blocked).toBe(true);
         if (parentFirst)
           await lock.query(
-            "UPDATE public.system_site SET deleted_at=CURRENT_TIMESTAMP(3),status='archived',version=version+1 WHERE id=$1",
+            "UPDATE system_fixture.system_site SET deleted_at=CURRENT_TIMESTAMP(3),status='archived',version=version+1 WHERE id=$1",
             [sid],
           );
         else
           await lock.query(
-            "INSERT INTO public.system_config_record(id,tenant_id,site_id,product_id,scope_type,scope_id,module_key,config_key,schema_version,value_json,status,digest) VALUES($1,'tenant-a',$2,$3,'surface','main','theme','race',1,$4,'active',$5)",
+            "INSERT INTO system_fixture.system_config_record(id,tenant_id,site_id,product_id,scope_type,scope_id,module_key,config_key,schema_version,value_json,status,digest) VALUES($1,'tenant-a',$2,$3,'surface','main','theme','race',1,$4,'active',$5)",
             [randomUUID(), sid, pid, JSON.stringify(value), "0".repeat(64)],
           );
         await lock.query("COMMIT");

@@ -1,3 +1,4 @@
+import { parseSystemDatabaseUrl } from "../../src/config/database-url.js";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Client } from "pg";
@@ -11,8 +12,9 @@ if (!adminUrl)
 const name = `system_g5_restore_${randomUUID().replaceAll("-", "")}`,
   url = new URL(adminUrl);
 url.pathname = `/${name}`;
+url.searchParams.set("schema", "system_fixture");
 const admin = new Client({ connectionString: adminUrl }),
-  db = new Client({ connectionString: url.href });
+  db = new Client(parseSystemDatabaseUrl(url.href));
 let running: Awaited<ReturnType<typeof startSystem>>;
 const token = "restore-admin-credential",
   site = randomUUID(),
@@ -22,7 +24,8 @@ beforeAll(async () => {
   await admin.connect();
   await admin.query(`CREATE DATABASE "${name}"`);
   await db.connect();
-  await db.query("SET search_path TO public,pg_catalog");
+  await db.query("CREATE SCHEMA system_fixture");
+  await db.query("SET search_path TO system_fixture,pg_catalog");
   await db.query(readFileSync("database/schema.sql", "utf8"));
   await db.query(
     "INSERT INTO system_site(id,tenant_id,site_key,display_name,status) VALUES($1,'restore',$2,'Parent','active')",

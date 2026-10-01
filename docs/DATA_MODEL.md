@@ -1,34 +1,80 @@
 # System 数据模型
 
+## R40 实施候选：完整 catalog 快照，待 Root 资源验收
+
+Root 已通过 R39 文档门及真实 R2/R3 RED。当前 installer 候选在 owner+schema advisory transaction lock 下创建缺失目标，按目标 namespace 查询 class/proc/type/extension 与 namespace membership metadata 检查为空，同事务 UTC/path + 原 canonical SQL；失败 rollback，不要求 public/其他 owner 为空。22 表 canonical 字节未改，单库/单 role 与业务不变量保持。
+
+Root 已真实执行同 22 表的七个语义漂移 RED（deep equality 失败），原三 owner 路由/安装及三个非表非空例通过；资源结果 7 fail/6 pass/6 旧例筛选 skip。后继 `scripts/system-schema-catalog.ts` 已替换表清单基线为完整只读快照候选；真实 GREEN/fresh/全门仍由 Root 验证。
+
+快照按 namespace OID 锁定归属，table/column/type/collation/routine/index/constraint 身份用 owner 或原 pg_catalog/外部 namespace 的 name/signature 表示；字段顺序与对象排序保留，无物理 OID、创建顺序或部署 owner/ACL 比较。保存 typmod/null/default/identity/generated、constraint definition、index key/include/collation/opclass/排序/predicate/有效性、函数参数/返回/语言/安全/volatility/parallel/cost/源文/配置、trigger enabled/type/args/列/transition tables 与完整重建定义。
+
+default/constraint/index component 使用相同非 pretty deparse；trigger 在已 SET LOCAL 目标 path 的 session 使用 `pg_get_triggerdef(..., true)`：PG 16 源码明确 visible table 不加 namespace，条件、参数及事件仍由原生 deparser 保留，另以 metadata 核实表及函数归属。没有对 SQL 字面量、JSON 或函数 body 做替换。[PG 16 对象重建函数](https://www.postgresql.org/docs/16/functions-info.html)、[官方 ruleutils trigger deparser](https://github.com/postgres/postgres/blob/REL_16_STABLE/src/backend/utils/adt/ruleutils.c) 是工具语义证据，不是本仓资源验收。
+
+当前 canonical 是 ordinary tables、自动 row/array types、内建 defaults 和两 PL/pgSQL guards。超出已批准覆盖的 view/sequence/foreign relation、自定义 domain/enum/base type、aggregate/pre-parsed SQL body/function search_path、rule/policy/extension、跨 namespace trigger function 或 schema-bound default dependency明确报 unsupported；不删掉语义后假装匹配。fresh 在自有临时数据库随机 reference namespace 执行同 canonical SQL/UTC，比较上述完整快照；原 23 项行为断言保留，无第二可编辑 expected 清单、运行时 reference DDL 或角色变化。基线 `c0a76a3a7614bf46ea6e665e523f24261862436f`，未提交/未资源验收。
+
+## R39 D0：owner namespace 与 fresh catalog（待 Root 文档门验收）
+
+2026-10-01，源码基线 `c0a76a3a7614bf46ea6e665e523f24261862436f`。唯一 canonical schema 仍是 `database/schema.sql`，现有 22 个 unqualified 表及业务约束不改。本节规定目标安装/验收边界，不声称现行 public installer 已切换。
+
+### 数据归属、锁与空边界
+
+本地/CI 应用共享一个 PostgreSQL 实例、数据库与应用 role，每 owner 使用独立 schema 和指向它的 URL；System 不读写其他 owner 业务事实。URL selector、控制字符/options 拒绝和 UTC 规则由 TECHNICAL_DESIGN 定义。runtime 不创建 namespace、不执行 reference DDL、不 fallback public。
+
+安装在一个 client/事务内先取得 `kokoro-system:canonical-schema:<schema>` advisory transaction lock；锁天然受当前数据库隔离，不误用仅 service 级全局 key。锁后只创建缺失的目标 namespace、检查目标为空、设置 UTC 与目标 search_path、执行原 canonical SQL。若目标已有 owner 对象则拒绝；不把整个数据库或 public 为空作为条件。失败 rollback，不删除已有 namespace/数据；其他 owner/public sentinel 的结构与数据必须保持不变。
+
+“空”是目标 namespace 无任何已存在的 schema-bound 用户对象，不只是无普通表：包含所有 relation kinds（表、分区、视图、materialized view、sequence、foreign table、index）、函数/过程、类型及其他 namespace-bound 对象。以目标 `pg_namespace.oid` 为边界，检查 namespace membership metadata（相关 catalog 的 namespace 字段及 `pg_depend` 指向该 namespace 的对象身份）；不得只查 `pg_tables`、按对象名前缀猜归属，或把外国对象对本 schema 的引用当成其归属。扩展绑定等非 canonical 对象也不视为空。引用 metadata 不是跨 owner 业务查询。
+
+### fresh 期望与只读快照
+
+未来 `scripts/system-schema-catalog.ts` 只快照指定 owner metadata，不安装、不删除、不重置、不承载第二份可编辑 schema/catalog。Root-owned fresh fixture 在自己的隔离数据库里创建随机 reference namespace，使用同一 canonical SQL 与同一安装 session 规则构建期望；actual/reference 使用同一快照实现比较。reference DDL/setup/cleanup 不进入正常 runtime、readiness 或 installer。既有 23 项行为不变量继续保留，catalog 比对补充而非替换它们。
+
+快照必须覆盖对象集合及语义，而不是只满足 22 表计数：table relation kind；column 顺序、类型/typmod、nullability、default、identity/generated、collation；constraint 名称/类型/列序/表达式/validated/deferrability；index 名称、method、unique、keys/includes、表达式、排序/nulls、predicate、有效性；函数与触发器。当前 canonical 无自定义 enum/domain/sequence，无外键；两函数 `model_revision_immutable_guard`、`system_feature_identity_guard` 及对应 immutable trigger 都必须比较。种子数据及业务运行语义由保留的行为断言验证，不拿 metadata 替代。
+
+### schema identity 规范化
+
+1. 先解析目标 namespace OID，只枚举归属匹配的对象；用结构化逻辑身份 `{ namespace: owner, name, signature }` 代替 actual/reference 的 schema 名和 OID。`pg_catalog` 内建依赖保留其内建身份；外部 schema 引用不能被抹成 owner。以逻辑 key 稳定排序，不比较 OID、创建顺序或本轮不涉及的部署 role/ACL。
+2. 函数比较相对名称、参数/返回类型身份、language、security、volatility、strictness、配置和 canonical `prosrc`。当前两段 PL/pgSQL body 无 schema literal，应保持原文相等；namespace/owner OID 只在已核实的 metadata 身份位置归一化，不整体替换 `pg_get_functiondef` 文本，不省略 body。
+3. 触发器按所属表的 `relnamespace` 及函数的 `pronamespace` 核实 owner，比较表/trigger 名称、事件与时机/type、enabled 状态、参数、函数逻辑身份及条件表达式；只去掉物理 OID。disabled trigger、改绑函数或改变事件均为 drift。
+4. default/constraint/index 表达式在各自事务中使用同样的 `SET LOCAL search_path=<target>,pg_catalog`，以相同非 pretty deparse 规则读取；其依赖身份按 owner-local 或 pg_catalog 结构化处理。当前 defaults 为内建时间、数值、布尔、字符串/JSONB，不含 owner-bound regclass/sequence；无需任意字符串替换。不得替换 literal、JSON payload 或函数 body 中恰与 schema 同名的字符串。
+5. 新增 schema-qualified/default dependency 超出当前已验证规范化范围时，应明确报 unsupported/drift，直到扩展实现及测试；不通过删掉限定符、默认表达式或外部依赖来放宽比较。列类型、null/default、index 或 immutable trigger 任一改变，即使仍为 22 表也必须失败。
+
+### 执行门与未决项
+
+方案无新 owner、role、迁移双轨或机器契约。D0 只改四文档，canonical SQL/catalog helper/源码/测试锁定。Root 审核后另行授权现有 kernel 与 lifecycle 两测试的 R1/R2/R3 RED；参考 fixture、完整 catalog 实现、其余 integration fixture/CI/smoke 只能在后续 GREEN 精确授权内实施。尚待 Root 提供隔离资源、实际 RED/完整 fresh/catalog/行为与契约门输出；本文设计不是这些运行证据。
+
+## 既有业务数据设计与历史证据
+
+以下 22 表及生命周期设计继续有效；历史安装/验收仅针对当时基线，不证明上述 namespace/catalog 目标已实现。
+
 状态：2026-09-08，五模块业务writer已实现；G5维护/生命周期工作树等待最终验收。唯一 canonical schema：database/schema.sql；SQL-first + pg，禁止 Prisma/第二schema/历史 migrations。
 基线7dde8e7；保留已有真实 Site/Workspace/Policy/Config/Release/Binding/Receipt/fence 表，增补产品与Model业务结构，不迁移开发数据。
 
 ## 表、索引、约束与生命周期
 
-| 表 | owner / writer | 主查询与索引 | 约束理由 / 生命周期 |
-|---|---|---|---|
-| system_site | sites | tenant+status+id；tenant+created_at DESC+id DESC | 活跃tenant/site_key唯一；version>0；软删30天，仍有活引用拒绝清理 |
-| system_site_host | sites | tenant/site+hostname；global hostname | active域名全局唯一防跨tenant接管；关联无恢复，删除archived，30天物理清理 |
-| system_site_policy | sites | tenant/site active | 一站一active；version CAS；allowed locale/product版本化数组用于装配不作查询条件，64KiB；默认语言必须允许；随Site清理 |
-| system_workspace | workspaces | tenant/site/status/id及tenant/created_at/id | tenant/site/key活跃唯一；site不可变；软删30天 |
-| system_product | products/global | product_key；created_at/id | 产品键永久不复用；version CAS；软删30天可恢复，期满保留ID/key tombstone，不物理删除身份 |
-| system_application | products/tenant | tenant/site/created_at/id；product反向检查 | tenant/site/app_key活跃唯一；product/site不可变；软删30天，先删除关联 |
-| system_feature_definition | products/global | global_feature_key；product/created_at/id | global key永久唯一、不可变结果契约；retired_at生命周期，无软删；永久保留身份，32KiB schema_version1结果契约 |
-| system_app_feature_exposure | products/tenant | tenant/application/feature | 每App/Feature唯一；无恢复语义关系，删除物理，generation同事务；enabled独立boolean |
-| system_presentation | products/tenant | tenant/application/locale/surface | 身份唯一；version CAS；navigation/theme/i18n typed schema_version1 JSON≤64KiB；App清理时物理清理 |
-| system_config_record | products | tenant/locale/module/scope/product；release引用检查 | active完整identity唯一（tenant/site/module/key/scope/product/locale/release）；schema_version>0；普通配置软删30天；release快照随retention |
-| system_config_release | products | tenant/status/id；tenant/created_at/id | tenant非空、tenant/release_key未retired唯一；digest64hex/version>0；draft→validated→published→retired；retired无binding后保留90天 |
-| system_release_binding | products | tenant/site/product/scope；release反向影响 | active完整scope唯一；tenant必需，site可空表示tenant默认；归属同tenant published release；archived30天物理清理 |
-| system_runtime_manifest_generation | runtime-manifests | tenant PK | 正BIGINT；每tenant写同事务增加，tenant注销时随owner清理 |
-| system_catalog_generation | products | singleton scope PK | global配置写fence；常驻一行，不是业务config KV |
-| system_command_receipt | 各写用例内部 | scope_kind/scope_id/key；expires_at | scope_kind/scope_id/key唯一+hash+completion一致性；operation/actor进入digest；完成7天后分批物理清理；pending只在事务内不持久泄漏 |
-| model_definition | model-catalog | model_key；created_at/id | 全局key永久唯一；version>0；软删30天可恢复，期满保留ID/key tombstone |
-| model_provider | model-catalog | provider/provider_key；created_at/id | provider/key永久唯一；只存secret_handle_ref不存secret；软删30天可恢复，期满保留ID/key tombstone |
-| model_label | model-catalog | label_key；feature_key/created_at/id | label_key永久唯一；feature_key引用产品Feature，default_revision同feature；软删30天可恢复，期满保留ID/key tombstone |
-| model_revision | model-catalog | model/revision；feature/published/retired/priority/id；provider反向 | model+revision唯一；draft可编辑，published/retired内容immutable，无通用delete；永久保留revision引用 |
-| model_routing_policy | model-catalog/tenant | tenant/label | tenant/label唯一，tenant/feature WHERE is_default唯一；指定revision须published且feature匹配；删除物理；version CAS |
-| model_provider_health_state | model-catalog | provider PK | 唯一health权威投影，不在provider复制health字段；generation CAS；observed_at UTC，provider删除后清理 |
-| model_cache_generation | model-catalog | resolve singleton | global模型写推进，tenant routing另推进tenant fence；常驻 |
+| 表                                 | owner / writer       | 主查询与索引                                                        | 约束理由 / 生命周期                                                                                                                       |
+| ---------------------------------- | -------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| system_site                        | sites                | tenant+status+id；tenant+created_at DESC+id DESC                    | 活跃tenant/site_key唯一；version>0；软删30天，仍有活引用拒绝清理                                                                          |
+| system_site_host                   | sites                | tenant/site+hostname；global hostname                               | active域名全局唯一防跨tenant接管；关联无恢复，删除archived，30天物理清理                                                                  |
+| system_site_policy                 | sites                | tenant/site active                                                  | 一站一active；version CAS；allowed locale/product版本化数组用于装配不作查询条件，64KiB；默认语言必须允许；随Site清理                      |
+| system_workspace                   | workspaces           | tenant/site/status/id及tenant/created_at/id                         | tenant/site/key活跃唯一；site不可变；软删30天                                                                                             |
+| system_product                     | products/global      | product_key；created_at/id                                          | 产品键永久不复用；version CAS；软删30天可恢复，期满保留ID/key tombstone，不物理删除身份                                                   |
+| system_application                 | products/tenant      | tenant/site/created_at/id；product反向检查                          | tenant/site/app_key活跃唯一；product/site不可变；软删30天，先删除关联                                                                     |
+| system_feature_definition          | products/global      | global_feature_key；product/created_at/id                           | global key永久唯一、不可变结果契约；retired_at生命周期，无软删；永久保留身份，32KiB schema_version1结果契约                               |
+| system_app_feature_exposure        | products/tenant      | tenant/application/feature                                          | 每App/Feature唯一；无恢复语义关系，删除物理，generation同事务；enabled独立boolean                                                         |
+| system_presentation                | products/tenant      | tenant/application/locale/surface                                   | 身份唯一；version CAS；navigation/theme/i18n typed schema_version1 JSON≤64KiB；App清理时物理清理                                          |
+| system_config_record               | products             | tenant/locale/module/scope/product；release引用检查                 | active完整identity唯一（tenant/site/module/key/scope/product/locale/release）；schema_version>0；普通配置软删30天；release快照随retention |
+| system_config_release              | products             | tenant/status/id；tenant/created_at/id                              | tenant非空、tenant/release_key未retired唯一；digest64hex/version>0；draft→validated→published→retired；retired无binding后保留90天         |
+| system_release_binding             | products             | tenant/site/product/scope；release反向影响                          | active完整scope唯一；tenant必需，site可空表示tenant默认；归属同tenant published release；archived30天物理清理                             |
+| system_runtime_manifest_generation | runtime-manifests    | tenant PK                                                           | 正BIGINT；每tenant写同事务增加，tenant注销时随owner清理                                                                                   |
+| system_catalog_generation          | products             | singleton scope PK                                                  | global配置写fence；常驻一行，不是业务config KV                                                                                            |
+| system_command_receipt             | 各写用例内部         | scope_kind/scope_id/key；expires_at                                 | scope_kind/scope_id/key唯一+hash+completion一致性；operation/actor进入digest；完成7天后分批物理清理；pending只在事务内不持久泄漏          |
+| model_definition                   | model-catalog        | model_key；created_at/id                                            | 全局key永久唯一；version>0；软删30天可恢复，期满保留ID/key tombstone                                                                      |
+| model_provider                     | model-catalog        | provider/provider_key；created_at/id                                | provider/key永久唯一；只存secret_handle_ref不存secret；软删30天可恢复，期满保留ID/key tombstone                                           |
+| model_label                        | model-catalog        | label_key；feature_key/created_at/id                                | label_key永久唯一；feature_key引用产品Feature，default_revision同feature；软删30天可恢复，期满保留ID/key tombstone                        |
+| model_revision                     | model-catalog        | model/revision；feature/published/retired/priority/id；provider反向 | model+revision唯一；draft可编辑，published/retired内容immutable，无通用delete；永久保留revision引用                                       |
+| model_routing_policy               | model-catalog/tenant | tenant/label                                                        | tenant/label唯一，tenant/feature WHERE is_default唯一；指定revision须published且feature匹配；删除物理；version CAS                        |
+| model_provider_health_state        | model-catalog        | provider PK                                                         | 唯一health权威投影，不在provider复制health字段；generation CAS；observed_at UTC，provider删除后清理                                       |
+| model_cache_generation             | model-catalog        | resolve singleton                                                   | global模型写推进，tenant routing另推进tenant fence；常驻                                                                                  |
 
 SQL-only system_product_profile 从无production writer，删除；system_audit_event 无writer且Audit归IAM，删除。不存在新Profile/Audit兼容表。
 Model旧Prisma schema只在独立旧仓，G1不复制其访问层/enum/receipt；合入模型统一System receipt，避免旧operation+key缺tenant的冲突范围。
@@ -66,11 +112,11 @@ G2后：真实双连接父删除/关系创建竞态、CAS、receipt replay、跨
 Receipt scope_kind固定global/tenant；global scope_id空串、tenant非空由SQL CHECK约束，不能用tenant magic string碰撞global。Config结构矩阵见API_CONTRACT与ck_system_config_scope_fields；关系scope指向的资源在同事务父锁内重验。
 
 ### 快照技术约束
+
 model_revision_immutable_guard承接旧Model数据库安全不变量，拒绝所有DELETE、identity修改；published后只允许retired_at/version/updated_at，published_at/digest/内容不可改，retirement不可撤销。system_feature_identity_guard永久保护Feature key/结果契约与身份，仅可retire/version；两者不编排业务、不隐藏写入，例外依据ADR0002与Root批准的immutable快照要求。真实SQL负例验证其行为。
 Binding不提供global release/API；tenant scope要求scope_id=tenant、site空，product scope要求scope_id=product UUID、site空，surface要求site+非空surface；均必需product，服务端同tenant校验published release。全局普通Config仍支持，无global release发布路径。
 
 Global Config release_id强制NULL；system_config_release.tenant_id NOT NULL；Config读写conditional scope的认证、查询选择见API_CONTRACT，不能用COALESCE回退全局release。
-
 
 ### G5实际维护查询
 

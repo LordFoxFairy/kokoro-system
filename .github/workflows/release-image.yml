@@ -38,7 +38,7 @@ jobs:
           --health-timeout=2s
           --health-retries=15
     env:
-      DATABASE_URL: postgresql://postgres:kokoro_ci@127.0.0.1:55432/kokoro_system
+      DATABASE_URL: postgresql://postgres:kokoro_ci@127.0.0.1:55432/kokoro_system?schema=system
       REDIS_URL: redis://127.0.0.1:56379
       TEST_ADMIN_DATABASE_URL: postgresql://postgres:kokoro_ci@127.0.0.1:55432/postgres
       TEST_REDIS_URL: redis://127.0.0.1:56379

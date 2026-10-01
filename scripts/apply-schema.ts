@@ -1,39 +1,44 @@
 import { readFile } from "node:fs/promises";
 import { Client } from "pg";
+import { parseSystemDatabaseUrl } from "../src/config/database-url.js";
 
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error("DATABASE_URL is required");
+const database = parseSystemDatabaseUrl(process.env.DATABASE_URL);
 const sql = await readFile(
   new URL("../database/schema.sql", import.meta.url),
   "utf8",
 );
-const connection = new Client({ connectionString: url });
+const connection = new Client(database);
 try {
   await connection.connect();
   await connection.query("BEGIN");
   await connection.query(
     "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-    ["kokoro-system:canonical-schema"],
+    [`kokoro-system:canonical-schema:${database.schema}`],
   );
-  const tables = await connection.query<Record<string, unknown>>(`
-    SELECT tablename AS table_name
-    FROM pg_catalog.pg_tables
-    WHERE schemaname = 'public'
-    ORDER BY tablename
-  `);
-  if (tables.rows.length > 0) {
-    const tableNames = tables.rows.map((table) => {
-      if (typeof table.table_name !== "string")
-        throw new Error(
-          "db:apply-schema received an invalid PostgreSQL table name",
-        );
-      return table.table_name;
-    });
-    throw new Error(
-      `db:apply-schema requires a blank database; found tables: ${tableNames.join(", ")}`,
-    );
-  }
-  await connection.query("SET LOCAL search_path TO public, pg_catalog");
+  await connection.query(`CREATE SCHEMA IF NOT EXISTS "${database.schema}"`);
+  const objects = await connection.query<{ present: boolean }>(
+    `
+    SELECT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_class WHERE relnamespace=n.oid
+      UNION ALL SELECT 1 FROM pg_catalog.pg_proc WHERE pronamespace=n.oid
+      UNION ALL SELECT 1 FROM pg_catalog.pg_type WHERE typnamespace=n.oid
+      UNION ALL SELECT 1 FROM pg_catalog.pg_extension WHERE extnamespace=n.oid
+      UNION ALL
+      SELECT 1 FROM pg_catalog.pg_depend d
+      CROSS JOIN LATERAL pg_catalog.pg_identify_object(d.classid,d.objid,d.objsubid) AS identity
+      WHERE d.refclassid='pg_catalog.pg_namespace'::regclass AND d.refobjid=n.oid
+        AND identity.schema=$1
+    ) AS present
+    FROM pg_catalog.pg_namespace n WHERE n.nspname=$1
+  `,
+    [database.schema],
+  );
+  if (objects.rows[0]?.present !== false)
+    throw new Error("db:apply-schema requires an empty owner schema");
+  await connection.query(
+    `SET LOCAL search_path TO "${database.schema}", pg_catalog`,
+  );
+  await connection.query("SET LOCAL TIME ZONE 'UTC'");
   await connection.query(sql);
   await connection.query("COMMIT");
 } catch (error) {

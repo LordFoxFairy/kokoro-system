@@ -7,6 +7,7 @@ import { createServer } from "node:net";
 import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { Client } from "pg";
+import { parseSystemDatabaseUrl } from "../src/config/database-url.js";
 const adminUrl = process.env.TEST_ADMIN_DATABASE_URL;
 if (!adminUrl)
   throw new Error("TEST_ADMIN_DATABASE_URL required; smoke never skips");
@@ -18,6 +19,7 @@ if (process.argv.includes("--image") && !image)
 const name = `system_g5_smoke_${randomUUID().replaceAll("-", "")}`;
 const url = new URL(adminUrl);
 url.pathname = `/${name}`;
+url.searchParams.set("schema", "system_smoke");
 const admin = new Client({ connectionString: adminUrl });
 let created = false,
   child: ChildProcess | undefined,
@@ -66,10 +68,11 @@ try {
   await admin.query(`CREATE DATABASE "${name}"`);
   created = true;
   console.log(`System smoke fixture created: ${name}`);
-  const db = new Client({ connectionString: url.href });
+  const db = new Client(parseSystemDatabaseUrl(url.href));
   await db.connect();
   try {
-    await db.query("SET search_path TO public,pg_catalog");
+    await db.query("CREATE SCHEMA system_smoke");
+    await db.query("SET search_path TO system_smoke,pg_catalog");
     await db.query(readFileSync("database/schema.sql", "utf8"));
   } finally {
     await db.end();

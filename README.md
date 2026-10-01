@@ -6,18 +6,18 @@ Kokoro 内部控制面：Site/域名/Policy、Workspace、Product/App/Feature、
 
 ## 本地源码启动
 
-复用已有 PostgreSQL/Redis，只为 System 创建独立空数据库；不覆盖已有数据。
+复用既有 PostgreSQL/Redis，本地/CI 共享应用数据库与 role；为 System 显式选择独立 owner schema，不覆盖已有数据。URL 必须包含唯一 `schema=system`（也可选其他安全 owner 名），禁止 `public`、`pg_` 和 URL `options`/应用连接配置覆盖；TLS 参数保留，时间为 UTC。
 
 ```bash
 pnpm install --frozen-lockfile
 cp .env.example .env
 # 填入本机独立 DATABASE_URL、REDIS_URL 与三个不同随机 service token
 set -a; source .env; set +a
-pnpm db:apply-schema  # 仅空库，已有表明确拒绝
+pnpm db:apply-schema  # 仅目标 owner schema 为空；其他 owner 非空允许
 pnpm dev
 ```
 
-`GET /healthz` 为进程存活，`GET /readyz` 检查本仓 PG/Redis。默认 `127.0.0.1:4240`；容器外部访问显式设置 HOST。业务请求需可信 service 身份；字段以 [只读 HTTP contract](contract/README.md) 为准，无 RPC/SDK 第二协议。
+`GET /healthz` 为进程存活，`GET /readyz` 检查本仓 PG/Redis，包括配置 namespace 存在、实际 current_schema 和 UTC。运行时不创建 schema 或 fallback public。默认 `127.0.0.1:4240`；容器外部访问显式设置 HOST。业务请求需可信 service 身份；字段以 [只读 HTTP contract](contract/README.md) 为准，无 RPC/SDK 第二协议。
 
 ## 完整本仓门禁
 
