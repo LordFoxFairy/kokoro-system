@@ -1,3 +1,13 @@
+## R115 fresh验证工具切片验收（2026-10-02）
+
+Root基线c2eebe91/System基线aa4e42e5；本切片只改既有fresh验证脚本及其测试，不变业务API、contract、canonical SQL或依赖。
+
+- `scripts/verify-system-fresh-schema.ts`：明确保留unknown原失败，三个清理步骤全部尝试并聚合异常；显式fixture库名仅接受42字符ASCII `system_g1_`+32小写hex，连接/CREATE/URL/DROP同身份，非法输入在资源构造前拒绝。
+- Root本轮原十纯门全部exit0，unit98/contract12/architecture9，共119pass/0fail/0skip，197tracked前后hash保持、owned进程组终态；manifest `/tmp/kokoro-r115b-system-pure-root.json` SHAcb0dc907c96d41023bfc4e03f381ea814e486ab05903f928ca29cfb6fd0e35ec。最初临时HOME使Corepack尝试访问registry的失败保留为验证环境问题，后续显式复用原12.3.4缓存并禁网，未改项目依赖/门禁。
+- 同源码da4675b9/测试45bd5286此前E77真实PG fresh已23assertions/22tables/catalog匹配、拒绝重复安装，自有临时库独立查询已不存在；本轮核hash一致，不冒称重新执行PG。manifest `/var/folders/gn/wbk8wfbd047_wvwkwtyn331r0000gn/T/kokoro-r114-system-fresh-dlt4tpud/manifest.json` SHAcaec26bf5ee8616f654acd3e9fe0b2bcdd2d3fc9e91d18ad1f52f93db426218d。
+- 独立切片审P0/P1/P2=0/0/0：`/tmp/kokoro-r115-system-release-review.md` SHA31519cb2fe5b70846c70b17ea5418ab1288d4b4fbaa99e9eebb9fa4304abc43b，runCleanup依赖已在基线tracked，不存在漏提交依赖。
+- 仅此工具切片验收：业务HTTP/Redis/runtime/provider/image、全部owner同应用库组合与完整T-Q12/T-R02未验。Root组合、推送及fresh clone仍由Root台账单独记录，不以本节宣称全服务上线闭环。
+
 ## R80-W05 System 模型归属边界 D0（2026-10-02）
 
 基线 `6ca96180749d4842c2ee0628328f372d114e320f`，本轮只允许修改 `docs/TECHNICAL_DESIGN.md`、`docs/API_CONTRACT.md`、`docs/DATA_MODEL.md`、`docs/CURRENT.md` 的新前缀；Root 独占 Git/index/commit、台账与共享资源。源码、canonical SQL、运行时 schema、OpenAPI、生成物、测试、依赖和服务均未改动或启动。

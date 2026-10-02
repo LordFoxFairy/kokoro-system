@@ -5,11 +5,28 @@ import { parseSystemDatabaseUrl } from "../src/config/database-url.js";
 import { snapshotSystemSchemaCatalog } from "./system-schema-catalog.js";
 import { readFileSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
+import { runCleanup } from "./smoke-cleanup.js";
 
 const administratorUrl = process.env.TEST_ADMIN_DATABASE_URL;
 if (!administratorUrl)
   throw new Error("TEST_ADMIN_DATABASE_URL is required; no integration skip");
-const databaseName = `system_g1_${randomUUID().replaceAll("-", "")}`;
+const configuredDatabaseName = process.env.TEST_SYSTEM_FRESH_DATABASE_NAME;
+const databaseName = (() => {
+  if (configuredDatabaseName === undefined)
+    return `system_g1_${randomUUID().replaceAll("-", "")}`;
+  const prefix = "system_g1_";
+  const suffix = configuredDatabaseName.slice(prefix.length);
+  const isValid =
+    configuredDatabaseName.length === 42 &&
+    configuredDatabaseName.startsWith(prefix) &&
+    suffix.length === 32 &&
+    [...suffix].every((character) => "0123456789abcdef".includes(character));
+  if (!isValid)
+    throw new Error(
+      "TEST_SYSTEM_FRESH_DATABASE_NAME must be system_g1_ followed by 32 lowercase hexadecimal characters",
+    );
+  return configuredDatabaseName;
+})();
 const referenceSchema = `system_ref_${randomUUID().replaceAll("-", "")}`;
 const admin = new Client({ connectionString: administratorUrl });
 const databaseUrl = new URL(administratorUrl);
@@ -19,6 +36,8 @@ const database = new Client(parseSystemDatabaseUrl(databaseUrl.href));
 let created = false;
 let connected = false;
 let assertions = 0;
+let hasFailure = false;
+let primaryFailure: unknown;
 async function rejected(
   sql: string,
   values: unknown[],
@@ -216,9 +235,39 @@ try {
   console.log(
     `Fresh PostgreSQL schema verified: ${assertions} assertions, 22 tables; complete canonical catalog match; isolated ${databaseName}; business HTTP not tested`,
   );
+} catch (error) {
+  hasFailure = true;
+  primaryFailure = error;
 } finally {
-  if (connected) await database.end();
-  if (created)
-    await admin.query(`DROP DATABASE "${databaseName}" WITH (FORCE)`);
-  await admin.end();
+  try {
+    await runCleanup([
+      async () => {
+        if (connected) await database.end();
+      },
+      async () => {
+        if (created)
+          await admin.query(`DROP DATABASE "${databaseName}" WITH (FORCE)`);
+      },
+      async () => {
+        await admin.end();
+      },
+    ]);
+  } catch (error) {
+    primaryFailure = hasFailure
+      ? new AggregateError(
+          [primaryFailure, error],
+          "Fresh schema verification and cleanup failed",
+        )
+      : error;
+    hasFailure = true;
+  }
+}
+if (hasFailure) {
+  const failure =
+    primaryFailure instanceof Error
+      ? primaryFailure
+      : new Error("Fresh schema verification failed", {
+          cause: primaryFailure,
+        });
+  throw failure;
 }
