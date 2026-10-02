@@ -1,5 +1,21 @@
 # System 数据模型
 
+## R80-W05 当前数据裁决：技术目录不承载成本事实
+
+2026-10-02，canonical 基线 `6ca96180749d4842c2ee0628328f372d114e320f`，对齐 Root `ADR-033-actual-usage-and-pricing-ownership.md` 当前裁决。System 的 22 张表和 `database/schema.sql` 保持不变；此前建议新增 `model_cost_revision` 或向 `model_revision` 添加价格字段的方案取消。
+
+现有模型数据只表达技术控制面：
+
+- `model_provider` 保存 System provider 目录身份、transport、优先级与 secret handle 引用；目录记录不是一次运行所用的底层 provider account 凭据。
+- `model_revision` 保存声明的 `provider_id`、`provider_model_name`、`gateway_model_name`、modalities、context window、priority 及技术内容 `digest`；published 后不可变，但不可变只证明声明未被改写，不证明网关按声明执行。
+- `model_routing_policy` 保存 tenant/feature/label 的 planned 选择；`model_provider_health_state` 保存带 `observed_at` 的健康投影；`model_cache_generation` 与 tenant generation 提供 resolve fence。它们均不保存 call、attempt、provider response、usage、采购费率或用户收费。
+
+因此 canonical schema 不新增货币、费率、倍率、Credit conversion、rounding、quote、hold、settlement 或 ledger 字段/表，也不把这些事实塞入 JSONB 配置。采购费率版本、默认精确 `7/5` 的可配置销售倍率、Credit 换算与舍入由 Billing `Metering` 的 canonical 数据模型唯一拥有；System 不创建其镜像、缓存权威或跨 owner SQL。
+
+实际调用证据由 Agent 持久化并发布严格契约：每个 call/attempt 要绑定 run/lease 身份、System 返回的完整 model/revision/digest/generation/provider/gateway planned binding，以及网关实际 provider/model/request identity、usage profile 与分类 counters、receipt/digest 和明确的 known/unknown 状态。网关 alias、System 目录声明、健康投影或缺失 usage 都不能转换为 actual 事实；未核实零成本与 `unknown` 分开。
+
+后继先由 Agent 与 Billing owner 收敛机器契约及各自 canonical schema，再由消费者固定发布版本。Billing 的成本计价目标将替代现有固定 Feature `quantity=1` 作为唯一模型收费路径；旧实现只在 Billing 完整承接授权、幂等、事务和恢复后删除，不保留两套默认实现。System 本轮没有数据迁移、表数变化、约束/索引变化、删除项、兼容表或双写；SQL、schema catalog/fresh 门及所有运行测试保持原样。
+
 ## R40 实施候选：完整 catalog 快照，待 Root 资源验收
 
 Root 已通过 R39 文档门及真实 R2/R3 RED。当前 installer 候选在 owner+schema advisory transaction lock 下创建缺失目标，按目标 namespace 查询 class/proc/type/extension 与 namespace membership metadata 检查为空，同事务 UTC/path + 原 canonical SQL；失败 rollback，不要求 public/其他 owner 为空。22 表 canonical 字节未改，单库/单 role 与业务不变量保持。

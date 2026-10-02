@@ -1,5 +1,27 @@
 # System API 契约
 
+## R80-W05 当前契约边界：planned resolve，不新增成本 API
+
+2026-10-02，源码基线 `6ca96180749d4842c2ee0628328f372d114e320f`，对齐 Root `ADR-033-actual-usage-and-pricing-ownership.md` 当前裁决。采购费率、销售倍率、Credit 换算与结算统一归 Billing `Metering`；逐实际 call/attempt usage evidence 归 Agent。此前建议的 System cost revision、成本查询端点和 Billing→System 成本读取身份全部取消。
+
+现有唯一模型选择操作保持 `POST /v1/system/model-catalog/resolve`：caller 必须是 `kokoro-agent`，tenant 来自受信 header；输入仍仅为必填 `feature_key` 与可选 `label_key`。成功响应继续严格包含：
+
+```text
+model_id, revision_id, revision, digest,
+generation, tenant_generation,
+provider_id, provider_model_name,
+transport, gateway_model_name,
+label_key, feature_key
+```
+
+这些字段是 System published catalog 与 tenant policy 在 generation fence 下选出的 **planned binding**。`digest` 绑定技术 revision 内容，`generation`/`tenant_generation` 绑定目录与 tenant route 观察点，健康筛选要求当前投影仍在新鲜窗口内。现有 `ROUTE_NOT_FOUND`、`POLICY_DENIED`、`MODEL_UNAVAILABLE` 与 `SYSTEM_UNAVAILABLE` 行为保持，不新增“缺价格等于零”或成本 fallback。
+
+该响应不包含 endpoint、secret、采购费率、倍率、Credit 金额、usage、provider receipt 或结算身份，也不声明 `provider_model_name`/`gateway_model_name` 就是网关实际执行结果。LiteLLM 可以在 System 返回之后执行底层选择、fallback 或 retry；System 没有 provider request/response，因此机器契约不能把 planned route 表述为 actual gateway evidence。
+
+后继契约顺序为：Agent owner 先发布逐 call/attempt evidence，完整携带 System binding 以及可信网关实际身份、usage 分类、receipt/digest 和 unknown 状态；Billing owner 再发布不可变采购费率、精确倍率、Credit 换算/舍入、quote/admission/settlement 契约并消费 Agent evidence。provider 调用前须有有效预占；fallback/retry 超出冻结集合先重新授权。Billing 根据冻结费率与严格用量重新计算，不信任 caller 自报最终金额；供应商最终 invoice 另由 reconciliation 核对。跨仓只固定 owner 发布的版本、commit 与 digest，不复制可编辑 schema，也不让 BFF、Agent 或 System 自算 Billing 价格。失败调用是否向用户收费仍待业务确认，不把任一策略写成已批准。
+
+本节不改变 83 个业务 operation、2 个 probe、运行时 Zod→只读 OpenAPI 的单向生成、artifact 版本或三种现有服务身份；不新增 System 表、路径、错误码、服务 credential、alias 或兼容双轨。相关源码、机器契约、生成物和测试在本 R80 切片中全部只读。
+
 ## R40 实施候选：wire 不变，资源验收未完成
 
 Root 已通过下文 R39 文档门并取得真实配置/安装/路由 RED。当前候选改动只涉及连接与 probe 内部依赖判断：统一 owner selector 与 UTC，拒绝 options/应用驱动覆盖，缺失或错路由使用既有 readiness 503 路径；无新 HTTP 字段、错误码、操作、schema/provenance 输入或 artifact 版本。schema 不来自 tenant/header/body，运行时没有建 schema 或参考 DDL 接口。

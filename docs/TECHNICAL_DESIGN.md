@@ -1,5 +1,31 @@
 # System 技术设计
 
+## R80-W05 当前裁决：System 仅拥有计划技术路由
+
+2026-10-02，源码基线 `6ca96180749d4842c2ee0628328f372d114e320f`。本节对齐 Root `ADR-033-actual-usage-and-pricing-ownership.md` 当前裁决，覆盖此前把采购成本版本放入 System 的建议；既有业务设计正文保留作历史与当前实现说明，不据此恢复成本方案。ADR 的跨仓 owner/目标路径已接受，严格契约与实现、失败收费资格仍未完成。
+
+### Owner 与放置边界
+
+- System `model-catalog` 只拥有技术模型、provider 目录、published revision、tenant routing policy、健康投影与 resolve 结果；不拥有采购费率、销售倍率、Credit 换算、舍入、预占、结算或账本。
+- Billing `Metering` 是采购费率和用户计价的唯一 owner，后续承载不可变费率版本、可配置销售倍率（当前 Root 裁决默认精确 `7/5`）、Credit 换算与舍入。System 不新增成本表、成本 API、Billing 服务身份或任意 `configs` 容器。
+- Agent 是实际模型调用、attempt、网关响应与 usage evidence 的唯一 owner。System 不写逐调用事实，Billing 不从 System 路由结果推断实际调用。
+
+该边界沿用现有 `src/modules/model-catalog`，不新增一级模块或进程。把采购费率放入 `model_revision` 或另建 System pricing/config 模块会让独立生命周期耦合并形成第二计价权威，均淘汰；现有 22 表、83 个业务操作、2 个 probe 和三种 System 服务身份保持不变。
+
+### 当前 resolve 能证明的 planned binding
+
+`POST /v1/system/model-catalog/resolve` 只接受已认证 `kokoro-agent` 与受信 tenant。一次成功结果证明：在该次解析的 generation fence 内，显式 tenant/feature/label policy 选择了仍 published、未 retired 的 immutable revision；关联 model/provider 未删除；provider 健康投影在配置的新鲜度窗口内为 `healthy`；transport 为 `litellm`。返回绑定字段为 `model_id`、`revision_id`、`revision`、revision `digest`、global/tenant `generation`、`provider_id`、`provider_model_name`、`gateway_model_name`、`transport`、`label_key`、`feature_key`。
+
+revision `digest` 只覆盖 System 保存的技术 revision 内容；generation 只防止目录/tenant policy 在读缓存和返回期间漂移；健康投影只证明其 `observed_at` 时刻的控制面观察。三者共同构成 planned route 的可复核绑定，不是 provider 执行或费用凭据。
+
+### actual gateway 与真实来源限制
+
+System 不发起推理，也不接收网关响应。`gateway_model_name` 是 Agent 交给 LiteLLM 的路由别名；`provider_id` 是 System 目录行身份；`provider_model_name` 是发布 revision 中声明的目标。这些字段不能单独证明网关最终选择的底层 provider、provider account、实际模型/版本、fallback、重试 attempt、provider request ID、token 分类、收费金额或调用是否发生。`model_provider_health_state` 是可变健康投影，不能替代单次调用 receipt。
+
+后继先由 Agent 发布严格的逐 call/attempt evidence contract，将上述完整 planned binding 与网关返回的实际身份、usage 分类、receipt/digest、lease/attempt 和 `known_zero`、`known_nonzero`、`unknown` 状态绑定；再由 Billing 发布并消费其版本化费率、倍率和结算契约。provider 执行前须有有效 Billing 预占；fallback/retry/新模型超出冻结费率或预算时先重新授权。没有可信实际落点时只能验证并约束固定 provider binding，否则保持 `unknown` 且不按推测费率结算；不把 alias、目录声明、缺 usage 或本地模型零变量成本推断成真实收费事实。
+
+本 R80 切片只修改四份既有文档的新前缀。源码、SQL、运行时 schema、OpenAPI artifact、服务凭据、测试和依赖均冻结；没有兼容 API、双读、fallback 或删除项。后继实现与资源验证由 Root 在 Agent/Billing owner 契约发布后另行授权。
+
 ## R40 实施候选：catalog 后继，待 Root 资源验收
 
 Root 已通过 R39 四文档门，并真实复验 R1（57 fail/10 pass）及 R2/R3（3 个真实 PostgreSQL fail；6 个旧例因筛选 skip）。基线仍为 `c0a76a3a7614bf46ea6e665e523f24261862436f`；以下为未提交候选，不是资源验收或发布结果。

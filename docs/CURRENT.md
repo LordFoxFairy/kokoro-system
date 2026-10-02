@@ -1,3 +1,15 @@
+## R80-W05 System 模型归属边界 D0（2026-10-02）
+
+基线 `6ca96180749d4842c2ee0628328f372d114e320f`，本轮只允许修改 `docs/TECHNICAL_DESIGN.md`、`docs/API_CONTRACT.md`、`docs/DATA_MODEL.md`、`docs/CURRENT.md` 的新前缀；Root 独占 Git/index/commit、台账与共享资源。源码、canonical SQL、运行时 schema、OpenAPI、生成物、测试、依赖和服务均未改动或启动。
+
+Root 当前 `ADR-033-actual-usage-and-pricing-ownership.md` 裁决已覆盖前轮把成本版本放入 System 的建议：System 只拥有技术模型/provider/revision/tenant route/健康投影与 planned resolve；Billing `Metering` 唯一拥有不可变采购费率、可配置销售倍率（当前默认精确 `7/5`）、Credit 换算/舍入及账务；Agent 唯一拥有逐实际 call/attempt usage evidence。System 不新增成本表/API、Billing service identity 或通用配置模块。
+
+已核实当前 resolve 返回 `model_id`、`revision_id`、`revision`、revision `digest`、global/tenant generation、`provider_id`、`provider_model_name`、`gateway_model_name`、`transport`、label/feature，并以 published/non-retired、目录未删、recent healthy 与 generation fence 约束选择。该结果只能证明控制面 planned binding：gateway name 是 LiteLLM alias，System 不调用推理、不接收 provider response/receipt，不能证明 actual provider/account/model、fallback/retry、request ID、usage 或成本。
+
+后继依赖为 Agent 正式发布绑定 planned route 与 actual gateway/usage/unknown 的逐调用契约，Billing 再发布并消费自己的费率、倍率、Credit、预占与结算契约；provider 执行前须有有效预占，fallback/retry 超出冻结集合先重新授权。缺可信实际落点时只能约束并验证固定 provider binding，否则保持 `unknown`，不把缺 usage、本地零变量成本或别名推断为真实收费。失败调用收费资格仍待业务确认；owner 边界通过不代表最终收费策略通过。
+
+本切片只做三面及 CURRENT 对齐，没有 source/SQL/contract 实现或资源验证；不声称模型调用、费用或用户旅程已闭环。交付后冻结，待 Root 审查、提交及后继 owner-first 授权。
+
 ## R44 Root 完整 owner 门（2026-10-01）
 
 Root在23path冻结manifest11b6f2f1上实际Node24.20.0 pnpm verify exit0：format/lint/typecheck/build、contract/lint/provenance及完整16文件176tests通过（56.47s），含原六个lifecycle用例；fresh23断言/22表/完整canonical catalog一致。日志/tmp/kokoro-system-schema-r44-root-full-verify.log。PG18.4、既有role nako/Redis14，fixture自有随机库，执行前后pg_database完整名单一致，fresh system_g1_a695b6e0defe4a3cb3c5665704128357已回收；无新共享基础设施或前缀批删。只发布本namespace/catalog切片：PG16 CI、cross-owner单库完整组合、正规用户登录/真实模型/费用浏览器链仍待验，不用176或fresh冒充整链。下方此前失败与候选证据保留历史。
