@@ -3,17 +3,17 @@
   "version": 2,
   "openapi": {
     "file": "openapi/system.openapi.json",
-    "sha256": "f9ea76f107e1ea0fc19df20ee7c59032c0fbac66e640e9a16a1b770ab27c1f37",
+    "sha256": "74c338f25494621421f2b9eb9edd78df57d4ee4560ca969a4bef30514fe59472",
     "source": "runtime-zod",
     "sourceSha256": {
-      "scripts/generate-system-openapi.ts": "f05534beb25bcf8644d5d43ca0fce175f5cbe276b688b6279cca243754241bcc",
+      "scripts/generate-system-openapi.ts": "b81d5c8fc74ba5b883364b9a6671f024e84adee2c81550aeec255acaff14b710",
       "scripts/system-openapi-operations.ts": "fb46bea2ec53a09c0f397d2f38aafc77a1c6e7eaef904b11667d56fda919d9f3",
       "src/http/protocol.schema.ts": "72dbe6ee57d842b855b337d1f1603a7ddbb8c3a4bb6c4f7bf3fe62821c8160c0",
       "src/modules/model-catalog/schemas/definition.schema.ts": "e2063b9ae62b8e5c4ca7cccce09dd4874f818831fc8966de2cf6d015a99bef64",
       "src/modules/model-catalog/schemas/label.schema.ts": "96116b4d390e203be056f73e32a30ea93e40dc0c60966ce60579cdb949f31a6a",
       "src/modules/model-catalog/schemas/provider.schema.ts": "f33d4aaa5bd34ff7008712ecda8f27c0c8769830652ada7df60f184e3961c57c",
-      "src/modules/model-catalog/schemas/resolve.schema.ts": "fd4e928318b8899d1a20b6180236d33bb994298a6a1af22a420c8ebbc8d5b877",
-      "src/modules/model-catalog/schemas/revision.schema.ts": "7bfbb5f7d246d9c3babf9cc6c4e1433b2f483ce215d5dee629e1df2ad2f49643",
+      "src/modules/model-catalog/schemas/resolve.schema.ts": "31b6d275c9187b3592ff402b3b3bef3da3b83629ffe53896050a8129310b1b74",
+      "src/modules/model-catalog/schemas/revision.schema.ts": "5d8559c0d4bac7e88a3e54d753c30e87c0f070be05dae813a401afe2b1a5274b",
       "src/modules/products/products.public.ts": "ccea3298f5ca5549d7882ce056e8bbb3445d23a9e1703958bd4b0a220882983e",
       "src/modules/products/schemas/application.schema.ts": "087d997360add9b9bbb2e244c1b1f9864fc6cf4ba93a7c9e8c14767288ca6a57",
       "src/modules/products/schemas/config.schema.ts": "92324f19fd4e39fdf2cef0a4a28f9e43f8b70c09fd5290e8153035a5a2aa2060",
@@ -28,18 +28,18 @@
     }
   },
   "releaseClassification": {
-    "contractVersion": "2.0.0",
+    "contractVersion": "3.0.0",
     "httpRouteGeneration": "v1",
-    "baseline": "none-unpublished",
-    "classification": "v1-fresh-cutover",
-    "change": "complete-system-http-zod-envelope-cas-model-owner",
+    "baseline": "2.0.0",
+    "classification": "execution-bound-breaking",
+    "change": "publish-model-execution-capability-bounds",
     "publishedCompatibilityRequired": false
   },
   "consumers": [
     {
       "consumer": "kokoro-bff",
       "surface": "runtime-manifest/model-catalog",
-      "disposition": "pinned-consumer-committed-http-verified"
+      "disposition": "3.0.0-pin-required-before-runtime-consumption"
     },
     {
       "consumer": "kokoro-agent",

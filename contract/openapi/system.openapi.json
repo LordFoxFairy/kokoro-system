@@ -8,8 +8,8 @@
   ],
   "info": {
     "title": "Kokoro System internal owner",
-    "version": "2.0.0",
-    "x-kokoro-release-classification": "v1-fresh-cutover",
+    "version": "3.0.0",
+    "x-kokoro-release-classification": "execution-bound-breaking",
     "description": "Generated from runtime Zod schemas; G1 target artifact, not implemented routes."
   },
   "paths": {
@@ -10843,7 +10843,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_0b4adc64a25563fa"
+                  "$ref": "#/components/schemas/schema_bae99a4b7279f69b"
                 }
               }
             }
@@ -10971,7 +10971,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_3407b1f62de56063"
+                  "$ref": "#/components/schemas/schema_5c6199a875eda8c2"
                 }
               }
             }
@@ -10997,7 +10997,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/schema_9f61e74d16596e70"
+                "$ref": "#/components/schemas/schema_fa79766349ca0639"
               }
             }
           }
@@ -11113,7 +11113,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_3407b1f62de56063"
+                  "$ref": "#/components/schemas/schema_5c6199a875eda8c2"
                 }
               }
             }
@@ -11259,7 +11259,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_3407b1f62de56063"
+                  "$ref": "#/components/schemas/schema_5c6199a875eda8c2"
                 }
               }
             }
@@ -11288,7 +11288,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/schema_24392f543580c8c4"
+                "$ref": "#/components/schemas/schema_5cb107caffcc4a56"
               }
             }
           }
@@ -11423,7 +11423,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_3407b1f62de56063"
+                  "$ref": "#/components/schemas/schema_5c6199a875eda8c2"
                 }
               }
             }
@@ -11577,7 +11577,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_3407b1f62de56063"
+                  "$ref": "#/components/schemas/schema_5c6199a875eda8c2"
                 }
               }
             }
@@ -12316,7 +12316,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_5a3a57311bea96a7"
+                  "$ref": "#/components/schemas/schema_00b9b5a3e10401fb"
                 }
               }
             }
@@ -18370,7 +18370,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_0b4adc64a25563fa": {
+      "schema_bae99a4b7279f69b": {
         "type": "object",
         "properties": {
           "data": {
@@ -18452,8 +18452,20 @@
                       "anyOf": [
                         {
                           "type": "integer",
-                          "exclusiveMinimum": 0,
-                          "maximum": 9007199254740991
+                          "minimum": 1,
+                          "maximum": 2147483647
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "max_output_tokens": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 2147483647
                         },
                         {
                           "type": "null"
@@ -18525,6 +18537,7 @@
                     "transport",
                     "gateway_model_name",
                     "context_window",
+                    "max_output_tokens",
                     "priority",
                     "id",
                     "version",
@@ -18556,7 +18569,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_3407b1f62de56063": {
+      "schema_5c6199a875eda8c2": {
         "type": "object",
         "properties": {
           "data": {
@@ -18633,8 +18646,20 @@
                 "anyOf": [
                   {
                     "type": "integer",
-                    "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "max_output_tokens": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
                   },
                   {
                     "type": "null"
@@ -18706,6 +18731,7 @@
               "transport",
               "gateway_model_name",
               "context_window",
+              "max_output_tokens",
               "priority",
               "id",
               "version",
@@ -18723,7 +18749,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_9f61e74d16596e70": {
+      "schema_fa79766349ca0639": {
         "type": "object",
         "properties": {
           "model_id": {
@@ -18797,8 +18823,20 @@
             "anyOf": [
               {
                 "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
               },
               {
                 "type": "null"
@@ -18823,11 +18861,12 @@
           "transport",
           "gateway_model_name",
           "context_window",
+          "max_output_tokens",
           "priority"
         ],
         "additionalProperties": false
       },
-      "schema_24392f543580c8c4": {
+      "schema_5cb107caffcc4a56": {
         "type": "object",
         "properties": {
           "provider_id": {
@@ -18891,8 +18930,20 @@
             "anyOf": [
               {
                 "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
               },
               {
                 "type": "null"
@@ -19188,7 +19239,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_5a3a57311bea96a7": {
+      "schema_00b9b5a3e10401fb": {
         "type": "object",
         "properties": {
           "data": {
@@ -19208,6 +19259,16 @@
                 "type": "integer",
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
+              },
+              "context_window": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "max_output_tokens": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
               },
               "digest": {
                 "type": "string",
@@ -19247,6 +19308,8 @@
               "model_id",
               "revision_id",
               "revision",
+              "context_window",
+              "max_output_tokens",
               "digest",
               "generation",
               "tenant_generation",

@@ -275,7 +275,7 @@ it("does not flag a deleted label's retained retired revision as a live orphan",
       [provider, provider],
     );
     await db.query(
-      "INSERT INTO model_revision(id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,transport,gateway_model_name,digest,published_at,retired_at) VALUES($1,$2,$3,1,'retained','Retained',$4,'[]','[]','litellm','retained',repeat('a',64),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+      "INSERT INTO model_revision(id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,transport,gateway_model_name,context_window,max_output_tokens,digest,published_at,retired_at) VALUES($1,$2,$3,1,'retained','Retained',$4,'[]','[]','litellm','retained',8192,2048,repeat('a',64),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
       [revision, model, provider, feature],
     );
     await db.query(

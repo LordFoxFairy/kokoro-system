@@ -39,7 +39,12 @@ export class RevisionService {
   ) {
     if (
       input.revision > 2147483647 ||
-      (input.context_window !== null && input.context_window > 2147483647)
+      (input.context_window !== null && input.context_window > 2147483647) ||
+      (input.max_output_tokens !== null &&
+        input.max_output_tokens > 2147483647) ||
+      (input.context_window !== null &&
+        input.max_output_tokens !== null &&
+        input.max_output_tokens > input.context_window)
     )
       throw new SystemError(
         "INVALID_ARGUMENT",
@@ -105,6 +110,15 @@ export class RevisionService {
       requireVersion(current.version, context.precondition);
       if (current.published_at)
         throw new SystemError("INVALID_STATE", "Revision already published");
+      if (
+        current.context_window === null ||
+        current.max_output_tokens === null ||
+        current.max_output_tokens > current.context_window
+      )
+        throw new SystemError(
+          "INVALID_STATE",
+          "Revision execution bounds are incomplete",
+        );
       if (current.digest !== commandDigest(revisionContent(current)))
         throw new SystemError("INVALID_STATE", "Revision digest mismatch");
       await this.generation.advance(tx);

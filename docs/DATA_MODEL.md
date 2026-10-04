@@ -1,8 +1,8 @@
 # System 数据模型
 
-## R210-SYSTEM-EXECUTION-D0：revision capability 与 request hard bound目标（2026-10-04）
+## R215 模型执行上限切片验收（2026-10-04）
 
-基线 `9a4e98eb9aed5513312090cf0e8e3f9c1d674bda`。当前 canonical `model_revision.context_window INTEGER NULL` 已由revision CRUD/content digest管理，但published仍可null且resolve不消费；`max_output_tokens`列不存在。因此当前数据库不能证明finite可执行bound。本节是下一SQL-first目标，不代表DDL已实施。
+实施前基线 `9a4e98eb9aed5513312090cf0e8e3f9c1d674bda` 尚无可发布的完整有限界。本切片已在现`model_revision`加入nullable draft `max_output_tokens`与published闭集CHECK；Root保留两个旧published fixture缺界导致full-owner 199通过/1失败及fresh失败，修正后完成16文件202测试和fresh 23 assertions/22 tables完整canonical全绿并通过独审。cache checksum不替代数据库事实，共享`resolveSchema`重验两值关系。本地交付commit状态见Root CURRENT/progress；远端尚未push，消费者未pin。
 
 目标仍只扩现 `model_revision`：保留`context_window`作为positive int32 provider capability metadata，新增nullable draft `max_output_tokens INTEGER`作为每物理请求output hard bound。canonical CHECK分别覆盖null或positive int32、两值同时存在时`max_output_tokens <= context_window`，并以 `published_at IS NULL OR (context_window IS NOT NULL AND max_output_tokens IS NOT NULL)` 保证raw SQL不能发布缺界revision；service `publish()`在现事务内仍进一步要求二者均非null。retired状态必先published，因而继续满足同一边界。这样draft可分步编辑，而任一成功published revision必有合法、immutable、digest-covered两值。不得把publish完整性只留给HTTP body，也不得用弱CHECK接受非法直接SQL状态。
 

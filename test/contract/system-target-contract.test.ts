@@ -223,6 +223,66 @@ describe("complete System target contract (not runtime acceptance)", () => {
       `${JSON.stringify(doc, null, 2)}\n`,
     );
   });
+  it("publishes the breaking 3.0 resolve execution-bound artifact without adding operations", () => {
+    const artifact = JSON.parse(
+      readFileSync("contract/openapi/system.openapi.json", "utf8"),
+    ) as {
+      info: { version: string };
+      paths: Record<string, Record<string, unknown>>;
+      components: { schemas: Record<string, unknown> };
+    };
+    expect(artifact.info.version).toBe("3.0.0");
+    expect(systemOperations).toHaveLength(83);
+    expect(
+      Object.values(artifact.paths).flatMap((methods) => Object.keys(methods)),
+    ).toHaveLength(85);
+    const findResolveShape = (
+      value: unknown,
+    ):
+      | { properties: Record<string, unknown>; required: unknown }
+      | undefined => {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const found = findResolveShape(item);
+          if (found) return found;
+        }
+        return undefined;
+      }
+      const object = z.record(z.string(), z.unknown()).safeParse(value);
+      if (!object.success) return undefined;
+      const properties = z
+        .record(z.string(), z.unknown())
+        .safeParse(object.data["properties"]);
+      if (
+        properties.success &&
+        "revision_id" in properties.data &&
+        "gateway_model_name" in properties.data
+      )
+        return {
+          properties: properties.data,
+          required: object.data["required"],
+        };
+      for (const child of Object.values(object.data)) {
+        const found = findResolveShape(child);
+        if (found) return found;
+      }
+      return undefined;
+    };
+    const resolveShape = findResolveShape(artifact);
+    expect(resolveShape?.properties?.["context_window"]).toMatchObject({
+      type: "integer",
+      minimum: 1,
+      maximum: 2147483647,
+    });
+    expect(resolveShape?.properties?.["max_output_tokens"]).toMatchObject({
+      type: "integer",
+      minimum: 1,
+      maximum: 2147483647,
+    });
+    expect(resolveShape?.required).toEqual(
+      expect.arrayContaining(["context_window", "max_output_tokens"]),
+    );
+  });
   it("has one SQL authority with useful resources and no phantom profile/audit", () => {
     const sql = readFileSync("database/schema.sql", "utf8");
     for (const table of [

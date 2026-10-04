@@ -18,6 +18,7 @@ export function revisionContent(
     transport: value.transport,
     gateway_model_name: value.gateway_model_name,
     context_window: value.context_window,
+    max_output_tokens: value.max_output_tokens,
     priority: value.priority,
   };
 }

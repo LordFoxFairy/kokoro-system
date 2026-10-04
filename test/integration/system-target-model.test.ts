@@ -1,6 +1,7 @@
 import { parseSystemDatabaseUrl } from "../../src/config/database-url.js";
 import { ModelGenerationRepository } from "../../src/modules/model-catalog/model-generation.repository.js";
 import { CacheService } from "../../src/cache/cache.service.js";
+import { commandDigest } from "../../src/database/command-digest.js";
 import { systemOperations } from "../../scripts/system-openapi-operations.js";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -167,7 +168,8 @@ async function seedRoute() {
         output_modalities: ["text"],
         transport: "litellm",
         gateway_model_name: "gateway",
-        context_window: null,
+        context_window: 8192,
+        max_output_tokens: 2048,
         priority: 1,
       },
       adminHeaders,
@@ -345,6 +347,7 @@ describe("real Nest Model catalog", () => {
       transport: "litellm",
       gateway_model_name: "gateway-model",
       context_window: 8000,
+      max_output_tokens: 2000,
       priority: 10,
     };
     const revision = await request(
@@ -427,6 +430,236 @@ describe("real Nest Model catalog", () => {
       await db.end();
     }
   });
+  it("rejects publishing a legacy-valid draft without finite execution bounds atomically", async () => {
+    const suffix = randomUUID();
+    const product = await request(
+      "products",
+      "POST",
+      { product_key: `bound-${suffix}`, name: "Execution bound" },
+      adminHeaders,
+    );
+    const feature = `bound.${suffix}`;
+    expect(
+      (
+        await request(
+          "features",
+          "POST",
+          {
+            global_feature_key: feature,
+            product_id: product.json.data?.id,
+            display_name: "Execution bound",
+            result_contract: {
+              schema_version: 1,
+              outcome_kind: "message",
+              media_types: [],
+              required_fields: [],
+            },
+          },
+          adminHeaders,
+        )
+      ).response.status,
+    ).toBe(201);
+    const model = await request(
+      "model-catalog/definitions",
+      "POST",
+      { model_key: `bound-${suffix}`, display_name: "Execution bound" },
+      adminHeaders,
+    );
+    const provider = await request(
+      "model-catalog/providers",
+      "POST",
+      {
+        provider: "litellm",
+        provider_key: `bound-${suffix}`,
+        display_name: "Execution bound",
+        secret_handle_ref: `vault:bound-${suffix}`,
+        transport: "litellm",
+        priority: 1,
+      },
+      adminHeaders,
+    );
+    const draft = await request(
+      "model-catalog/revisions",
+      "POST",
+      {
+        model_id: model.json.data?.id,
+        provider_id: provider.json.data?.id,
+        revision: 1,
+        provider_model_name: "provider-bound",
+        display_name: "Execution bound",
+        feature_key: feature,
+        input_modalities: ["text"],
+        output_modalities: ["text"],
+        transport: "litellm",
+        gateway_model_name: "gateway-bound",
+        context_window: null,
+        max_output_tokens: null,
+        priority: 1,
+      },
+      adminHeaders,
+    );
+    expect(draft.response.status).toBe(201);
+    const revisionId = String(draft.json.data?.id);
+    const publishKey = randomUUID();
+    const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
+    await db.connect();
+    try {
+      const snapshot = async () => {
+        const revision = await db.query<{ row: string }>(
+          "SELECT row_to_json(r)::text AS row FROM system_fixture.model_revision r WHERE id=$1",
+          [revisionId],
+        );
+        const generation = await db.query<{ row: string }>(
+          "SELECT row_to_json(g)::text AS row FROM system_fixture.model_cache_generation g WHERE scope='resolve'",
+        );
+        const receipts = await db.query<{ row: string }>(
+          "SELECT row_to_json(r)::text AS row FROM system_fixture.system_command_receipt r WHERE idempotency_key=$1 ORDER BY id",
+          [publishKey],
+        );
+        return {
+          revision: revision.rows.map((row) => row.row),
+          generation: generation.rows.map((row) => row.row),
+          receipts: receipts.rows.map((row) => row.row),
+        };
+      };
+      const before = await snapshot();
+      for (const statement of [
+        "UPDATE system_fixture.model_revision SET max_output_tokens=0 WHERE id=$1",
+        "UPDATE system_fixture.model_revision SET context_window=100,max_output_tokens=101 WHERE id=$1",
+        "UPDATE system_fixture.model_revision SET published_at=CURRENT_TIMESTAMP(3) WHERE id=$1",
+      ]) {
+        await expect(db.query(statement, [revisionId])).rejects.toMatchObject({
+          code: "23514",
+        });
+        expect(await snapshot()).toEqual(before);
+      }
+      const published = await request(
+        `model-catalog/revisions/${revisionId}/publish`,
+        "POST",
+        undefined,
+        {
+          ...adminHeaders,
+          "if-match": '"1"',
+          "idempotency-key": publishKey,
+        },
+      );
+      const after = await snapshot();
+      expect(published.response.status).toBe(409);
+      expect(published.json.error).toMatchObject({
+        code: "INVALID_STATE",
+        retryable: false,
+      });
+      expect(after).toEqual(before);
+    } finally {
+      await db.end();
+    }
+  });
+  it("enforces nullable draft and complete int32 execution-bound edges without side effects", async () => {
+    const { modelId, pid, feature } = await seedRoute();
+    const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
+    await db.connect();
+    const snapshot = async () => {
+      const revisions = await db.query<{ row: string }>(
+        "SELECT row_to_json(r)::text AS row FROM system_fixture.model_revision r WHERE model_id=$1 ORDER BY revision,id",
+        [modelId],
+      );
+      const generation = await db.query<{ row: string }>(
+        "SELECT row_to_json(g)::text AS row FROM system_fixture.model_cache_generation g WHERE scope='resolve'",
+      );
+      const receipts = await db.query<{ row: string }>(
+        "SELECT row_to_json(r)::text AS row FROM system_fixture.system_command_receipt r ORDER BY scope_kind,scope_id,idempotency_key,id",
+      );
+      return {
+        revisions: revisions.rows.map((row) => row.row),
+        generation: generation.rows.map((row) => row.row),
+        receipts: receipts.rows.map((row) => row.row),
+      };
+    };
+    const input = (
+      revision: number,
+      contextWindow: number | null,
+      maxOutputTokens: number | null,
+    ) => ({
+      model_id: modelId,
+      provider_id: pid,
+      revision,
+      provider_model_name: `edge-${revision}`,
+      display_name: `Edge ${revision}`,
+      feature_key: feature,
+      input_modalities: ["text"],
+      output_modalities: ["text"],
+      transport: "litellm",
+      gateway_model_name: `edge-${revision}`,
+      context_window: contextWindow,
+      max_output_tokens: maxOutputTokens,
+      priority: revision,
+    });
+    try {
+      for (const [revision, contextWindow, maxOutputTokens] of [
+        [10, 0, null],
+        [11, -1, null],
+        [12, 2147483648, null],
+        [13, 2147483647, 0],
+        [14, 2147483647, -1],
+        [15, 2147483647, 2147483648],
+        [16, 100, 101],
+      ] as const) {
+        const before = await snapshot();
+        const rejected = await request(
+          "model-catalog/revisions",
+          "POST",
+          input(revision, contextWindow, maxOutputTokens),
+          adminHeaders,
+        );
+        expect(rejected.response.status).toBe(400);
+        expect(rejected.json.error?.code).toBe("INVALID_ARGUMENT");
+        expect(await snapshot()).toEqual(before);
+      }
+      for (const [revision, contextWindow, maxOutputTokens] of [
+        [17, 2147483647, null],
+        [18, null, 1],
+      ] as const) {
+        const draft = await request(
+          "model-catalog/revisions",
+          "POST",
+          input(revision, contextWindow, maxOutputTokens),
+          adminHeaders,
+        );
+        expect(draft.response.status).toBe(201);
+        const revisionId = String(draft.json.data?.id);
+        const beforePublish = await snapshot();
+        const rejected = await request(
+          `model-catalog/revisions/${revisionId}/publish`,
+          "POST",
+          undefined,
+          { ...adminHeaders, "if-match": '"1"' },
+        );
+        expect(rejected.response.status).toBe(409);
+        expect(rejected.json.error?.code).toBe("INVALID_STATE");
+        expect(await snapshot()).toEqual(beforePublish);
+      }
+      const upper = await request(
+        "model-catalog/revisions",
+        "POST",
+        input(19, 2147483647, 2147483647),
+        adminHeaders,
+      );
+      expect(upper.response.status).toBe(201);
+      const published = await request(
+        `model-catalog/revisions/${String(upper.json.data?.id)}/publish`,
+        "POST",
+        undefined,
+        { ...adminHeaders, "if-match": '"1"' },
+      );
+      expect(published.response.status).toBe(200);
+      expect(published.json.data).toMatchObject({
+        context_window: 2147483647,
+        max_output_tokens: 2147483647,
+      });
+    } finally {
+      await db.end();
+    }
+  });
   it("resolves explicit and owner-default tenant routes without leaking credentials", async () => {
     const ah = {
       "x-kokoro-service": "system-admin",
@@ -488,7 +721,8 @@ describe("real Nest Model catalog", () => {
           output_modalities: ["text"],
           transport: "litellm",
           gateway_model_name: "gateway-route",
-          context_window: null,
+          context_window: 16384,
+          max_output_tokens: 4096,
           priority: 1,
         },
         ah,
@@ -557,7 +791,17 @@ describe("real Nest Model catalog", () => {
     expect(resolved.response.status).toBe(200);
     expect(resolved.json.data?.revision_id).toBe(rid);
     expect(resolved.json.data?.gateway_model_name).toBe("gateway-route");
+    expect(resolved.json.data?.context_window).toBe(16384);
+    expect(resolved.json.data?.max_output_tokens).toBe(4096);
     expect(resolved.json.data).not.toHaveProperty("secret_handle_ref");
+    const cached = await request(
+      "model-catalog/resolve",
+      "POST",
+      { feature_key: "routing.chat" },
+      agent,
+    );
+    expect(cached.response.status).toBe(200);
+    expect(cached.json.data).toEqual(resolved.json.data);
     expect(
       (
         await request(
@@ -616,6 +860,114 @@ describe("real Nest Model catalog", () => {
         )
       ).json.error?.code,
     ).toBe("POLICY_DENIED");
+  });
+  it("rejects a checksummed relationally-invalid route from the real isolated cache", async () => {
+    const { feature, pid, rid } = await seedRoute();
+    expect(
+      (
+        await request(
+          `model-catalog/providers/${pid}/health`,
+          "PUT",
+          { status: "healthy", observed_at: new Date().toISOString() },
+          { ...adminHeaders, "if-none-match": "*" },
+        )
+      ).response.status,
+    ).toBe(200);
+    const first = await request(
+      "model-catalog/resolve",
+      "POST",
+      { feature_key: feature },
+      agentHeaders,
+    );
+    expect(first.response.status).toBe(200);
+    const generation = String(first.json.data?.generation);
+    const tenantGeneration = String(first.json.data?.tenant_generation);
+    const key = `model-resolve:${commandDigest({
+      tenant: "tenant-a",
+      feature,
+      label: null,
+      generation,
+      tenant_generation: tenantGeneration,
+    })}`;
+    const cache = app.get(CacheService);
+    const raw = await cache.get(key);
+    expect(raw).not.toBeNull();
+    const stored = JSON.parse(raw ?? "null") as {
+      kind: "route";
+      key: string;
+      checksum: string;
+      expires_at: number;
+      data: Record<string, unknown>;
+    };
+    const poisonedWithoutChecksum = {
+      kind: stored.kind,
+      key: stored.key,
+      expires_at: stored.expires_at,
+      data: {
+        ...stored.data,
+        context_window: 100,
+        max_output_tokens: 101,
+      },
+    };
+    await cache.set(
+      key,
+      JSON.stringify({
+        ...poisonedWithoutChecksum,
+        checksum: commandDigest(poisonedWithoutChecksum),
+      }),
+      30,
+    );
+    const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
+    await db.connect();
+    try {
+      const snapshot = async () => {
+        const revision = await db.query<{ row: string }>(
+          "SELECT row_to_json(r)::text AS row FROM system_fixture.model_revision r WHERE id=$1",
+          [rid],
+        );
+        const fences = await db.query<{ row: string }>(
+          "SELECT row_to_json(g)::text AS row FROM system_fixture.model_cache_generation g WHERE scope='resolve'",
+        );
+        return {
+          revision: revision.rows.map((row) => row.row),
+          fences: fences.rows.map((row) => row.row),
+        };
+      };
+      const before = await snapshot();
+      let rejected: Awaited<ReturnType<typeof request>>;
+      try {
+        rejected = await request(
+          "model-catalog/resolve",
+          "POST",
+          { feature_key: feature },
+          agentHeaders,
+        );
+      } finally {
+        await cache.remove(key);
+      }
+      let recovered: Awaited<ReturnType<typeof request>>;
+      try {
+        recovered = await request(
+          "model-catalog/resolve",
+          "POST",
+          { feature_key: feature },
+          agentHeaders,
+        );
+      } finally {
+        await cache.remove(key);
+      }
+      expect(rejected.response.status).toBe(503);
+      expect(rejected.json.error).toMatchObject({
+        code: "SYSTEM_UNAVAILABLE",
+        retryable: true,
+      });
+      expect(recovered.response.status).toBe(200);
+      expect(recovered.json.data?.revision_id).toBe(rid);
+      expect(await snapshot()).toEqual(before);
+    } finally {
+      await cache.remove(key);
+      await db.end();
+    }
   });
   it("enforces observation freshness, health CAS and cache expiry at health deadline", async () => {
     const { feature, pid } = await seedRoute();
@@ -1057,6 +1409,7 @@ describe("real Nest Model catalog", () => {
         transport: "litellm",
         gateway_model_name: "overflow",
         context_window: null,
+        max_output_tokens: null,
         priority: 1,
       },
       adminHeaders,
@@ -1078,6 +1431,7 @@ describe("real Nest Model catalog", () => {
       transport: "litellm",
       gateway_model_name: "draft",
       context_window: null,
+      max_output_tokens: null,
       priority: 5,
     };
     const draft = await request(
@@ -1091,11 +1445,31 @@ describe("real Nest Model catalog", () => {
     const changed = await request(
       `model-catalog/revisions/${rid}`,
       "PATCH",
-      { provider_model_name: "changed", context_window: 12000 },
+      {
+        provider_model_name: "changed",
+        context_window: 12000,
+        max_output_tokens: 3000,
+      },
       { ...adminHeaders, "if-match": '"1"' },
     );
     expect(changed.response.status).toBe(200);
     expect(changed.json.data?.digest).not.toBe(draft.json.data?.digest);
+    const invalidPartial = await request(
+      `model-catalog/revisions/${rid}`,
+      "PATCH",
+      { max_output_tokens: 13000 },
+      { ...adminHeaders, "if-match": '"2"' },
+    );
+    expect(invalidPartial.response.status).toBe(400);
+    expect(invalidPartial.json.error?.code).toBe("INVALID_ARGUMENT");
+    const unchanged = await request(
+      `model-catalog/revisions/${rid}`,
+      "GET",
+      undefined,
+      adminHeaders,
+    );
+    expect(unchanged.json.data?.version).toBe("2");
+    expect(unchanged.json.data?.max_output_tokens).toBe(3000);
     expect(
       (
         await request(

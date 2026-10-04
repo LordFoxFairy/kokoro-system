@@ -9,7 +9,7 @@ import { commandDigest } from "../../database/command-digest.js";
 import { revisionSchema } from "./schemas/revision.schema.js";
 import type { revisionInputSchema } from "./schemas/revision.schema.js";
 const columns =
-  "id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,transport,gateway_model_name,context_window,priority,digest,version,published_at,retired_at,created_at,updated_at";
+  "id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,transport,gateway_model_name,context_window,max_output_tokens,priority,digest,version,published_at,retired_at,created_at,updated_at";
 @Injectable()
 export class RevisionRepository {
   public async find(tx: TransactionContext, id: string, lock = false) {
@@ -37,7 +37,7 @@ export class RevisionRepository {
     input: z.infer<typeof revisionInputSchema>,
   ) {
     const result = await tx.query(
-      `INSERT INTO model_revision(id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,transport,gateway_model_name,context_window,priority,digest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING ${columns}`,
+      `INSERT INTO model_revision(id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,transport,gateway_model_name,context_window,max_output_tokens,priority,digest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING ${columns}`,
       [
         randomUUID(),
         input.model_id,
@@ -51,6 +51,7 @@ export class RevisionRepository {
         input.transport,
         input.gateway_model_name,
         input.context_window,
+        input.max_output_tokens,
         input.priority,
         commandDigest(input),
       ],
@@ -63,7 +64,7 @@ export class RevisionRepository {
     input: z.infer<typeof revisionInputSchema>,
   ) {
     const result = await tx.query(
-      `UPDATE model_revision SET provider_id=$2,provider_model_name=$3,display_name=$4,feature_key=$5,input_modalities=$6,output_modalities=$7,transport=$8,gateway_model_name=$9,context_window=$10,priority=$11,digest=$12,version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=$1 RETURNING ${columns}`,
+      `UPDATE model_revision SET provider_id=$2,provider_model_name=$3,display_name=$4,feature_key=$5,input_modalities=$6,output_modalities=$7,transport=$8,gateway_model_name=$9,context_window=$10,max_output_tokens=$11,priority=$12,digest=$13,version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=$1 RETURNING ${columns}`,
       [
         id,
         input.provider_id,
@@ -75,6 +76,7 @@ export class RevisionRepository {
         input.transport,
         input.gateway_model_name,
         input.context_window,
+        input.max_output_tokens,
         input.priority,
         commandDigest(input),
       ],

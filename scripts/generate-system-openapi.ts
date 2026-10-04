@@ -205,8 +205,8 @@ export function buildSystemOpenApi(): Readonly<{
     servers: [{ url: "/", description: "Same internal-owner origin" }],
     info: {
       title: "Kokoro System internal owner",
-      version: "2.0.0",
-      "x-kokoro-release-classification": "v1-fresh-cutover",
+      version: "3.0.0",
+      "x-kokoro-release-classification": "execution-bound-breaking",
       description:
         "Generated from runtime Zod schemas; G1 target artifact, not implemented routes.",
     },

@@ -17,7 +17,8 @@ export const revisionInputSchema = z.strictObject({
     .max(4),
   transport: z.literal("litellm"),
   gateway_model_name: z.string().min(1).max(255),
-  context_window: z.int().positive().nullable(),
+  context_window: z.int().min(1).max(2147483647).nullable(),
+  max_output_tokens: z.int().min(1).max(2147483647).nullable(),
   priority: z.int().min(0).max(100000),
 });
 export const revisionUpdateSchema = revisionInputSchema

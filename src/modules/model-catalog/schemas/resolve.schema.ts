@@ -4,20 +4,27 @@ export const resolveInputSchema = z.strictObject({
   label_key: z.string().min(1).max(128).optional(),
   feature_key: z.string().min(1).max(128),
 });
-export const resolveSchema = z.strictObject({
-  model_id: z.uuid(),
-  revision_id: z.uuid(),
-  revision: z.int().positive(),
-  digest: z.string().regex(/^[a-f0-9]{64}$/u),
-  generation: z.string().regex(/^[1-9][0-9]*$/u),
-  tenant_generation: z.string().regex(/^[1-9][0-9]*$/u),
-  provider_id: z.uuid(),
-  provider_model_name: z.string(),
-  transport: z.literal("litellm"),
-  gateway_model_name: z.string(),
-  label_key: z.string(),
-  feature_key: z.string(),
-});
+export const resolveSchema = z
+  .strictObject({
+    model_id: z.uuid(),
+    revision_id: z.uuid(),
+    revision: z.int().positive(),
+    context_window: z.int().min(1).max(2147483647),
+    max_output_tokens: z.int().min(1).max(2147483647),
+    digest: z.string().regex(/^[a-f0-9]{64}$/u),
+    generation: z.string().regex(/^[1-9][0-9]*$/u),
+    tenant_generation: z.string().regex(/^[1-9][0-9]*$/u),
+    provider_id: z.uuid(),
+    provider_model_name: z.string(),
+    transport: z.literal("litellm"),
+    gateway_model_name: z.string(),
+    label_key: z.string(),
+    feature_key: z.string(),
+  })
+  .refine((value) => value.max_output_tokens <= value.context_window, {
+    message: "max_output_tokens must be less than or equal to context_window",
+    path: ["max_output_tokens"],
+  });
 export const catalogQuerySchema = z.strictObject({
   feature_key: z.string().min(1).max(128).optional(),
   cursor: z.string().min(1).max(2048).optional(),

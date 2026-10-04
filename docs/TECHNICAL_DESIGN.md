@@ -1,8 +1,8 @@
 # System 技术设计
 
-## R210-SYSTEM-EXECUTION-D0：模型 revision 执行能力发布目标（2026-10-04）
+## R215 模型执行上限切片验收（2026-10-04）
 
-基线 `9a4e98eb9aed5513312090cf0e8e3f9c1d674bda`。当前 `POST /v1/system/model-catalog/resolve` 的受信执行上限字段为 **0**：`model_revision.context_window` 虽已存在于 canonical SQL、revision CRUD 与 revision digest，但允许 `NULL`、resolve 不读取也不发布；`max_output_tokens` 尚无 canonical 事实。下述为 Root 批准的目标设计，不代表源码、SQL、机器契约、SDK 消费或收费链已经实现。
+实施前基线 `9a4e98eb9aed5513312090cf0e8e3f9c1d674bda` 的resolve执行上限字段为0。本切片已实现canonical SQL、revision/resolve两项required有限界、3.0.0正规artifact与本仓测试，并获Root单仓验收。Root保留full-owner 199通过/1 fixture失败及fresh fixture失败、checksum合法关系错误cache被200接受的真实业务RED；修正后在同冻结源码上完成check/contract、16文件202测试、fresh 23 assertions/22 tables完整canonical全绿，独审0P0/P1/P2。本地交付commit及远端发布状态见Root CURRENT/progress；当前尚未远端push，Agent消费者未pin，3310未更新，SDK实际消费、正式模型调用及费用链尚未闭环。
 
 ### Owner 与目标语义
 
@@ -19,21 +19,21 @@ System 内部 `health_valid_until`/cache TTL 只控制健康读取和缓存，�
 
 ### §8 放置与实施闭集
 
-| 项 | R210 决定 |
-|---|---|
-| Owner | System `src/modules/model-catalog` 唯一写 revision capability/limit 与 resolve；Agent/Billing边界如上。 |
-| 当前事实 | `context_window INTEGER NULL` 已进 revision digest/CRUD但 resolve 不返回；`max_output_tokens` 不存在；Agent SDK不发送output cap。 |
-| 目标职责 | published revision冻结非NULL context capability与request output硬界；现resolve严格发布，Agent固定消费。 |
-| 位置方案 | **采用**现 immutable `model-catalog` revision + 现 resolve，生命周期、digest、publish/retire、generation一致。**淘汰** `runtime-manifests`：其owner是site/product UI manifest，生命周期不同且会制造第二事实源。 |
-| 粒度 | 扩既有 schema/repository/service/content/resolve 与唯一canonical SQL；不建新目录、模块、endpoint、进程或通用config。 |
-| 依赖 | System不import Agent/Billing；Agent只pin System owner生成artifact；Billing只读Agent正式artifact，不直信resolve body/ref。 |
-| 数据/API | `context_window`、`max_output_tokens`均positive int32；draft nullable，publish时均非NULL且output<=context；published immutable、digest/generation同事务。现resolve response新增两个required字段，目标artifact正式版本为`3.0.0`（当前保持`2.0.0`直至真正实施发布），属于strict consumer必须同步pin的breaking机器变化。 |
-| 删除项 | 删除把nullable context、health TTL、Run总budget、recursion limit、字符数冒充逐attempt bound的路径；无兼容alias/双轨。 |
-| 验证 | canonical SQL CHECK/catalog drift/fresh；publish缺失及关系负例零写；HTTP首次/cache replay与generation竞态；OpenAPI generate/provenance；隔离SDK adapter→owned HTTP peer观察exact output cap；正式native invoke在Billing缺席时仍验证0 provider。 |
+| 项       | R210 决定                                                                                                                                                                                                                                                                                                                                       |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Owner    | System `src/modules/model-catalog` 唯一写 revision capability/limit 与 resolve；Agent/Billing边界如上。                                                                                                                                                                                                                                         |
+| 实施前事实 | `context_window INTEGER NULL` 已进 revision digest/CRUD但 resolve 不返回；`max_output_tokens` 不存在；Agent SDK不发送output cap。                                                                                                                                                                                                             |
+| 目标职责 | published revision冻结非NULL context capability与request output硬界；现resolve严格发布，Agent固定消费。                                                                                                                                                                                                                                         |
+| 位置方案 | **采用**现 immutable `model-catalog` revision + 现 resolve，生命周期、digest、publish/retire、generation一致。**淘汰** `runtime-manifests`：其owner是site/product UI manifest，生命周期不同且会制造第二事实源。                                                                                                                                 |
+| 粒度     | 扩既有 schema/repository/service/content/resolve 与唯一canonical SQL；不建新目录、模块、endpoint、进程或通用config。                                                                                                                                                                                                                            |
+| 依赖     | System不import Agent/Billing；Agent只pin System owner生成artifact；Billing只读Agent正式artifact，不直信resolve body/ref。                                                                                                                                                                                                                       |
+| 数据/API | `context_window`、`max_output_tokens`均positive int32；draft nullable，publish时均非NULL且output<=context；published immutable、digest/generation同事务。现resolve response新增两个required字段，artifact版本为`3.0.0`并已获Root单仓验收；远端尚未push且消费者尚未pin，属于strict consumer必须同步pin的breaking机器变化。 |
+| 删除项   | 删除把nullable context、health TTL、Run总budget、recursion limit、字符数冒充逐attempt bound的路径；无兼容alias/双轨。                                                                                                                                                                                                                           |
+| 验证     | canonical SQL CHECK/catalog drift/fresh；publish缺失及关系负例零写；HTTP首次/cache replay与generation竞态；OpenAPI generate/provenance；隔离SDK adapter→owned HTTP peer观察exact output cap；正式native invoke在Billing缺席时仍验证0 provider。                                                                                                 |
 
 ### 后继精确文件集与顺序
 
-System tests-first/实现仅应触及：`database/schema.sql`；`src/modules/model-catalog/{schemas/revision.schema.ts,revision-content.ts,revision.repository.ts,revision.service.ts,schemas/resolve.schema.ts,resolve.repository.ts,resolve.service.ts,resolve-cache.schema.ts}`（后两者仅类型/strict cache确需时）；现 `scripts/generate-system-openapi.ts`、`scripts/update-system-openapi-provenance.ts` 将artifact正规升为`3.0.0`并产出 `contract/openapi/system.openapi.json`、`contract/provenance.json`；同步现 `contract/README.md` 第3行version及第19行breaking/pin策略；现 model integration、contract、schema installation/catalog drift tests；完成后同步本四D0。当前README、generator、provenance与artifact字节仍保持`2.0.0`，本D0不得提前修改；不得手改生成物绕generator。
+本次System切片触及：`database/schema.sql`；`src/modules/model-catalog/{schemas/revision.schema.ts,revision-content.ts,revision.repository.ts,revision.service.ts,schemas/resolve.schema.ts,resolve.repository.ts,resolve.service.ts,resolve-cache.schema.ts}`（后两者仅类型/strict cache确需时）；现 `scripts/generate-system-openapi.ts`、`scripts/update-system-openapi-provenance.ts` 已将artifact正规升为`3.0.0`并产出 `contract/openapi/system.openapi.json`、`contract/provenance.json`；现 `contract/README.md` 第3行version及第19行breaking/pin策略也已同步，model integration、contract、schema installation/catalog drift tests已随切片更新。本切片已获Root单仓验收，本地交付commit状态见Root CURRENT/progress；远端尚未push且Agent消费者尚未pin。不得手改生成物绕generator或把单仓验收冒充消费者已发布。
 
 System owner提交正式`3.0.0`机器artifact后，Agent依序：(1) 同时pin commit、artifact SHA-256与source/provenance digest并strict decode required两字段，不保compat；(2) loopback证明 `max_output_tokens` 真进入单次SDK请求，缺失/非法/不支持均0 provider；(3) 冻结自己的execution-bound artifact及lease-derived有效期；(4) 等正式Billing Admission owner reader/runtime后才准唯一dispatch；(5) 仅provider实际响应后append strict usage evidence。`context_window` 可作为保守technical upper-bound输入，但费用数量与金额换算仍由Billing正式rate/policy裁决。
 
@@ -44,7 +44,6 @@ System owner提交正式`3.0.0`机器artifact后，Agent依序：(1) 同时pin c
 - Contract：不增operation/URI，resolve strict required字段与Zod单向生成一致，provenance/contract drift为0。
 - SDK适配器隔离正控：不绕过或放宽native Billing gate，只以真实锁定SDK→自有loopback HTTP peer证明合法output cap进入exact一次请求；不冒充正式invoke。
 - 正式native invoke：缺失/畸形/不支持字段，或Billing consumer缺席，均0 provider；只有正式Admission授权接线后才验真实authorized runtime请求。两门都不等于真实付费模型或用户收费闭环。
-
 
 ## R80-W05 当前裁决：System 仅拥有计划技术路由
 
