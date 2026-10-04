@@ -3,10 +3,10 @@
   "version": 2,
   "openapi": {
     "file": "openapi/system.openapi.json",
-    "sha256": "74c338f25494621421f2b9eb9edd78df57d4ee4560ca969a4bef30514fe59472",
+    "sha256": "94ed91655741cbba66ce80a4c41717b9179cc509cb6858534e0b78aa3e6dc059",
     "source": "runtime-zod",
     "sourceSha256": {
-      "scripts/generate-system-openapi.ts": "b81d5c8fc74ba5b883364b9a6671f024e84adee2c81550aeec255acaff14b710",
+      "scripts/generate-system-openapi.ts": "4830a6c594255984261efe2907c17cd4e63df4b28d10c2ef1cf65c8e61287890",
       "scripts/system-openapi-operations.ts": "fb46bea2ec53a09c0f397d2f38aafc77a1c6e7eaef904b11667d56fda919d9f3",
       "src/http/protocol.schema.ts": "72dbe6ee57d842b855b337d1f1603a7ddbb8c3a4bb6c4f7bf3fe62821c8160c0",
       "src/modules/model-catalog/schemas/definition.schema.ts": "e2063b9ae62b8e5c4ca7cccce09dd4874f818831fc8966de2cf6d015a99bef64",
@@ -44,7 +44,7 @@
     {
       "consumer": "kokoro-agent",
       "surface": "model-catalog/resolve",
-      "disposition": "pinned-factory-wiring-committed-http-verified"
+      "disposition": "3.0.0-pin-pending-owner-consumer-validation; prior-2.0.0-http-verification-is-historical"
     },
     {
       "consumer": "control-plane-service-callers",

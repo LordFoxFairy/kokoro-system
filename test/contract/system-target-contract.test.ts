@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { StandardSchemaValidationPipe } from "@nestjs/common";
 import { readFileSync, globSync, existsSync } from "node:fs";
@@ -281,6 +282,69 @@ describe("complete System target contract (not runtime acceptance)", () => {
     });
     expect(resolveShape?.required).toEqual(
       expect.arrayContaining(["context_window", "max_output_tokens"]),
+    );
+  });
+  it("describes the implemented 3.0 owner routes without claiming consumer validation", () => {
+    const artifact = z
+      .object({
+        info: z.object({ version: z.string(), description: z.string() }),
+      })
+      .parse(
+        JSON.parse(
+          readFileSync("contract/openapi/system.openapi.json", "utf8"),
+        ),
+      );
+    expect(artifact.info).toEqual({
+      version: "3.0.0",
+      description:
+        "Generated from runtime Zod schemas for implemented System internal-owner routes; 3.0.0 adds required model execution capability bounds.",
+    });
+    expect(artifact.info.description).not.toMatch(
+      /target|not implemented|consumer.*(?:verified|validated)/iu,
+    );
+  });
+  it("records the sole Agent consumer as pending 3.0 validation with the 2.0 history boundary", () => {
+    const provenance = z
+      .object({
+        releaseClassification: z.object({
+          contractVersion: z.string(),
+          baseline: z.string(),
+        }),
+        consumers: z.array(
+          z.object({
+            consumer: z.string(),
+            surface: z.string(),
+            disposition: z.string(),
+          }),
+        ),
+      })
+      .parse(JSON.parse(readFileSync("contract/provenance.json", "utf8")));
+    expect(provenance.releaseClassification).toMatchObject({
+      contractVersion: "3.0.0",
+      baseline: "2.0.0",
+    });
+    expect(
+      provenance.consumers.filter(
+        ({ consumer }) => consumer === "kokoro-agent",
+      ),
+    ).toEqual([
+      {
+        consumer: "kokoro-agent",
+        surface: "model-catalog/resolve",
+        disposition:
+          "3.0.0-pin-pending-owner-consumer-validation; prior-2.0.0-http-verification-is-historical",
+      },
+    ]);
+  });
+  it("publishes the exact OpenAPI and provenance digests in the contract README", () => {
+    const sha256 = (path: string): string =>
+      createHash("sha256").update(readFileSync(path)).digest("hex");
+    const readme = readFileSync("contract/README.md", "utf8");
+    expect(readme).toContain(
+      `artifact SHA256 \`${sha256("contract/openapi/system.openapi.json")}\``,
+    );
+    expect(readme).toContain(
+      `provenance SHA256 \`${sha256("contract/provenance.json")}\``,
     );
   });
   it("has one SQL authority with useful resources and no phantom profile/audit", () => {

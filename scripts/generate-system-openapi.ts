@@ -208,7 +208,7 @@ export function buildSystemOpenApi(): Readonly<{
       version: "3.0.0",
       "x-kokoro-release-classification": "execution-bound-breaking",
       description:
-        "Generated from runtime Zod schemas; G1 target artifact, not implemented routes.",
+        "Generated from runtime Zod schemas for implemented System internal-owner routes; 3.0.0 adds required model execution capability bounds.",
     },
     paths,
     components: {

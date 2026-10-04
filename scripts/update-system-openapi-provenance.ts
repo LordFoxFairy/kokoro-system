@@ -53,7 +53,8 @@ provenance.consumers = [
   {
     consumer: "kokoro-agent",
     surface: "model-catalog/resolve",
-    disposition: "pinned-factory-wiring-committed-http-verified",
+    disposition:
+      "3.0.0-pin-pending-owner-consumer-validation; prior-2.0.0-http-verification-is-historical",
   },
   {
     consumer: "control-plane-service-callers",
