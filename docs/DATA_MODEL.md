@@ -1,5 +1,18 @@
 # System 数据模型
 
+## R210-SYSTEM-EXECUTION-D0：revision capability 与 request hard bound目标（2026-10-04）
+
+基线 `9a4e98eb9aed5513312090cf0e8e3f9c1d674bda`。当前 canonical `model_revision.context_window INTEGER NULL` 已由revision CRUD/content digest管理，但published仍可null且resolve不消费；`max_output_tokens`列不存在。因此当前数据库不能证明finite可执行bound。本节是下一SQL-first目标，不代表DDL已实施。
+
+目标仍只扩现 `model_revision`：保留`context_window`作为positive int32 provider capability metadata，新增nullable draft `max_output_tokens INTEGER`作为每物理请求output hard bound。canonical CHECK分别覆盖null或positive int32、两值同时存在时`max_output_tokens <= context_window`，并以 `published_at IS NULL OR (context_window IS NOT NULL AND max_output_tokens IS NOT NULL)` 保证raw SQL不能发布缺界revision；service `publish()`在现事务内仍进一步要求二者均非null。retired状态必先published，因而继续满足同一边界。这样draft可分步编辑，而任一成功published revision必有合法、immutable、digest-covered两值。不得把publish完整性只留给HTTP body，也不得用弱CHECK接受非法直接SQL状态。
+
+revision create/update receipt、parent locks、generation advance、publish/retire与immutable trigger保持现顺序和原子性；`revisionContent()`及`digest`加入新字段。resolve candidate读取两值并只返回合法published事实，现generation double-read/cache checksum防止identity/limit混搭。无新表、索引、FK、跨owner SQL、runtime-manifest JSON副本、兼容列或双写。
+
+`health_valid_until`、健康`observed_at`与cache TTL仍是可变控制面投影，不持久成execution expiry。Agent以后用受信Run lease/正式授权生成逐attempt有限有效期；System数据库不保存call、attempt、dispatch、actual usage或费用。Billing独占pricing account/profile、费率、倍率、quote、hold、金额、rounding、settlement/ledger，canonical System SQL不增加这些字段。
+
+Fresh/schema验收必须覆盖：列类型/nullability；positive/关系/published-nonnull CHECK正文及validated状态；draft null；service与raw SQL publish缺值均失败且零写；合法publish后的immutability；revision digest漂移；resolve/cache/generation一致；catalog mutation fail-closed。缺正式System DDL与生成artifact时Agent consumer不得先GREEN，更不得以nullable context、字符数、Run budget或recursion limit替代。
+
+
 ## R80-W05 当前数据裁决：技术目录不承载成本事实
 
 2026-10-02，canonical 基线 `6ca96180749d4842c2ee0628328f372d114e320f`，对齐 Root `ADR-033-actual-usage-and-pricing-ownership.md` 当前裁决。System 的 22 张表和 `database/schema.sql` 保持不变；此前建议新增 `model_cost_revision` 或向 `model_revision` 添加价格字段的方案取消。

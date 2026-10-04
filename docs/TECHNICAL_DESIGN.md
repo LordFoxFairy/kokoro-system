@@ -1,5 +1,51 @@
 # System 技术设计
 
+## R210-SYSTEM-EXECUTION-D0：模型 revision 执行能力发布目标（2026-10-04）
+
+基线 `9a4e98eb9aed5513312090cf0e8e3f9c1d674bda`。当前 `POST /v1/system/model-catalog/resolve` 的受信执行上限字段为 **0**：`model_revision.context_window` 虽已存在于 canonical SQL、revision CRUD 与 revision digest，但允许 `NULL`、resolve 不读取也不发布；`max_output_tokens` 尚无 canonical 事实。下述为 Root 批准的目标设计，不代表源码、SQL、机器契约、SDK 消费或收费链已经实现。
+
+### Owner 与目标语义
+
+System `model-catalog` 是 technical model/provider/revision、provider capability metadata、管理员执行硬界与 planned route 的唯一 writer；Agent 是逐 call/attempt execution-bound artifact、dispatch、provider response 与 usage evidence 的唯一 writer；Billing 是 pricing account/profile、费率、倍率、quote、预占、金额、结算和账本的唯一 writer。System 不新增任何 Billing 字段，也不把 `runtime-manifests` 变成任意模型配置容器。
+
+目标 published revision 同时冻结两个 positive int32：
+
+- `context_window`：管理员核验的 provider/revision 总上下文 capability metadata。它不是价格、实际 usage 或本地精确分词结果；不要求 Agent 为所有 provider 安装 tokenizer，也不猜未知 provider 限制。
+- `max_output_tokens`：Kokoro 对该 revision 每次物理模型请求的管理员硬上限，必须 `<= context_window`。Agent 消费正式 resolve 后将它显式传入当前 LiteLLM/OpenAI-compatible SDK 请求，由请求参数形成真实 output hard cap；SDK/route不能执行该参数时必须失败关闭，不静默忽略。
+
+Draft 可暂存 `NULL` 以允许管理流程分步完成；canonical SQL 必须以 `published_at IS NULL OR (context_window IS NOT NULL AND max_output_tokens IS NOT NULL)` 闭合集合，并另有正值/关系 CHECK，使 raw SQL 也不能发布缺界 revision。`publish` 仍须在同一现有 revision 事务、父事实锁与 generation advance 内拒绝任一缺失、非正 int32 或关系非法。retired revision 仍先是 published revision，因此服从同一非NULL边界。published revision 保持 immutable，revision digest 必须覆盖两值。resolve 只选择合法 published revision，并在现 generation double-check/cache checksum 中严格返回两值；不新增 URI、模块、服务、alias、fallback 或第二配置轨。
+
+System 内部 `health_valid_until`/cache TTL 只控制健康读取和缓存，绝不发布或推断为逐 attempt execution-bound expiry。Agent 后继从受信 Run lease/正式授权冻结有限 `valid_until`；缺 Billing consumer 时即使 System 两值齐全仍保持现有 typed dependency failure、0 provider，不制造 fake grant、免费路径或 known-zero evidence。
+
+### §8 放置与实施闭集
+
+| 项 | R210 决定 |
+|---|---|
+| Owner | System `src/modules/model-catalog` 唯一写 revision capability/limit 与 resolve；Agent/Billing边界如上。 |
+| 当前事实 | `context_window INTEGER NULL` 已进 revision digest/CRUD但 resolve 不返回；`max_output_tokens` 不存在；Agent SDK不发送output cap。 |
+| 目标职责 | published revision冻结非NULL context capability与request output硬界；现resolve严格发布，Agent固定消费。 |
+| 位置方案 | **采用**现 immutable `model-catalog` revision + 现 resolve，生命周期、digest、publish/retire、generation一致。**淘汰** `runtime-manifests`：其owner是site/product UI manifest，生命周期不同且会制造第二事实源。 |
+| 粒度 | 扩既有 schema/repository/service/content/resolve 与唯一canonical SQL；不建新目录、模块、endpoint、进程或通用config。 |
+| 依赖 | System不import Agent/Billing；Agent只pin System owner生成artifact；Billing只读Agent正式artifact，不直信resolve body/ref。 |
+| 数据/API | `context_window`、`max_output_tokens`均positive int32；draft nullable，publish时均非NULL且output<=context；published immutable、digest/generation同事务。现resolve response新增两个required字段，目标artifact正式版本为`3.0.0`（当前保持`2.0.0`直至真正实施发布），属于strict consumer必须同步pin的breaking机器变化。 |
+| 删除项 | 删除把nullable context、health TTL、Run总budget、recursion limit、字符数冒充逐attempt bound的路径；无兼容alias/双轨。 |
+| 验证 | canonical SQL CHECK/catalog drift/fresh；publish缺失及关系负例零写；HTTP首次/cache replay与generation竞态；OpenAPI generate/provenance；隔离SDK adapter→owned HTTP peer观察exact output cap；正式native invoke在Billing缺席时仍验证0 provider。 |
+
+### 后继精确文件集与顺序
+
+System tests-first/实现仅应触及：`database/schema.sql`；`src/modules/model-catalog/{schemas/revision.schema.ts,revision-content.ts,revision.repository.ts,revision.service.ts,schemas/resolve.schema.ts,resolve.repository.ts,resolve.service.ts,resolve-cache.schema.ts}`（后两者仅类型/strict cache确需时）；现 `scripts/generate-system-openapi.ts`、`scripts/update-system-openapi-provenance.ts` 将artifact正规升为`3.0.0`并产出 `contract/openapi/system.openapi.json`、`contract/provenance.json`；同步现 `contract/README.md` 第3行version及第19行breaking/pin策略；现 model integration、contract、schema installation/catalog drift tests；完成后同步本四D0。当前README、generator、provenance与artifact字节仍保持`2.0.0`，本D0不得提前修改；不得手改生成物绕generator。
+
+System owner提交正式`3.0.0`机器artifact后，Agent依序：(1) 同时pin commit、artifact SHA-256与source/provenance digest并strict decode required两字段，不保compat；(2) loopback证明 `max_output_tokens` 真进入单次SDK请求，缺失/非法/不支持均0 provider；(3) 冻结自己的execution-bound artifact及lease-derived有效期；(4) 等正式Billing Admission owner reader/runtime后才准唯一dispatch；(5) 仅provider实际响应后append strict usage evidence。`context_window` 可作为保守technical upper-bound输入，但费用数量与金额换算仍由Billing正式rate/policy裁决。
+
+### 系统验收矩阵
+
+- Fresh PG：draft null可管理；缺任一值、0/负/超int32、output>context均无法publish且revision/generation/receipt无业务副作用；合法publish后两值及digest不可变。
+- 真实System HTTP：健康route首次与cache replay逐值返回同一revision/digest/generation/limits；generation并发变化不混合旧identity与新limit；DB列/digest漂移失败关闭。
+- Contract：不增operation/URI，resolve strict required字段与Zod单向生成一致，provenance/contract drift为0。
+- SDK适配器隔离正控：不绕过或放宽native Billing gate，只以真实锁定SDK→自有loopback HTTP peer证明合法output cap进入exact一次请求；不冒充正式invoke。
+- 正式native invoke：缺失/畸形/不支持字段，或Billing consumer缺席，均0 provider；只有正式Admission授权接线后才验真实authorized runtime请求。两门都不等于真实付费模型或用户收费闭环。
+
+
 ## R80-W05 当前裁决：System 仅拥有计划技术路由
 
 2026-10-02，源码基线 `6ca96180749d4842c2ee0628328f372d114e320f`。本节对齐 Root `ADR-033-actual-usage-and-pricing-ownership.md` 当前裁决，覆盖此前把采购成本版本放入 System 的建议；既有业务设计正文保留作历史与当前实现说明，不据此恢复成本方案。ADR 的跨仓 owner/目标路径已接受，严格契约与实现、失败收费资格仍未完成。

@@ -1,3 +1,11 @@
+## R210-SYSTEM-EXECUTION-D0 文档门候选（2026-10-04）
+
+System基线 `9a4e98eb9aed5513312090cf0e8e3f9c1d674bda`。当前真实状态：resolve执行上限字段为0；数据库仅有nullable `model_revision.context_window`，没有`max_output_tokens`，Agent SDK未发送output hard cap。本文档切片只统一四D0目标，源码、canonical SQL、Zod/OpenAPI/生成物、测试、依赖与服务均未改变或运行。
+
+Root批准目标采用现`model-catalog` immutable revision与现resolve：`context_window`是管理员核验的provider capability metadata，`max_output_tokens`是管理员每请求硬界；两者positive int32，draft可null，publish必须非null且output<=context，canonical SQL同时以published-nonnull CHECK阻止raw SQL缺界发布，并随revision digest/published immutability/generation同事务冻结。目标机器artifact为正式`3.0.0`，当前`2.0.0`在实现发布前不变；生成器/provenance正规升版后消费者才可按版本、commit、SHA/digest pin且无compat。Agent后继先用隔离真实SDK adapter→自有HTTP peer验证output cap，不绕native Billing gate；正式invoke在Billing缺席时保持0 provider，Admission正式接线后才验authorized request；不要求本地tokenizer，不猜provider限制，不把health/cache TTL当逐attempt expiry。
+
+System不拥有pricing account/profile、费率、倍率、quote、hold、金额或结算。Billing consumer缺席时，即使技术bound发布也仍0 provider，不fake grant、不走free fallback、不造known-zero。下一步须由Root先审四D0，再另授System真实PG/HTTP/contract tests-first与DDL/source/generated实现；文档通过不等于能力、正式模型调用或费用主链完成。
+
 ## R115 fresh验证工具切片验收（2026-10-02）
 
 Root基线c2eebe91/System基线aa4e42e5；本切片只改既有fresh验证脚本及其测试，不变业务API、contract、canonical SQL或依赖。

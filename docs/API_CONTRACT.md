@@ -1,5 +1,26 @@
 # System API 契约
 
+## R210-SYSTEM-EXECUTION-D0：现 resolve 发布执行能力的目标机器变化（2026-10-04）
+
+基线 `9a4e98eb9aed5513312090cf0e8e3f9c1d674bda`。当前唯一模型选择操作仍为 `POST /v1/system/model-catalog/resolve`，其执行上限字段为 **0**；本节只冻结下一 breaking strict-response 目标：正式artifact版本`3.0.0`，当前仍为`2.0.0`直到真正实现、正规生成并发布；不宣称 OpenAPI、生成物或消费者已改变。
+
+现 operation、认证、tenant header、请求 `feature_key`/可选 `label_key`、错误 envelope 与 operation inventory均不变。成功response在现完整 planned binding 上新增两个 **required positive int32**：
+
+```text
+context_window, max_output_tokens
+```
+
+`context_window` 是 System 管理员核验的 provider revision capability metadata；`max_output_tokens` 是每个物理请求的管理员硬界并必须小于等于前者。两值属于 published immutable revision content并受同一revision `digest`、global/tenant generation fence与cache checksum保护。它们不是 actual usage、provider receipt、价格、account/profile、费率、倍率、quote、hold或结算。
+
+Draft revision CRUD目标允许两值暂时为null；publish必须拒绝null/非法/关系错误，因此成功resolve永远返回非null。System不新增URI、错误码、compat alias或旧response fallback；strict Agent consumer必须在System owner通过`generate-system-openapi.ts`与`update-system-openapi-provenance.ts`正规生成/发布后，同时pin `3.0.0`、commit、artifact SHA-256与provenance/source digest并同步升级，不保留`2.0.0`兼容响应。缺字段、畸形字段、digest/identity漂移或SDK不能硬性执行output参数时Agent须0 provider失败关闭。
+
+目标正式route仍固定`transport=litellm`，Agent将`max_output_tokens`映射到锁定OpenAI-compatible SDK的真实请求参数；先由隔离SDK adapter→自有HTTP peer正控观察wire而不绕native Billing gate，正式native invoke在Billing缺席时仍必须0 provider，真实authorized请求只能在正式Admission接线后验证；`context_window`不要求本地tokenizer，也不声称Agent能精确预分词。System的`health_valid_until`/cache TTL不进入response，不是execution expiry；逐attempt有效期由Agent受信lease/正式授权冻结。
+
+机器事实继续由Zod schema单向生成 `contract/openapi/system.openapi.json` 并更新 `contract/provenance.json`；真正实施发布时必须同步 `contract/README.md` 第3行version及第19行breaking/pin说明为`3.0.0`，当前三者及两generator中的`2.0.0`字节保持不变。禁止手写第二份DTO/schema。System contract/HTTP/generation测试必须证明新字段required、缓存重放逐值一致、并发generation不混搭。Billing consumer尚未发布时，字段齐全也不构成Admission或dispatch许可；现0-provider gate保持。
+
+只读版本入口核查所得非历史实施路径闭集为：System `scripts/generate-system-openapi.ts`、`scripts/update-system-openapi-provenance.ts`、`contract/openapi/system.openapi.json`、`contract/provenance.json`、`contract/README.md`；Agent严格消费者 `src/kokoro_agent/clients/system.py`、`contract/provenance.json`及相邻client/contract tests。BFF `contract/README.md` 仍记录整个System owner artifact的`2.0.0` pin，虽不消费本resolve字段，正式breaking artifact发布任务仍须由其owner核验并更新pin说明；其 vendored Agent provenance只能随Agent owner正规artifact更新，System不得跨仓手改。`docs/ADR/0002-local-contract-authority.md`与旧D0/验收段是历史证据，不做全仓字符串替换。
+
+
 ## R80-W05 当前契约边界：planned resolve，不新增成本 API
 
 2026-10-02，源码基线 `6ca96180749d4842c2ee0628328f372d114e320f`，对齐 Root `ADR-033-actual-usage-and-pricing-ownership.md` 当前裁决。采购费率、销售倍率、Credit 换算与结算统一归 Billing `Metering`；逐实际 call/attempt usage evidence 归 Agent。此前建议的 System cost revision、成本查询端点和 Billing→System 成本读取身份全部取消。
