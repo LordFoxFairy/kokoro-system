@@ -1,3 +1,49 @@
+## R257 当前技术路由保证设计门（2026-10-06；仅文档，未发布保证）
+
+对齐Root 15:33裁决及本仓TECHNICAL_DESIGN/API_CONTRACT同名R257前缀。基线 `955bd587f46a771e43a4330d202d90a7d2d67262`；唯一canonical仍 `database/schema.sql`，本片零DDL、零新entity/table/index、零普通数据/配置写。三原正文逐字节保留，以下只是后继数据放置与生命周期提案，不冒新schema或已部署保证。
+
+### 当前事实与owner
+
+现model_revision只保存技术目录内容、context/output两界及published/retired状态；publish非null/关系CHECK与immutable trigger保护同一revision digest。provider目录的secret_handle_ref可独立变更且不是账户证明；generation/cache/health是控制面观察，不是gateway部署revision或execution expiry。当前没有guarantee来源、technical account/exact endpoint/profile/生效截止的持久事实；正式3.0 artifact也不提供它们。Agent已消费容量与已发布HTTP5 final evidence，不改变上述缺口。
+
+System model-catalog唯一写技术route/证据准入与版本；Agent唯一写本方application HTTP、attempt/final body identity、bound及actual evidence；Billing唯一写商业mapping、pricing account、费率、金额、hold/settlement/ledger。System不落调用数据/商业账户，不访问别仓表；Agent/Billing不读System数据库。
+
+计费单元须按具体正式provider/gateway合同判定：本方新HTTP发送/显式retry独立attempt与许可；若合同覆盖该API请求全部可收费总量，其内部不额外突破上界的重试不要求任意内部物理网络审计。额外独立收费/绑定漂移越出该unit即不具资格。该合同是尚待核实的前置，不由System表行、签名或admin权限变真。
+
+### 最窄持久放置方案（待Root审阅后另授DDL）
+
+优先随**现immutable model_revision**冻结技术描述，不建独立保证中心/通用配置表/签名entity。与runtime-manifests比较，前者已有模型revision/发布/退役/digest，后者是UI/site配置且生命周期不符，淘汰。若实际来源必须独立续签或即时撤销、不能服从revision有限窗口，先重新明确其真实生命周期与必要查询，再决定是否需要普通实体；本片不预批新表或把复杂度藏入JSONB。
+
+后继需要明确的技术普通事实包括：exact endpoint适用范围、opaque technical account、正式来源revision/证据引用与内容摘要、核验时间、closed request/usage profile版本及digest、有效起止；仅当保证依赖特定gateway部署/路由revision时绑定该身份。字段名/SQL类型/最大长度/空值与CHECK在正式来源收敛后冻结，不以本段文字创建schema。关系是同一revision覆盖的固定tuple，不从secret_handle_ref/API key/hash/名称临时推导，不存任何credential或prompt。
+
+有限计量关系属于具名profile，不存一份可任意解释的收费JSON：I<=context、O<=Agent实际final cap、total=I+O、cache-read⊆I、reasoning⊆O必须有来源支撑；准确allowed body/nested content/tools/tier/category集合尚未核定。未知/未支持维度拒绝授权，不填0。System只存所发布的技术依据与约束，Agent最终cap/request digest和逐attempt期限不复制为System调用行；Billing按自身tariff对联合约束求金额上界。
+
+拟扩现revision时继续同一receipt/publish事务、父事实锁、generation advance、digest与immutable trigger；新增技术事实进入revisionContent/digest，缺依据/歧义/非法有效窗口不得发布。证据更新、profile/账户/endpoint改变必须新revision，旧已发布行不能补写成有保证；发布状态和当前源证据判定共同决定是否具paid-bound资格，现3.0历史published不被追认为已保证。
+
+### 生效、退休与bounded撤销
+
+最窄提案为保证承诺覆盖完整固定有效窗口。时间瞬时点UTC，保证生效/截止必须来源明确、有限且前者早于后者；禁止以健康TTL、应用时钟延长或猜永久期限代替。System publish/resolve后继按本仓DB时钟核有效性，cache expiry不得晚于保证截止；原generation重核保持。现retire继续是终止后续resolve选择的唯一控制面变更，推进generation并保留原immutable内容，不另建撤销ledger。
+
+Agent候选bound expiry=min(floor(lease_expiry), floor(guarantee_expiry))，同DB clock生成sealed_at且严格早于截止；seal/read/dispatch各核绑定与有限时效，续租不更新旧bound。这些逐attempt事实由Agent自己的事务实现，System不写Agent lease/attempt。
+
+retire阻止新解析不等于瞬时撤销已经签发的bound：上述方案接受其最多到原固定截止的窗口，前提是正式来源在窗口内仍承担已声明约束。若产品要求即时撤销或来源可能即时撤回承诺，则需要该具体route可执行的最新状态/拒绝与竞态语义并另过Root门；否则路线仍无资格。再次GET、短TTL或事务外重核都不证明跨服务原子撤销，不跨网络持有PG锁。已started的调用仍按原evidence/Billing恢复规则处理，不因退休/期限到达伪造未调用/整笔释放。
+
+Root须确认该有限窗口提案与真实来源的承诺能力；本片不自行改变Agent原R252 lease-only expiry或Billing永久snapshot重放代码。读取过期bound阻止**新**准入，不抹除已成立Admission和账务证据。
+
+### 后继数据文件、验证与保护
+
+若Root批准现revision方案，canonical候选仅 `database/schema.sql`；读写/digest候选仅 `src/modules/model-catalog/revision.repository.ts`、`revision.service.ts`、`revision-content.ts`、`schemas/revision.schema.ts`，resolve/缓存对应 `resolve.repository.ts`、`resolve.service.ts`、`resolve-cache.schema.ts`、`schemas/resolve.schema.ts`。不预增索引：先有实际新增查询才论证；现revision点读/候选排序/retire路径继续用现访问方式，不建无查询理由的账户/profile索引族。生成链与machine版本门见API_CONTRACT，不手改派生物。
+
+测试候选为现 `test/integration/system-target-model.test.ts`、`test/integration/system-lifecycle.test.ts`、`test/contract/system-target-contract.test.ts`；`scripts/verify-system-fresh-schema.ts`仅确需catalog/行为断言时另准。必须覆盖缺依据/过期/未生效/绑定或profile漂移拒绝且receipt/generation零副作用、published不可变、首次/cache返回一致、边界时间与retire/cache竞态、同事务rollback/replay。新合同正规生成与原owner全门同跑；仅D0不具备以上PASS。
+
+正常已有revision/历史数据如何进入新required语义须Root另裁有数据演进，不以fresh installer/reset、伪造来源回填、nullable兼容成功或旧profile fallback解决。旧有效目录读能力与未具paid-bound资格分别表达，不能为门禁假造guarantee。无本次删除/清库/资金写。
+
+当前可先做Agent现零send、取消/rollback/ACKunknown、重复claim保护，以及Root批准后的closed-profile合法负控；不需要等全部provider证据才做这些研发。真正positive producer/reader与B1必须等正式保证来源/机器发布；不直接INSERT假bound。
+
+尚待Root确认与另两D0完全相同的四项：实际首个来源及exact route/account；closed请求/计量全集；有限窗口撤销提案及执行可行性；对应普通列/机器版本和正常现存数据方案。本轮只文档，未核provider合同、未运行任何资源测试，未宣称新功能完成。
+
+---
+
 # System 数据模型
 
 ## R215 模型执行上限切片验收（2026-10-04）

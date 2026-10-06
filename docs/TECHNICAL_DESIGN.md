@@ -1,3 +1,59 @@
+## R257 当前技术路由保证设计门（2026-10-06；仅文档，未发布保证）
+
+依据 Root `docs/task.md` 15:33 裁决与15:40任务卡；System源码基线 `955bd587f46a771e43a4330d202d90a7d2d67262`。本节、API_CONTRACT与DATA_MODEL的同名R257前缀共同描述当前方案，覆盖下方历史时点的“消费者未pin”等叙述，不改写原正文。只读依据为 Root `var/dev/r255-preserve/r257-system-guarantee-source-review.md`，SHA256 `dd9904cb41ded83ff487fb9e65bc0220f238646e637d0abd86f8a94c567cf75a`。本片只改三份现文档；没有源码、机器、Schema、配置、运行或provider验收。
+
+### 当前事实与目标
+
+System唯一机器仍是3.0.0，artifact SHA256 `94ed91655741cbba66ce80a4c41717b9179cc509cb6858534e0b78aa3e6dc059`。现resolve返回immutable model/provider/revision、目录generation、gateway alias及`context_window/max_output_tokens`；两界由SQL/publish/digest闭合。Agent当前已严格消费两界，最终HTTPX hook校endpoint/Host、n=1、最终output cap并冻结请求摘要，SDK无retry、HTTPX无redirect；缺Billing consumer仍拒绝发送。Agent HTTP5 final usage evidence已发布，但它是调用后证据，不是pre-dispatch bound。
+
+当前System未发布technical account、exact endpoint适用范围、正式计费语义/closed profile、保证生效与截止；目录generation也不是gateway部署revision。provider目录ID/secret handle不证明实际凭据账户；容量、strict usage、健康TTL、签名或管理员声明均不独立证明金额上界。当前没有经本任务核实的正式provider/gateway合同，也没有合法positive bound。目标是在既有model-catalog中发布**有正式依据的具名技术路由/执行语义**，供Agent形成逐attempt bound，而非新建保证中心。
+
+### 唯一owner与计费单元
+
+- System `model-catalog` 唯一写技术route、技术账户绑定、执行/计量语义的证据准入与版本发布；不写调用、预占或金额。
+- Agent唯一写本方HTTP dispatch、单claim/无retry/redirect、attempt状态、最终request profile/cap和逐attempt bound；实际usage/归属仍通过final evidence发布。
+- Billing唯一写commercial mapping、pricing account、rate/policy、quote、金额、hold/settlement/ledger；技术账户opaque ref不是Billing商业账户。
+
+**application HTTP request** 指Agent向已绑定API endpoint实际发送的一次请求。一次本方新发送、显式retry/fallback必须新的attempt与财务许可；不能把logical Run当一次请求。**billable API unit** 指适用该具体route/账户的正式provider或gateway合同定义的计费单元。如果该合同完整限定一个API请求的所有收费类别及数量上界，内部不另突破上界的重试不要求Kokoro审计任意内部网络实现；这是合同前置，不是本地代码已验证的事实。若内部额外收费、route/account漂移或多次收费可突破已界定单元，该路线不具paid-bound资格。
+
+该区分不默许隐藏多次收费；Billing历史“真实provider retry/fallback新attempt”仍适用于新的独立收费尝试。跨仓后继须同步同一术语，不能由System替Billing扩大许可。当前只固定owner与准入原则，不宣称真实合同满足它。
+
+### 最窄来源、身份与生命周期方案
+
+1. **来源**：仅使用具体受支持route的正式provider/gateway计费及执行合同，固定其版本、适用模型/账户/API范围、证据引用与内容摘要；记录核验时间、有效起止和明确支持的计量profile。SDK/自有HTTP peer证据只证明本方发送行为。需要自有gateway实施的限界才核该具体部署/route实现，不一律要求任意远端源码透明。admin权限只授权发布经核证事实，不产生真实性；不新增签名中心、通用证明服务或浮动网页运行时抓取。
+2. **身份**：同一published model revision绑定provider/model、gateway alias、exact canonical endpoint（scheme/authority/path、固定POST、无userinfo/query/fragment）、opaque technical account及正式来源revision/digest。只在执行保证依赖特定gateway部署/路由配置时，再要求其可核定revision；若合同直接稳定覆盖该endpoint/账户/模型，不机械增加部署ID。身份匹配失败拒绝，不从API key、alias或secret handle推导账户。credentials、原请求与商业价格不进入保证。
+3. **profile**：首个候选仍为Agent R252 token联合约束：I<=context、O<=最终cap、total=I+O、cache-read为I子集、reasoning为O子集；每条关系均需正式来源支持，不额外猜I+O<=context。最终body须有具名closed字段与nested content/tools规则；支持文本、stream和现有效工具声明的范围须逐项核定。cache-write、音视频/图像、未知service tier/category及无法证明的关系在授权前拒绝，不等响应后发现未知再补许可。准确允许集尚待来源核验与Agent现合法SDK向量对照，未核定前无正控schema。
+4. **持久生命周期建议**：最小形态随现immutable model revision冻结技术保证内容和有限生效窗口，不先建独立entity/table/端点；新的来源/profile/账户/endpoint必须新revision，不能修改已发布历史。现retire+generation/cache fence可立即停止后续成功resolve，但不承诺瞬时撤销已发出的不可变快照。Agent bound候选期限取`min(floor(lease_expiry), floor(guarantee_expiry))`，seal/reader/dispatch分别核时间与绑定，续租不延长原bound。
+5. **有效撤销的限制**：首版建议只准正式来源允许其承诺覆盖整个已签发有限窗口的route；retire阻止新解析，既有未dispatch bound最多存活至其固定截止。dispatch前的再次读取可缩短观察滞后，但不是跨服务原子撤销保证。如果实际来源可即时取消承诺，必须先有该具体route可执行的最新状态/拒绝机制及竞态语义，或保持不具资格；不以小TTL、一次GET或PG锁跨网络冒即时撤销。已started的调用不因退休/到期改成未调用或自动释放资金。
+
+第4–5项是提交Root审阅的最窄期限/撤销提案；Root须确认是否接受有限窗口内旧bound继续有效，以及证据来源能否支持它。未确认前不授producer成功实现，不默认永久有效。
+
+### §8 放置与依赖门
+
+| 项 | 本片结论 |
+|---|---|
+| Owner / writer | System model-catalog技术发布；本片唯一writer只编辑这三D0，Root独占Git与资源；Agent/Billing各自实现事实不越界。 |
+| 当前事实 | 现revision/resolve、SQL与3.0机器如上；无technical guarantee数据或已核合同。三原正文SHA在交付报告逐一保留。 |
+| 目标职责 | 判断具体route能否支持有限billable unit约束，并发布可固定消费的技术身份/依据；不是资金许可。 |
+| 位置比较 | 采用现model-catalog revision/resolve，同业务词汇与发布生命周期；淘汰runtime-manifests（UI配置生命周期不同）、Agent自证下游、Billing制造技术事实、新配置/签名服务。 |
+| 粒度 | 先三D0前缀；后继扩现schema/content/repository/service，不预建目录/实体。复杂度若超出revision生命周期，先重新过设计门。 |
+| 依赖 | System固定发布物→Agent严格消费/producer/reader→Billing B1→Agent A2；无跨仓源码import/SQL、无免费/旧整笔capture兼容。 |
+| 数据/API | 本片零变更。后继技术字段须普通列/明确约束并进入revision digest；现Zod单向生成，版本和字段另冻结，不在本片发明机器URI。 |
+| 删除项 | 不新增alias/fallback；保A1 final evidence、现零send/取消/恢复。保证缺失不保兼容成功轨。 |
+| 验证 | 本片仅三面一致/后缀逐字节/hash；后继真实合同准入、负控、HTTP/cache、PG原子性/撤销/期限与原owner工程门，均未本轮运行。 |
+
+### 后继精确候选范围与停止线
+
+System若采用上述revision生命周期，手写候选仅 `src/modules/model-catalog/schemas/revision.schema.ts`、`schemas/resolve.schema.ts`、`revision-content.ts`、`revision.repository.ts`、`revision.service.ts`、`resolve.repository.ts`、`resolve.service.ts`、`resolve-cache.schema.ts` 与 `database/schema.sql`；普通技术schema确需独立职责时另报现schemas内单文件，不先创建。provider schema/service、runtime-manifests、config及其它模块不预授权。
+
+机器链仅现 `scripts/generate-system-openapi.ts`、`scripts/update-system-openapi-provenance.ts` → `contract/openapi/system.openapi.json`、`contract/provenance.json`，以及 `contract/README.md`；新breaking版本、字段名/类型与required规则在来源/生命周期确认后冻结，禁止手改生成物。测试候选仅现 `test/integration/system-target-model.test.ts`、`test/contract/system-target-contract.test.ts`、`test/integration/system-lifecycle.test.ts`；fresh/catalog入口仅有确切断言需要时另准。正常现存revision/数据演进另由Root评审，不用fresh installer/reset/伪证据回填。
+
+立即可独立推进：Agent既有零send/重复claim/取消/rollback/ACKunknown状态机保护；Root批准closed-profile后用合法JSON和真实现guard构造新增费用字段拒绝RED；System整理本三D0与来源清单；Billing原三D0收口商业mapping/expiry。没有正式保证时，不造positive bound，也不把未来import失败或无前置404当合法admission RED。
+
+未决项限于：(a) 实际首个provider/gateway正式来源及技术账户/endpoint适用绑定；(b) closed字段/计量全集；(c) 有限窗口撤销提案及该route的执行可行性；(d) 因上述结果决定的机器字段/版本、普通列和正常已有数据处理。已裁owner/费用政策不重问。Root确认三面后另授源码；本节不是新功能PASS。
+
+---
+
 # System 技术设计
 
 ## R215 模型执行上限切片验收（2026-10-04）
