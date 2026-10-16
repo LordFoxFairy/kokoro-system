@@ -7,7 +7,7 @@
 - [x] 核验当前 System `1460820`、Agent `84502e6`，确认 only-litellm 限制贯穿 schema/SQL/consumer，不是只改启动环境即可。
 - [x] 将已批准的 direct 默认/可选 LiteLLM 方向写入本仓三面设计，说明 provider 稳定连接、revision 快照及删除项；Agent 三面设计登记实际 usage planned 字段影响。
 - [x] 两owner设计候选独立审查通过：最小route/usage表示、历史读取表、旧attempt收束和回滚限制已明确；无剩余已证P1/P2设计阻断，不代表实现验收。
-- [ ] 用户审阅确认关键连接不可变/版本切换方案；此前不发布任何breaking artifact或执行DDL。
+- [x] 用户于 2026-10-16 明确确认关键连接不可变/版本切换方案：各服务独立地址/凭据引用、默认 direct/LiteLLM 可选、调用固定连接版本、历史记录不套新地址。配置与版本切换已获准；正式 Billing 许可前仍不发送模型请求。
 - [ ] System 在现 schemas/SQL/service/repository/resolve/cache/digest 的最小闭集实施，先正式契约与失败反例，再业务实现；原生成器发布 breaking artifact，保 83 业务操作/2 probes，不新增网关服务。
 - [ ] 主仓执行 System 本 owner 完整门及隔离 fresh schema/真实 HTTP/cache/并发发布；正式 source commit/artifact/version/digest 固定后才交消费者。
 - [ ] Agent 正式 pin、新连接/凭据装配及协议适配器；按先行冻结的usage2/HTTP6历史读取表正规发布唯一active canonical artifact和下游reader，v1仅冻结历史读取，不扩大重构其余usage语义。
@@ -15,7 +15,7 @@
 - [ ] 版本验收覆盖 repository 先验证 frozen attempt 再解析 evidence、sealed attempt 终态维护的整条历史校验链；planned/evidence/HTTP envelope 版本错配、未知版本、v1原字节读取、旧attempt未收束、v2首写后旧部署回滚必须有明确反例。
 - [ ] Billing 授权/真实使用记录完整后，执行正式收费模型旅程；此前 native 零 provider 门保留，不造测试 grant 或免费状态。
 
-**当前状态**：仅设计候选。未安装依赖、启动服务、执行 SQL 或发布新契约；System/Agent 原 main 与 Root gitlink 未变。实际文档检查和审查结果在本节后续记载，不以旧门绿替代。
+**当前状态**：设计与用户确认门已通过，System4 机器/源码实施尚未开始；不再等待上述确认。未安装依赖、启动服务、执行 SQL 或发布新契约；System/Agent 原 main 与 Root gitlink 未变。下一 writer 在既有 model-catalog 写区先落连接 Schema/owner 快照反例，再正规生成契约与实现；实际证据在本节后续记载，不以旧门绿替代。
 
 ---
 
