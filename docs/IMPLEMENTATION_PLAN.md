@@ -1,3 +1,24 @@
+## MC-01 当前增量：默认 direct、LiteLLM 可选（2026-10-15）
+
+**目标**：落实用户已批准的连接拓扑，保持 System 配置/路由、Agent 执行、Billing 资金、IAM 身份的原 owner；完整 Skills/MCP 目标不缩减。此节复用本仓唯一计划，不另建任务中心。
+
+**范围**：System 既有 model-catalog 及其 canonical SQL/运行时 Zod/生成器；Agent 在自身文档和固定消费者中承接。Root 串行集成，所有远端 CI/推送/PR/merge 按用户要求暂缓。
+
+- [x] 核验当前 System `1460820`、Agent `84502e6`，确认 only-litellm 限制贯穿 schema/SQL/consumer，不是只改启动环境即可。
+- [x] 将已批准的 direct 默认/可选 LiteLLM 方向写入本仓三面设计，说明 provider 稳定连接、revision 快照及删除项；Agent 三面设计登记实际 usage planned 字段影响。
+- [x] 两owner设计候选独立审查通过：最小route/usage表示、历史读取表、旧attempt收束和回滚限制已明确；无剩余已证P1/P2设计阻断，不代表实现验收。
+- [ ] 用户审阅确认关键连接不可变/版本切换方案；此前不发布任何breaking artifact或执行DDL。
+- [ ] System 在现 schemas/SQL/service/repository/resolve/cache/digest 的最小闭集实施，先正式契约与失败反例，再业务实现；原生成器发布 breaking artifact，保 83 业务操作/2 probes，不新增网关服务。
+- [ ] 主仓执行 System 本 owner 完整门及隔离 fresh schema/真实 HTTP/cache/并发发布；正式 source commit/artifact/version/digest 固定后才交消费者。
+- [ ] Agent 正式 pin、新连接/凭据装配及协议适配器；按先行冻结的usage2/HTTP6历史读取表正规发布唯一active canonical artifact和下游reader，v1仅冻结历史读取，不扩大重构其余usage语义。
+- [ ] 本地启动器只装配正式连接；分别验证 direct 与实际可选 LiteLLM，涵盖同 path 多地址/账户、缺凭据、取消、错误、stream 和硬限，禁止自动拓扑 fallback。
+- [ ] 版本验收覆盖 repository 先验证 frozen attempt 再解析 evidence、sealed attempt 终态维护的整条历史校验链；planned/evidence/HTTP envelope 版本错配、未知版本、v1原字节读取、旧attempt未收束、v2首写后旧部署回滚必须有明确反例。
+- [ ] Billing 授权/真实使用记录完整后，执行正式收费模型旅程；此前 native 零 provider 门保留，不造测试 grant 或免费状态。
+
+**当前状态**：仅设计候选。未安装依赖、启动服务、执行 SQL 或发布新契约；System/Agent 原 main 与 Root gitlink 未变。实际文档检查和审查结果在本节后续记载，不以旧门绿替代。
+
+---
+
 # System 完整交付唯一实施计划
 
 当前：完整System源码、消费者HTTP、NestJS工程边界与tag镜像发布均已验收。R8提交 `7252d50c67338842978961244e86a884daa87f5b`、tag `v0.1.2`；GitHub release run `34222465469`与常规CI run `34222465488`成功，GHCR digest `sha256:8fe6e701451f461b02b84c6520d76f49ad872c8f11d6ae3a8c5b80532797eb37`。private仓GitHub attestation按平台能力跳过，不冒称已签。完整五模块83业务操作，非仅Site交付。

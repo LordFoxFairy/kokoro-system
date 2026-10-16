@@ -1,3 +1,19 @@
+## MC-01：模型连接持久事实（2026-10-15；目标，无 DDL）
+
+基线 `1460820eab10ade1ca62cd9fdf18b8ac700c0d7a` 的唯一 schema 仍为 `database/schema.sql`。现 provider 保存 secret_handle_ref/固定 litellm transport，revision 保存 provider/gateway 两名称且没有完整连接快照。本片不更新 Schema、共享数据或 published digest。
+
+目标只扩现 model_provider 与 model_revision，不新增通用配置表、跨 owner 表或外键。provider 是稳定技术连接身份：协议、direct/litellm 类型、规范 API base URL、opaque credential reference；实际密钥由 Agent 的部署 secret 独占。技术字段自创建固定，换连接/账户走新 provider；原显示名/优先级、软删/恢复和管理 version 继续各自含义。
+
+revision 保存创建时由 owner 读取的连接快照及唯一请求模型标识，与既有限额一起纳入 digest。快照是同 owner 的不可变历史证据，不是第二个可编辑配置中心；采用具名、带约束的普通列，不建任意 JSONB 配置袋。新 request_model 是唯一执行输入，provider_model_name 保留声明目标元数据；gateway 专属执行名称与 transport 固定值在新 canonical schema 中原子替换。
+
+创建 revision、发布与 provider 生命周期继续在原事务内锁定父事实，保 CAS/幂等/generation 与 published immutable trigger。provider 元数据更新不改变技术快照，provider 级 health 不跨技术连接复用；删除/恢复和到期维护不得重写已发布 revision 快照或摘要。现删除超过 30 天后清空 provider.secret_handle_ref 的维护操作，作为已超过恢复窗口的 provider 到期脱敏例外保留；其不再有恢复/resolve 资格。revision 保留原不透明引用与摘要，不保存密钥，也不通过该历史引用恢复执行；有效服务调用仍须 provider 未删且凭据可用。
+
+secret 轮换只替换同一不透明引用背后的同账户密钥，不把 key/hash 放进 SQL/digest/日志；账户变化需新引用与新连接。System 不持有真实账户证明、价格、用量、hold 或结算事实，原 R257 未决收费保证不由本片填补。
+
+切换前核实际 model/provider/revision、活动消费者与缓存。新鲜隔离 schema 验证不授权清理现存应用库；旧 published revision 不猜地址、不从全局 Agent env 倒填。既有数据的明确处置与回滚资源未批准前，不对共享库执行 DDL 或破坏性操作。
+
+---
+
 ## R257 当前技术路由保证设计门（2026-10-06；仅文档，未发布保证）
 
 对齐Root 15:33裁决及本仓TECHNICAL_DESIGN/API_CONTRACT同名R257前缀。基线 `955bd587f46a771e43a4330d202d90a7d2d67262`；唯一canonical仍 `database/schema.sql`，本片零DDL、零新entity/table/index、零普通数据/配置写。三原正文逐字节保留，以下只是后继数据放置与生命周期提案，不冒新schema或已部署保证。

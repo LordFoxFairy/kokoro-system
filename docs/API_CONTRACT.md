@@ -1,3 +1,21 @@
+## MC-01：模型连接契约设计门（2026-10-15；尚未发布）
+
+用户批准默认 direct、可选 LiteLLM；现 canonical artifact 仍为 3.0.0，`resolve` 仍只支持 `litellm`，本节不修改任何生成物。技术方案及生命周期以 TECHNICAL_DESIGN 同名 MC-01 为准。
+
+目标继续使用既有 provider/revision CRUD 与 `POST /v1/system/model-catalog/resolve`，caller、tenant、错误 envelope、限额和 generation fence 不变。协议与 direct/litellm 类型独立；连接由完整 API base URL、唯一请求模型标识与不透明凭据引用绑定，provider_id 作为稳定连接身份。
+
+resolve 的目标表示包含与同一 revision/digest 绑定的具名连接快照；管理输入、响应及快照采用同一运行时 Zod 事实源。目标 System artifact major 为 4.0.0，HTTP 路径仍 `/v1`；连接快照使用协议、direct/litellm 类型、完整 API base URL、credential reference 与 request_model 的明确语义。provider_model_name 保留声明目标元数据，不作为执行输入；旧 transport 固定标签及 gateway 专属执行名称退出新 route，不建立字段 alias 或缺字段 fallback。字段类型/长度只在后继运行时 Zod 中维护并由原生成器产生机器约束，本段不是第二份 JSON Schema。
+
+只有受认证 Agent resolve 与有权的内部管理操作看到适用的连接元数据/credential reference；公开 catalog、runtime manifest 和普通 BFF 用户投影不因此获得上游 URL 或 secret handle。实际 API key 在所有 System wire 中均禁止。已有公开模型列表只返回原有选择投影。
+
+provider 技术连接字段创建后固定，技术字段变更走新 provider 与新 model revision；显示名/优先级等 CAS 更新保留。任何新字段都不表示供应商实际执行归属、技术账户证明、价格或已获资金授权。健康 TTL 也不是执行许可有效期。
+
+发布顺序：System 运行时 Zod/SQL/HTTP 与真实资源门 → 正规 OpenAPI/provenance breaking 发布 → Agent 固定消费者/模型调用与 usage planned binding 正规发布 → Billing/BFF 等受影响消费者 pin → 隔离组合切换。旧模型使用记录、活动 Run 和缓存的处置先由对应 owner 核定，不把旧 published revision 补写成具有新连接保证；不手改 generated 文件，不保留第二执行协议。
+
+本片仅文档，无新 artifact/version/pin、SQL、服务启动或外部模型请求。未完成的收费保证来源与撤权/资金链仍按原有设计门处理。
+
+---
+
 ## R257 当前技术路由保证设计门（2026-10-06；仅文档，未发布保证）
 
 对齐Root 15:33 owner/计费单位裁决与本仓TECHNICAL_DESIGN同名R257前缀。System基线 `955bd587f46a771e43a4330d202d90a7d2d67262`；现唯一机器仍3.0.0、SHA256 `94ed91655741cbba66ce80a4c41717b9179cc509cb6858534e0b78aa3e6dc059`。本片没有改Zod/OpenAPI/provenance/version、operation、认证、Schema或运行配置；以下语义是后继准入方案，尚不能被消费者当新机器pin。

@@ -1,3 +1,38 @@
+## MC-01：默认直连、LiteLLM 可选的连接设计（2026-10-15；目标，未实施）
+
+用户已确定 Agent 默认直连配置地址，LiteLLM 是受支持的可选网关而非部署前置。当前源码基线为 `1460820eab10ade1ca62cd9fdf18b8ac700c0d7a`；provider/revision/resolve 的 Zod、SQL CHECK 与 Agent 消费者仍只允许 `litellm`。本节只推进设计门，不代表新机器契约、数据库或运行时已经启用。下方 R257 中计费保证的未决事项继续有效；连通模型不构成 Billing 许可。
+
+### Owner、范围与方案
+
+System model-catalog 只发布技术连接与模型选择；Agent 执行请求、取消及用量观察；Billing 保有资金授权和结算。IAM 不代理推理，BFF 不新增模型转发入口。复用现有 provider、revision、resolve 与管理操作，不增加顶层模块、独立代理进程或通用配置中心。
+
+采用现 `model_provider` 作为稳定连接身份，现 `model_revision` 保存可重现的连接快照。比较：新建连接中心/CRUD 会重复已有目录生命周期；继续 Agent 单一全局地址会丢失多连接选择并继续把直连叫作 LiteLLM。前者暂不引入，后者删除。
+
+协议和连接类型分开：本片正式执行协议为既有 Chat Completions 的 OpenAI-compatible；连接类型为 direct 或 litellm。两类均由 Agent 的同一协议适配器执行，区别只在显式选中的上游。未配置 LiteLLM 不影响 direct；配置了 LiteLLM 才允许选择对应连接。其他 API/原生协议的已有非正式构造不删除，但不因连接类型改变就被冒称正式可执行；后继按各自实际协议和能力声明接入。
+
+### 连接身份与发布
+
+- 同一 path 可出现在不同连接；选择依据是 provider 身份、完整上游 base URL、请求模型标识及凭据引用，不以 path 或模型显示名猜测。direct 仅描述本方连接拓扑，不证明远端没有代理。
+- 连接的协议、类型、base URL 和凭据引用在 provider 创建后固定；更改地址、协议或供应商账户创建新 provider，再发布新 model revision。显示名、优先级等管理元数据保持原 CAS 更新。这样既有 provider 级 health 不会被新地址挪用，历史 revision 也不会随 provider 编辑漂移。
+- revision 创建时由 owner 读取并保存具体连接快照；请求模型标识由该 revision 明确给出。快照与既有 context/output 限额均纳入同一 digest。客户端不重复提交 provider 连接字段覆盖快照。
+- base URL 保存用户配置的完整 API 前缀，包括其已有路径；不自动再加 `/v1`。当前协议适配器只追加其明确的资源路径，最终实际 method/endpoint/model/body 继续在 Agent 发送前核对。
+- URI 拒绝 userinfo、query、fragment、控制字符和歧义形式；正式远程连接使用 HTTPS。本地 HTTP 仅由部署显式允许 loopback 的测试配置启用，不由浏览器参数切换。Agent 不跟随重定向，也不经环境代理悄悄改变上游。
+- System 保存和发送的是不透明 credential reference，不保存或发送实际密钥。Agent 只从部署 secret 解析引用；引用缺失、provider 绑定错误或凭据不可读均在发送前失败。同一账户的密钥轮换不改变引用；更换账户使用新引用/新 provider。引用不是远端实际账户或计费保证的证明。
+
+### 失败与恢复
+
+保留 tenant policy、健康新鲜度、generation fence、bounded cache、CAS、幂等及发布/退役语义。direct 与 litellm 均保持取消、超时、输出硬限和未获授权零发送；不因网关错误自动直连、换 key、换模型或在 SDK 内隐藏重试。显式新发送/重试仍属于独立 attempt，按正式授权流程处理。
+
+### 依赖、删除与验收
+
+先完成本仓三面文档/唯一任务表，发布运行时 Zod 正规生成的 breaking artifact，再由 Agent 固定 version/commit/digest 消费；BFF/Admin 只更新受影响的契约 pin 与管理字段，不新增转发代理。删除新生产路径中 `transport=litellm` 的总入口限制，以 `request_model` 作为唯一执行模型标识；`provider_model_name` 保留既有声明目标元数据，不作为第二执行输入、不证明 actual attribution。旧 gateway 专属必填名称不再冒充 direct 请求模型；历史记录不重写为新含义。
+
+System 后继写区为现 model-catalog schemas、provider/revision/resolve repositories/services、revision-content、cache schema、canonical SQL 及原生成器/测试。Agent 的 usage planned binding 也含旧名称：其版本化发布与历史读取必须先通过 Agent 设计门，禁止只改 factory 或只改环境变量。
+
+验收必须覆盖两种显式连接、同 path/同名不同地址及账户、连接快照/发布不可变、provider 编辑限制、缓存重放、非法 URL/缺 secret/错 provider/过期 health、旧新 artifact 错配失败。真实收费调用另依赖未完成的 Billing 链；自有 HTTP peer 只证明本方 wire。纯文档阶段不运行服务或 SQL，不报业务 PASS。
+
+---
+
 ## R257 当前技术路由保证设计门（2026-10-06；仅文档，未发布保证）
 
 依据 Root `docs/task.md` 15:33 裁决与15:40任务卡；System源码基线 `955bd587f46a771e43a4330d202d90a7d2d67262`。本节、API_CONTRACT与DATA_MODEL的同名R257前缀共同描述当前方案，覆盖下方历史时点的“消费者未pin”等叙述，不改写原正文。只读依据为 Root `var/dev/r255-preserve/r257-system-guarantee-source-review.md`，SHA256 `dd9904cb41ded83ff487fb9e65bc0220f238646e637d0abd86f8a94c567cf75a`。本片只改三份现文档；没有源码、机器、Schema、配置、运行或provider验收。
