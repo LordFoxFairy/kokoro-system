@@ -11,9 +11,13 @@ import {
 import { systemOperations } from "./system-openapi-operations.js";
 
 type JsonObject = Record<string, unknown>;
-function json(schema: z.ZodType): JsonObject {
+function json(
+  schema: z.ZodType,
+  io: "input" | "output" = "output",
+): JsonObject {
   const result = z.toJSONSchema(schema, {
     target: "draft-2020-12",
+    io,
     unrepresentable: "throw",
   });
   delete result.$schema;
@@ -33,8 +37,12 @@ const requestIdHeader = {
     schema: json(requestIdSchema),
   },
 };
-function component(schema: z.ZodType, schemas: JsonObject): JsonObject {
-  const value = json(schema);
+function component(
+  schema: z.ZodType,
+  schemas: JsonObject,
+  io: "input" | "output" = "output",
+): JsonObject {
+  const value = json(schema, io);
   const key = `schema_${createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16)}`;
   schemas[key] = value;
   return { $ref: `#/components/schemas/${key}` };
@@ -177,7 +185,9 @@ export function buildSystemOpenApi(): Readonly<{
       item.requestBody = {
         required: true,
         content: {
-          "application/json": { schema: component(operation.body, schemas) },
+          "application/json": {
+            schema: component(operation.body, schemas, "input"),
+          },
         },
       };
     paths[operation.path] ??= {};
@@ -205,10 +215,10 @@ export function buildSystemOpenApi(): Readonly<{
     servers: [{ url: "/", description: "Same internal-owner origin" }],
     info: {
       title: "Kokoro System internal owner",
-      version: "3.0.0",
-      "x-kokoro-release-classification": "execution-bound-breaking",
+      version: "4.0.0",
+      "x-kokoro-release-classification": "model-connection-breaking",
       description:
-        "Generated from runtime Zod schemas for implemented System internal-owner routes; 3.0.0 adds required model execution capability bounds.",
+        "Generated from runtime Zod schemas for implemented System internal-owner routes; 4.0.0 binds model revisions to immutable direct or optional LiteLLM connections.",
     },
     paths,
     components: {

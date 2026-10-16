@@ -221,7 +221,7 @@ it("reconciles every stored relationship without repairing or deleting immutable
       "INSERT INTO system_config_record(id,tenant_id,product_id,module_key,scope_type,scope_id,config_key,schema_version,value_json,status,digest) VALUES($1,'orphan',$2::uuid,'theme','product',$2::text,$3,1,'{}','active',repeat('a',64))",
       "INSERT INTO system_release_binding(id,tenant_id,product_id,release_id,scope_type,scope_id,status) VALUES($1,'orphan',$2,$2,'tenant','orphan','active')",
       "INSERT INTO model_label(id,label_key,display_name,feature_key,default_revision_id) VALUES($1,$3,'Orphan',$3,$2)",
-      "INSERT INTO model_revision(id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,transport,gateway_model_name,digest) VALUES($1,$2,$2,1,'model','Orphan',$3,'[]','[]','litellm','model',repeat('a',64))",
+      "INSERT INTO model_revision(id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,connection_protocol,connection_type,connection_base_url,connection_secret_handle_ref,request_model,digest) VALUES($1,$2,$2,1,'model','Orphan',$3,'[]','[]','openai_chat_completions','litellm','https://gateway.example/v1','vault:fixture','model',repeat('a',64))",
       "INSERT INTO model_routing_policy(id,tenant_id,label_id,feature_key,model_revision_id,visible) VALUES($1,'orphan',$2,$3,$2,true)",
       "INSERT INTO model_provider_health_state(provider_id,status,observed_at) VALUES($1,'healthy',CURRENT_TIMESTAMP)",
     ];
@@ -271,11 +271,11 @@ it("does not flag a deleted label's retained retired revision as a live orphan",
       [model, model],
     );
     await db.query(
-      "INSERT INTO model_provider(id,provider,provider_key,display_name,secret_handle_ref,transport) VALUES($1,'retained',$2,'Retained','handle','litellm')",
+      "INSERT INTO model_provider(id,provider,provider_key,display_name,secret_handle_ref,protocol,connection_type,base_url) VALUES($1,'retained',$2,'Retained','handle','openai_chat_completions','litellm','https://gateway.example/v1')",
       [provider, provider],
     );
     await db.query(
-      "INSERT INTO model_revision(id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,transport,gateway_model_name,context_window,max_output_tokens,digest,published_at,retired_at) VALUES($1,$2,$3,1,'retained','Retained',$4,'[]','[]','litellm','retained',8192,2048,repeat('a',64),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+      "INSERT INTO model_revision(id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,connection_protocol,connection_type,connection_base_url,connection_secret_handle_ref,request_model,context_window,max_output_tokens,digest,published_at,retired_at) VALUES($1,$2,$3,1,'retained','Retained',$4,'[]','[]','openai_chat_completions','litellm','https://gateway.example/v1','vault:fixture','retained',8192,2048,repeat('a',64),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
       [revision, model, provider, feature],
     );
     await db.query(

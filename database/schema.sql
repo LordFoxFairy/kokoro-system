@@ -319,7 +319,9 @@ CREATE TABLE IF NOT EXISTS model_provider (
   provider_key VARCHAR(128) NOT NULL,
   display_name VARCHAR(160) NOT NULL,
   secret_handle_ref VARCHAR(255) NOT NULL,
-  transport TEXT NOT NULL,
+  protocol TEXT NOT NULL,
+  connection_type TEXT NOT NULL DEFAULT 'direct',
+  base_url VARCHAR(2048) NOT NULL,
   priority INTEGER NOT NULL DEFAULT 100,
   version BIGINT NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -327,7 +329,10 @@ CREATE TABLE IF NOT EXISTS model_provider (
   deleted_at TIMESTAMPTZ(3),
   deleted_by TEXT,
   CONSTRAINT uq_model_provider_key UNIQUE (provider, provider_key),
-  CONSTRAINT ck_model_provider_transport CHECK (transport = 'litellm'),
+  CONSTRAINT ck_model_provider_protocol CHECK (protocol = 'openai_chat_completions'),
+  CONSTRAINT ck_model_provider_connection_type CHECK (connection_type IN ('direct','litellm')),
+  CONSTRAINT ck_model_provider_base_url CHECK (length(base_url)>0 AND base_url !~ '[[:space:][:cntrl:]?#]' AND position(chr(92) in base_url)=0 AND base_url !~ '^https?://[^/]*@' AND (base_url ~ '^https://[^/]+' OR base_url ~ '^http://(localhost|127[.]0[.]0[.]1|\[::1\])(:[0-9]+)?(/|$)')),
+  CONSTRAINT ck_model_provider_secret_ref CHECK (length(secret_handle_ref)>0 OR deleted_at IS NOT NULL),
   CONSTRAINT ck_model_provider_priority CHECK (priority >= 0),
   CONSTRAINT ck_model_provider_version CHECK (version > 0)
 );
@@ -361,8 +366,11 @@ CREATE TABLE IF NOT EXISTS model_revision (
   feature_key VARCHAR(128) NOT NULL,
   input_modalities JSONB NOT NULL,
   output_modalities JSONB NOT NULL,
-  transport TEXT NOT NULL,
-  gateway_model_name VARCHAR(255) NOT NULL,
+  request_model VARCHAR(255) NOT NULL,
+  connection_protocol TEXT NOT NULL,
+  connection_type TEXT NOT NULL,
+  connection_base_url VARCHAR(2048) NOT NULL,
+  connection_secret_handle_ref VARCHAR(255) NOT NULL,
   context_window INTEGER,
   max_output_tokens INTEGER,
   priority INTEGER NOT NULL DEFAULT 100,
@@ -379,7 +387,11 @@ CREATE TABLE IF NOT EXISTS model_revision (
   CONSTRAINT ck_model_revision_max_output CHECK (max_output_tokens IS NULL OR max_output_tokens > 0),
   CONSTRAINT ck_model_revision_bound_relation CHECK (max_output_tokens IS NULL OR context_window IS NULL OR max_output_tokens <= context_window),
   CONSTRAINT ck_model_revision_published_bound CHECK (published_at IS NULL OR (context_window IS NOT NULL AND max_output_tokens IS NOT NULL)),
-  CONSTRAINT ck_model_revision_transport CHECK (transport = 'litellm'),
+  CONSTRAINT ck_model_revision_request_model CHECK (length(request_model)>0),
+  CONSTRAINT ck_model_revision_protocol CHECK (connection_protocol = 'openai_chat_completions'),
+  CONSTRAINT ck_model_revision_connection_type CHECK (connection_type IN ('direct','litellm')),
+  CONSTRAINT ck_model_revision_base_url CHECK (length(connection_base_url)>0 AND connection_base_url !~ '[[:space:][:cntrl:]?#]' AND position(chr(92) in connection_base_url)=0 AND connection_base_url !~ '^https?://[^/]*@' AND (connection_base_url ~ '^https://[^/]+' OR connection_base_url ~ '^http://(localhost|127[.]0[.]0[.]1|\[::1\])(:[0-9]+)?(/|$)')),
+  CONSTRAINT ck_model_revision_secret_ref CHECK (length(connection_secret_handle_ref)>0),
   CONSTRAINT ck_model_revision_digest CHECK (digest ~ '^[a-f0-9]{64}$'),
   CONSTRAINT ck_model_revision_retirement CHECK (retired_at IS NULL OR published_at IS NOT NULL),
   CONSTRAINT ck_model_revision_modalities CHECK (jsonb_typeof(input_modalities) = 'array' AND jsonb_typeof(output_modalities) = 'array')
@@ -425,6 +437,29 @@ CREATE TABLE IF NOT EXISTS model_cache_generation (
   CONSTRAINT ck_model_cache_generation CHECK (generation > 0)
 );
 INSERT INTO model_cache_generation (scope) VALUES ('resolve');
+
+-- Stable provider identity; the sole technical mutation is expired deleted-reference redaction.
+CREATE FUNCTION model_provider_connection_guard() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'immutable model provider identity' USING ERRCODE = '23514';
+  END IF;
+  IF ROW(NEW.id,NEW.provider,NEW.provider_key,NEW.protocol,NEW.connection_type,NEW.base_url,NEW.created_at)
+    IS DISTINCT FROM ROW(OLD.id,OLD.provider,OLD.provider_key,OLD.protocol,OLD.connection_type,OLD.base_url,OLD.created_at) THEN
+    RAISE EXCEPTION 'immutable model provider connection' USING ERRCODE = '23514';
+  END IF;
+  IF NEW.secret_handle_ref IS DISTINCT FROM OLD.secret_handle_ref AND NOT (
+    OLD.deleted_at IS NOT NULL AND OLD.deleted_at < clock_timestamp()-INTERVAL '30 days'
+    AND NEW.deleted_at IS NOT DISTINCT FROM OLD.deleted_at
+    AND OLD.secret_handle_ref<>'' AND NEW.secret_handle_ref=''
+  ) THEN
+    RAISE EXCEPTION 'immutable model provider credential reference' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER trg_model_provider_connection_guard BEFORE UPDATE OR DELETE ON model_provider
+  FOR EACH ROW EXECUTE FUNCTION model_provider_connection_guard();
 
 -- Technical immutable-snapshot integrity guard; no orchestration or hidden writes.
 CREATE FUNCTION model_revision_immutable_guard() RETURNS TRIGGER LANGUAGE plpgsql AS $$

@@ -16,6 +16,10 @@ export const systemEnvironmentSchema = z.object({
   KOKORO_SYSTEM_BFF_SERVICE_TOKEN: z.string().min(16),
   KOKORO_SYSTEM_AGENT_SERVICE_TOKEN: z.string().min(16),
   KOKORO_SYSTEM_ADMIN_SERVICE_TOKEN: z.string().min(16),
+  KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
   KOKORO_SYSTEM_MODEL_HEALTH_MAX_AGE_MS: z.coerce
     .number()
     .int()

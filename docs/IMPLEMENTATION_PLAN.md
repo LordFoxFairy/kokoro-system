@@ -8,14 +8,16 @@
 - [x] 将已批准的 direct 默认/可选 LiteLLM 方向写入本仓三面设计，说明 provider 稳定连接、revision 快照及删除项；Agent 三面设计登记实际 usage planned 字段影响。
 - [x] 两owner设计候选独立审查通过：最小route/usage表示、历史读取表、旧attempt收束和回滚限制已明确；无剩余已证P1/P2设计阻断，不代表实现验收。
 - [x] 用户于 2026-10-16 明确确认关键连接不可变/版本切换方案：各服务独立地址/凭据引用、默认 direct/LiteLLM 可选、调用固定连接版本、历史记录不套新地址。配置与版本切换已获准；正式 Billing 许可前仍不发送模型请求。
-- [ ] System 在现 schemas/SQL/service/repository/resolve/cache/digest 的最小闭集实施，先正式契约与失败反例，再业务实现；原生成器发布 breaking artifact，保 83 业务操作/2 probes，不新增网关服务。
-- [ ] 主仓执行 System 本 owner 完整门及隔离 fresh schema/真实 HTTP/cache/并发发布；正式 source commit/artifact/version/digest 固定后才交消费者。
+- [x] System 在现 schemas/SQL/service/repository/resolve/cache/digest 的最小闭集实施，先正式契约与失败反例，再业务实现；原生成器发布 breaking artifact，保 83 业务操作/2 probes，不新增网关服务。
+- [x] 主仓执行 System 本 owner 完整门及隔离 fresh schema/真实 HTTP/cache/并发发布；正式 source commit/artifact/version/digest 固定后才交消费者。
 - [ ] Agent 正式 pin、新连接/凭据装配及协议适配器；按先行冻结的usage2/HTTP6历史读取表正规发布唯一active canonical artifact和下游reader，v1仅冻结历史读取，不扩大重构其余usage语义。
 - [ ] 本地启动器只装配正式连接；分别验证 direct 与实际可选 LiteLLM，涵盖同 path 多地址/账户、缺凭据、取消、错误、stream 和硬限，禁止自动拓扑 fallback。
 - [ ] 版本验收覆盖 repository 先验证 frozen attempt 再解析 evidence、sealed attempt 终态维护的整条历史校验链；planned/evidence/HTTP envelope 版本错配、未知版本、v1原字节读取、旧attempt未收束、v2首写后旧部署回滚必须有明确反例。
 - [ ] Billing 授权/真实使用记录完整后，执行正式收费模型旅程；此前 native 零 provider 门保留，不造测试 grant 或免费状态。
 
-**当前状态**：设计与用户确认门已通过，System4 机器/源码实施尚未开始；不再等待上述确认。2026-10-16 主方在本工作树重核 `2ce476a` clean，以Node24.20.0/pnpm12.3.4离线 frozen安装现有lock依赖（无manifest/lock变化），`pnpm typecheck`与`pnpm test:unit`基线通过（5 files/98 PASS/0 SKIP）；尚未执行integration/fresh资源门，不把单元当完整owner验收。未启动服务、执行SQL、改正常配置或发布新契约；System/Agent原main与Rootgitlink未变。下一 writer 在既有model-catalog写区先落连接Schema/owner快照反例，再正规生成契约与实现。
+**当前状态**：System4候选源码和本owner资源门已通过，非正常部署完成。Node24.20.0/pnpm12.3.4执行完整pnpm verify退出0：format/lint/type/build、83业务＋2probe正规契约/20来源/contract19 PASS、完整16files212 PASS/0 SKIP及隔离fresh33 assertions/22表完整catalog。新增3schema/3真实HTTP-PG-cache/1脱敏恢复回归，仅扩既有文件、无新测试suite或依赖。已有锁/CAS/幂等/并发/取消/cache负控随全门保留。独审P2：维护合法清引用后restore误503，经真实RED后persistence-only tombstone投影修为409/INVALID_STATE/不推进generation或receipt，原CAS与DB恢复窗口未变；其余无新增确定P0/P1。
+
+正式4.0.0/artifact与provenance原字节只由两generator产生，完整83/2 inventory不变；source commit以本次提交与Root交付记录固定，不手填未知SHA。正常System/Agent/BFF/Admin未切新source或schema，未改登录/凭据/应用数据/积分或模型发送；Agent/BFF/Admin消费接线、原有数据明确处置和正常切换仍按下列未勾项推进，未把技术快照当资金许可。第一次完整check有4个测试字符串冗余转义lint错误、后purge回归出现typedPG行缺泛型lint，均已修并重新完整verify，未删除风险或改门禁。测试oracle首轮uuid/text参数推断及测试启动URL名错误修正后才取得真实503 RED；不把oracle失败当产品复现。
 
 ---
 

@@ -1,6 +1,6 @@
-## MC-01：默认直连、LiteLLM 可选的连接设计（2026-10-15；目标，未实施）
+## MC-01：默认直连、LiteLLM 可选的连接设计（2026-10-16；候选源码与资源门已通过）
 
-用户已确定 Agent 默认直连配置地址，LiteLLM 是受支持的可选网关而非部署前置。当前源码基线为 `1460820eab10ade1ca62cd9fdf18b8ac700c0d7a`；provider/revision/resolve 的 Zod、SQL CHECK 与 Agent 消费者仍只允许 `litellm`。本节只推进设计门，不代表新机器契约、数据库或运行时已经启用。下方 R257 中计费保证的未决事项继续有效；连通模型不构成 Billing 许可。
+用户已确定 Agent 默认直连配置地址，LiteLLM 是受支持的可选网关而非部署前置。实施基线 `1460820eab10ade1ca62cd9fdf18b8ac700c0d7a` 的 only-litellm 限制已由本工作树 System4 正规契约、owner 快照与 canonical SQL 替换；provider 创建默认 direct、技术字段不可编辑，revision/resolve 返回冻结连接与唯一 request_model。Node24完整pnpm verify已通过（contract19、完整212 tests、fresh33 assertions/22表完整catalog、格式/lint/type/build），包括隔离真实HTTP/PG/cache；不是正常服务或消费者切换证明。Agent/BFF/Admin尚未消费新版本，正常已有库未执行DDL。下方 R257 中计费保证的未决事项继续有效；连接配置不构成Billing许可，模型发送保持0。
 
 ### Owner、范围与方案
 
@@ -22,6 +22,10 @@ System model-catalog 只发布技术连接与模型选择；Agent 执行请求�
 ### 失败与恢复
 
 保留 tenant policy、健康新鲜度、generation fence、bounded cache、CAS、幂等及发布/退役语义。direct 与 litellm 均保持取消、超时、输出硬限和未获授权零发送；不因网关错误自动直连、换 key、换模型或在 SDK 内隐藏重试。显式新发送/重试仍属于独立 attempt，按正式授权流程处理。
+
+### 本片实现与证据边界
+
+原module/service/repository和事务顺序不变；shared schemas/connection.schema.ts只定义具名连接结构/规范URL，revisionInput严格拒绝caller快照，revisionContentSchema组合owner内容参与摘要。provider到期脱敏仅DB旧deleted超过30天且其他技术字段不变时准许清ref；恢复入口用persistence-only tombstone投影承接合法空引用，再经过原CAS/DB时间窗稳定拒绝，不放宽active或公开响应Schema。该分支已真实maintenance→restore503 RED→409 GREEN，generation/receipt零变化。KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL默认为false，仅部署可开启规范loopback HTTP；create/publish/resolve/cache均承接，不由body控制。cache v4含部署policy，旧cache无双读fallback。
 
 ### 依赖、删除与验收
 

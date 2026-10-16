@@ -84,7 +84,7 @@ const resources = [
   {
     table: "model_provider",
     path: "model-catalog/providers",
-    sql: "INSERT INTO model_provider(id,provider,provider_key,display_name,secret_handle_ref,transport,deleted_at) VALUES($1,'restore',$2,'Restore','handle','litellm',clock_timestamp()-$3::int*INTERVAL '1 day')",
+    sql: "INSERT INTO model_provider(id,provider,provider_key,display_name,secret_handle_ref,protocol,connection_type,base_url,deleted_at) VALUES($1,'restore',$2,'Restore','handle','openai_chat_completions','litellm','https://gateway.example/v1',clock_timestamp()-$3::int*INTERVAL '1 day')",
   },
   {
     table: "model_label",
@@ -196,4 +196,53 @@ it("rechecks PG wall clock after crossing cutoff within the same transaction", a
       await running.app.get(SiteRepository).restore(tx, "restore", id);
     }),
   ).rejects.toMatchObject({ code: "INVALID_STATE" });
+});
+
+it("returns a stable conflict after actual provider retention purge, without advancing generations or receipts", async () => {
+  const id = randomUUID();
+  await db.query(
+    "INSERT INTO model_provider(id,provider,provider_key,display_name,secret_handle_ref,protocol,connection_type,base_url,deleted_at) VALUES($1,'purged',$2,'Purged','handle','openai_chat_completions','direct','https://model.example/v1',clock_timestamp()-INTERVAL '31 days')",
+    [id, id],
+  );
+  const { MaintenanceService } =
+    await import("../../src/maintenance/maintenance.service.js");
+  await running.app.get(MaintenanceService).runOnce();
+  expect(
+    (
+      await db.query<{ secret_handle_ref: string }>(
+        "SELECT secret_handle_ref FROM system_fixture.model_provider WHERE id=$1",
+        [id],
+      )
+    ).rows[0]?.secret_handle_ref,
+  ).toBe("");
+  const before = await generations();
+  const receiptCount = (
+    await db.query("SELECT count(*) FROM system_fixture.system_command_receipt")
+  ).rows;
+  const response = await fetch(
+    `${running.url}/v1/system/model-catalog/providers/${id}/restore`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "x-kokoro-service": "system-admin",
+        "x-kokoro-actor-id": "restore-actor",
+        "x-kokoro-iam-permissions": "system:write",
+        "idempotency-key": randomUUID(),
+        "if-match": '"1"',
+      },
+    },
+  );
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({
+    error: { code: "INVALID_STATE", retryable: false },
+  });
+  expect(await generations()).toEqual(before);
+  expect(
+    (
+      await db.query(
+        "SELECT count(*) FROM system_fixture.system_command_receipt",
+      )
+    ).rows,
+  ).toEqual(receiptCount);
 });

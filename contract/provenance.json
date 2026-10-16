@@ -3,17 +3,18 @@
   "version": 2,
   "openapi": {
     "file": "openapi/system.openapi.json",
-    "sha256": "94ed91655741cbba66ce80a4c41717b9179cc509cb6858534e0b78aa3e6dc059",
+    "sha256": "c7cda9d09db266cd26dc1b80dfe9bb95c3c9f6a91bdbd6c5d7de4f85295d1dc6",
     "source": "runtime-zod",
     "sourceSha256": {
-      "scripts/generate-system-openapi.ts": "4830a6c594255984261efe2907c17cd4e63df4b28d10c2ef1cf65c8e61287890",
+      "scripts/generate-system-openapi.ts": "6cbbbfa18ac42511048dc8543605da6dd2087d40fc094212ee51d1cbf43d1dae",
       "scripts/system-openapi-operations.ts": "fb46bea2ec53a09c0f397d2f38aafc77a1c6e7eaef904b11667d56fda919d9f3",
       "src/http/protocol.schema.ts": "72dbe6ee57d842b855b337d1f1603a7ddbb8c3a4bb6c4f7bf3fe62821c8160c0",
+      "src/modules/model-catalog/schemas/connection.schema.ts": "7d9efcaeb0d4d8725b50e2e2da95d37f9c64094ecbe99143aba3076df615ab03",
       "src/modules/model-catalog/schemas/definition.schema.ts": "e2063b9ae62b8e5c4ca7cccce09dd4874f818831fc8966de2cf6d015a99bef64",
       "src/modules/model-catalog/schemas/label.schema.ts": "96116b4d390e203be056f73e32a30ea93e40dc0c60966ce60579cdb949f31a6a",
-      "src/modules/model-catalog/schemas/provider.schema.ts": "f33d4aaa5bd34ff7008712ecda8f27c0c8769830652ada7df60f184e3961c57c",
-      "src/modules/model-catalog/schemas/resolve.schema.ts": "31b6d275c9187b3592ff402b3b3bef3da3b83629ffe53896050a8129310b1b74",
-      "src/modules/model-catalog/schemas/revision.schema.ts": "5d8559c0d4bac7e88a3e54d753c30e87c0f070be05dae813a401afe2b1a5274b",
+      "src/modules/model-catalog/schemas/provider.schema.ts": "ad07f69888f9cac1a263af81b70648381e19bbbd6f771c107eaa09b429099373",
+      "src/modules/model-catalog/schemas/resolve.schema.ts": "9d0786377b08c1f1e55c62f5821b85f4a6dc76a52a9ef70fea05e0243231e8b8",
+      "src/modules/model-catalog/schemas/revision.schema.ts": "ad96204bc69d4310a0a44d67539921edc57076e9724a160170cb9abdf7ccae5a",
       "src/modules/products/products.public.ts": "ccea3298f5ca5549d7882ce056e8bbb3445d23a9e1703958bd4b0a220882983e",
       "src/modules/products/schemas/application.schema.ts": "087d997360add9b9bbb2e244c1b1f9864fc6cf4ba93a7c9e8c14767288ca6a57",
       "src/modules/products/schemas/config.schema.ts": "92324f19fd4e39fdf2cef0a4a28f9e43f8b70c09fd5290e8153035a5a2aa2060",
@@ -28,23 +29,23 @@
     }
   },
   "releaseClassification": {
-    "contractVersion": "3.0.0",
+    "contractVersion": "4.0.0",
     "httpRouteGeneration": "v1",
-    "baseline": "2.0.0",
-    "classification": "execution-bound-breaking",
-    "change": "publish-model-execution-capability-bounds",
+    "baseline": "3.0.0",
+    "classification": "model-connection-breaking",
+    "change": "immutable-versioned-direct-and-optional-litellm-connections",
     "publishedCompatibilityRequired": false
   },
   "consumers": [
     {
       "consumer": "kokoro-bff",
       "surface": "runtime-manifest/model-catalog",
-      "disposition": "3.0.0-pin-required-before-runtime-consumption"
+      "disposition": "4.0.0-pin-required-before-runtime-consumption"
     },
     {
       "consumer": "kokoro-agent",
       "surface": "model-catalog/resolve",
-      "disposition": "3.0.0-pin-pending-owner-consumer-validation; prior-2.0.0-http-verification-is-historical"
+      "disposition": "4.0.0-pin-pending-owner-consumer-validation; prior-3.0.0-http-verification-is-historical"
     },
     {
       "consumer": "control-plane-service-callers",

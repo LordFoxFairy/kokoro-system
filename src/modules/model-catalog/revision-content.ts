@@ -1,11 +1,11 @@
 import type { z } from "zod";
 import type {
   revisionSchema,
-  revisionInputSchema,
+  revisionContentSchema,
 } from "./schemas/revision.schema.js";
 export function revisionContent(
   value: z.infer<typeof revisionSchema>,
-): z.infer<typeof revisionInputSchema> {
+): z.infer<typeof revisionContentSchema> {
   return {
     model_id: value.model_id,
     provider_id: value.provider_id,
@@ -15,8 +15,8 @@ export function revisionContent(
     feature_key: value.feature_key,
     input_modalities: value.input_modalities,
     output_modalities: value.output_modalities,
-    transport: value.transport,
-    gateway_model_name: value.gateway_model_name,
+    request_model: value.request_model,
+    connection: value.connection,
     context_window: value.context_window,
     max_output_tokens: value.max_output_tokens,
     priority: value.priority,

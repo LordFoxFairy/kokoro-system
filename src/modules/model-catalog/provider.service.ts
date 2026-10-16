@@ -1,3 +1,5 @@
+import { SystemConfig } from "../../config/system-config.js";
+import { SystemError } from "../../system.error.js";
 import type { z } from "zod";
 import type {
   providerInputSchema,
@@ -16,6 +18,7 @@ import { providerSchema } from "./schemas/provider.schema.js";
 @Injectable()
 export class ProviderService {
   public constructor(
+    @Inject(SystemConfig) private readonly config: SystemConfig,
     @Inject(ModelGenerationRepository)
     private readonly generation: ModelGenerationRepository,
     @Inject(DatabaseService) private readonly database: DatabaseService,
@@ -41,6 +44,14 @@ export class ProviderService {
     context: RequestContext,
     input: z.infer<typeof providerInputSchema>,
   ) {
+    if (
+      input.base_url.startsWith("http:") &&
+      !this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL
+    )
+      throw new SystemError(
+        "INVALID_ARGUMENT",
+        "HTTP loopback model connections are disabled",
+      );
     return this.receipts.run(context, input, providerSchema, async (tx) => {
       await this.generation.advance(tx);
       return this.providers.create(tx, input);

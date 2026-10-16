@@ -34,7 +34,7 @@ export class ResolveService {
     const tenant = tenantScope(context);
     for (let attempt = 0; attempt < 3; attempt++) {
       const before = await this.generations(tenant),
-        key = `model-resolve:${commandDigest({ tenant, feature: input.feature_key, label: input.label_key ?? null, ...before })}`;
+        key = `model-resolve:v4:${commandDigest({ tenant, feature: input.feature_key, label: input.label_key ?? null, allow_loopback_http: this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL, ...before })}`;
       const cached = await this.cache.get(key);
       if (cached !== null) {
         const parsed = resolveCacheSchema.safeParse(JSON.parse(cached));
@@ -89,7 +89,18 @@ export class ResolveService {
             await this.cache.remove(key);
             continue;
           }
-          if (value.kind === "route") return value.data;
+          if (value.kind === "route") {
+            if (
+              value.data.connection.base_url.startsWith("http:") &&
+              !this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL
+            )
+              throw new SystemError(
+                "MODEL_UNAVAILABLE",
+                "HTTP loopback model connections are disabled",
+                true,
+              );
+            return value.data;
+          }
           throw new SystemError(
             value.code,
             "Model route unavailable",
@@ -126,6 +137,7 @@ export class ResolveService {
           input.feature_key,
           policy.revision_id,
           this.config.values.KOKORO_SYSTEM_MODEL_HEALTH_MAX_AGE_MS,
+          this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL,
         );
         if (!candidate)
           return {

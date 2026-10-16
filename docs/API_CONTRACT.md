@@ -1,6 +1,6 @@
-## MC-01：模型连接契约设计门（2026-10-15；尚未发布）
+## MC-01：模型连接契约（2026-10-16；System4候选已生成）
 
-用户批准默认 direct、可选 LiteLLM；现 canonical artifact 仍为 3.0.0，`resolve` 仍只支持 `litellm`，本节不修改任何生成物。技术方案及生命周期以 TECHNICAL_DESIGN 同名 MC-01 为准。
+用户批准默认direct、可选LiteLLM；本工作树已由原Zod生成链生成4.0.0/OpenAPI与provenance，83业务operation/2probes及/v1不变。技术方案及生命周期以TECHNICAL_DESIGN同名MC-01为准，消费者和正常运行切换尚未完成。
 
 目标继续使用既有 provider/revision CRUD 与 `POST /v1/system/model-catalog/resolve`，caller、tenant、错误 envelope、限额和 generation fence 不变。协议与 direct/litellm 类型独立；连接由完整 API base URL、唯一请求模型标识与不透明凭据引用绑定，provider_id 作为稳定连接身份。
 
@@ -12,7 +12,7 @@ provider 技术连接字段创建后固定，技术字段变更走新 provider �
 
 发布顺序：System 运行时 Zod/SQL/HTTP 与真实资源门 → 正规 OpenAPI/provenance breaking 发布 → Agent 固定消费者/模型调用与 usage planned binding 正规发布 → Billing/BFF 等受影响消费者 pin → 隔离组合切换。旧模型使用记录、活动 Run 和缓存的处置先由对应 owner 核定，不把旧 published revision 补写成具有新连接保证；不手改 generated 文件，不保留第二执行协议。
 
-本片仅文档，无新 artifact/version/pin、SQL、服务启动或外部模型请求。未完成的收费保证来源与撤权/资金链仍按原有设计门处理。
+本片当前机器为4.0.0，consumer pin尚未升级；字段以正式runtime Zod/生成物唯一决定。provider创建使用Zod input导出，connection_type可省略并默认direct；输出类型必填，revision请求拒绝connection，response/resolve中的connection来自owner快照。URL完整规范化谓词、跨字段关系和部署HTTP许可仍由runtime校验，不能将生成pattern/长度检查当全部语义。request_model唯一执行名，旧transport/gateway_model_name无alias。完整contract19测试与资源门已通过；正常服务未启动新版本、未执行应用库DDL、模型发送0。未完成的收费保证来源与撤权/资金链仍按原设计门处理。
 
 ---
 

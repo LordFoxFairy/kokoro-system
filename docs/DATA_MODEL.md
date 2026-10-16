@@ -1,6 +1,6 @@
-## MC-01：模型连接持久事实（2026-10-15；目标，无 DDL）
+## MC-01：模型连接持久事实（2026-10-16；canonical已改、正常库未切换）
 
-基线 `1460820eab10ade1ca62cd9fdf18b8ac700c0d7a` 的唯一 schema 仍为 `database/schema.sql`。现 provider 保存 secret_handle_ref/固定 litellm transport，revision 保存 provider/gateway 两名称且没有完整连接快照。本片不更新 Schema、共享数据或 published digest。
+唯一canonical仍database/schema.sql。实施基线1460820的固定transport/gateway执行名已在候选中原子替换：provider普通列protocol/connection_type/base_url/secret_handle_ref；revision普通列connection_protocol/connection_type/connection_base_url/connection_secret_handle_ref及request_model，wire由SQL投影具名connection。无新表/FK/JSON配置袋/双写；fresh33 assertions/22表完整catalog匹配已过，正常共享库与历史published digest未改。
 
 目标只扩现 model_provider 与 model_revision，不新增通用配置表、跨 owner 表或外键。provider 是稳定技术连接身份：协议、direct/litellm 类型、规范 API base URL、opaque credential reference；实际密钥由 Agent 的部署 secret 独占。技术字段自创建固定，换连接/账户走新 provider；原显示名/优先级、软删/恢复和管理 version 继续各自含义。
 
