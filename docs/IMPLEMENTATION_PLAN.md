@@ -15,7 +15,7 @@
 - [ ] 版本验收覆盖 repository 先验证 frozen attempt 再解析 evidence、sealed attempt 终态维护的整条历史校验链；planned/evidence/HTTP envelope 版本错配、未知版本、v1原字节读取、旧attempt未收束、v2首写后旧部署回滚必须有明确反例。
 - [ ] Billing 授权/真实使用记录完整后，执行正式收费模型旅程；此前 native 零 provider 门保留，不造测试 grant 或免费状态。
 
-**当前状态**：设计与用户确认门已通过，System4 机器/源码实施尚未开始；不再等待上述确认。未安装依赖、启动服务、执行 SQL 或发布新契约；System/Agent 原 main 与 Root gitlink 未变。下一 writer 在既有 model-catalog 写区先落连接 Schema/owner 快照反例，再正规生成契约与实现；实际证据在本节后续记载，不以旧门绿替代。
+**当前状态**：设计与用户确认门已通过，System4 机器/源码实施尚未开始；不再等待上述确认。2026-10-16 主方在本工作树重核 `2ce476a` clean，以Node24.20.0/pnpm12.3.4离线 frozen安装现有lock依赖（无manifest/lock变化），`pnpm typecheck`与`pnpm test:unit`基线通过（5 files/98 PASS/0 SKIP）；尚未执行integration/fresh资源门，不把单元当完整owner验收。未启动服务、执行SQL、改正常配置或发布新契约；System/Agent原main与Rootgitlink未变。下一 writer 在既有model-catalog写区先落连接Schema/owner快照反例，再正规生成契约与实现。
 
 ---
 
