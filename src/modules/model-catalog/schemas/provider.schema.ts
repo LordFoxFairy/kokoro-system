@@ -7,9 +7,17 @@ const providerContentSchema = connectionSchema.extend({
   display_name: z.string().min(1).max(160),
   priority: z.int().min(0).max(100000),
 });
-export const providerInputSchema = providerContentSchema.extend({
-  connection_type: connectionSchema.shape.connection_type.default("direct"),
-});
+export const modelApiKeySchema = z
+  .string()
+  .min(1)
+  .max(4096)
+  .regex(/^[\x21-\x7e]+$/u);
+export const providerInputSchema = providerContentSchema
+  .omit({ secret_handle_ref: true })
+  .extend({
+    api_key: modelApiKeySchema.meta({ writeOnly: true }),
+    connection_type: connectionSchema.shape.connection_type.default("direct"),
+  });
 export const providerUpdateSchema = providerContentSchema
   .pick({ display_name: true, priority: true })
   .partial()

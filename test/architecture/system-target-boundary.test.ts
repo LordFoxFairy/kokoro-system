@@ -1,3 +1,4 @@
+import { ModelCredentialController } from "../../src/modules/model-catalog/model-credential.controller.js";
 import { ResolveController } from "../../src/modules/model-catalog/resolve.controller.js";
 import { CatalogController } from "../../src/modules/model-catalog/catalog.controller.js";
 import { HealthController } from "../../src/modules/model-catalog/health.controller.js";
@@ -39,6 +40,7 @@ describe("System target native Nest boundaries", () => {
   it("matches every native method/path/access rule against frozen owner contract", () => {
     const actual: string[] = [];
     for (const controller of [
+      ModelCredentialController,
       SitesController,
       WorkspacesController,
       ProductController,
@@ -91,7 +93,7 @@ describe("System target native Nest boundaries", () => {
         .map((operation) => `${operation.method} ${operation.path}`)
         .sort(),
     );
-    expect(new Set(actual).size).toBe(83);
+    expect(new Set(actual).size).toBe(85);
   });
   it("keeps SQL in owner repositories and forbids cross-module writes/deep imports", () => {
     const owners: Record<string, readonly string[]> = {
@@ -111,6 +113,7 @@ describe("System target native Nest boundaries", () => {
       "model-catalog": [
         "model_definition",
         "model_provider",
+        "model_provider_credential",
         "model_label",
         "model_revision",
         "model_routing_policy",

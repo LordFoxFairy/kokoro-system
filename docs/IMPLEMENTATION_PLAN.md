@@ -1,3 +1,15 @@
+## MC-02 已批准实施：密钥底座与正式配置旅程（2026-10-20）
+
+主会话唯一 writer；隔离 worktree 从 b7fe78e 起步，原正常源码／进程不动。用户已批准 System 现模块方案；不重复等待相同裁决。
+
+Owner最终完整 `pnpm verify` 通过：格式/lint/type/build/contract、19文件225 PASS/0SKIP、fresh33断言/23表完整canonical；实际测试库存前后相等，无残留自有库。最终artifact `10ff7ee82ca7405dcab473f3fd80e620aa6c4e0bc92e64111797144ce0fa4061`、provenance `ed2e312bc5bc3022111797771190e57133818af83c0bb7ad2024a615a4e033c5`。两次完整门分别保留，最终门绑定classification纠正后的生成物；前置RED、fixture修正与初次失败不计通过。消费者、正常切换、页面及整批PR未完成。
+
+- [x] 运行时契约 RED→GREEN：provider只写Key输入、受控读取与脱敏查询、窄model-management身份；沿既有generator发布新major，消费者不先猜字段。
+- [x] 同owner PG事务落provider／密文／永久创建标记／脱敏receipt，原锁与CAS；固定启动私有材料、AAD、独立HMAC，误配置／篡改／跨身份拒绝。
+- [x] 领取从当前policy实际目标比较精确provider/revision/digest并核health、URL与删除状态；软删拒读、过期擦除同事务并保创建标记；原历史digest不改。
+- [x] 现测试文件承接新真实HTTP/PG回放、并发、rollback、未知查回、越权、30日恢复／擦除及fresh完整canonical；主方完整owner门后提交精确artifact。
+- [ ] Agent删除旧文件消费，BFF／App／Admin按固定源更新完整配置表单与业务组合；正常页面验收及本批集中PR另行据实完成。
+
 ## MC-02A 当前执行：共享配置与业务组合（2026-10-20）
 
 用户已确认“共享模型配置，业务分别组合”。主会话是唯一 writer，沿当前 feature 分支；不碰对方自动化／连接器、正常数据库／进程或实际调用。

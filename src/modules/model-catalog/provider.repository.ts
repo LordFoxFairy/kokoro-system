@@ -3,7 +3,6 @@ import type {
   providerInputSchema,
   providerUpdateSchema,
 } from "./schemas/provider.schema.js";
-import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import type { TransactionContext } from "../../database/transaction-context.js";
 import { decodeRow } from "../../database/row-decoder.js";
@@ -50,12 +49,15 @@ export class ProviderRepository {
   }
   public async create(
     tx: TransactionContext,
-    input: z.infer<typeof providerInputSchema>,
+    input: Omit<z.infer<typeof providerInputSchema>, "api_key"> & {
+      secret_handle_ref: string;
+    },
+    id: string,
   ) {
     const result = await tx.query(
       `INSERT INTO model_provider(id,provider,provider_key,display_name,secret_handle_ref,protocol,connection_type,base_url,priority) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ${columns}`,
       [
-        randomUUID(),
+        id,
         input.provider,
         input.provider_key,
         input.display_name,

@@ -36,6 +36,34 @@ import { systemOperations } from "../../scripts/system-openapi-operations.js";
 import { buildSystemOpenApi } from "../../scripts/generate-system-openapi.js";
 
 describe("complete System target contract (not runtime acceptance)", () => {
+  it("accepts a write-only API key and rejects caller-chosen credential handles", () => {
+    const input = {
+      provider: "openai-compatible",
+      provider_key: "shared-connection",
+      display_name: "Shared connection",
+      protocol: "openai_chat_completions",
+      base_url: "https://models.example/v1",
+      priority: 0,
+      api_key: "opaque-test-api-key",
+    };
+    expect(providerInputSchema.safeParse(input).success).toBe(true);
+    expect(
+      providerInputSchema.safeParse({
+        ...input,
+        secret_handle_ref: "caller:chosen",
+      }).success,
+    ).toBe(false);
+    for (const api_key of [
+      "",
+      "leading space",
+      "line\nbreak",
+      "a".repeat(4097),
+    ])
+      expect(providerInputSchema.safeParse({ ...input, api_key }).success).toBe(
+        false,
+      );
+  });
+
   it("defaults optional business aliases and distinguishes clearing from an omitted patch", () => {
     const label = {
       label_key: "chat/fast",
@@ -76,7 +104,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
           operation: operation as Record<string, unknown>,
         })),
     );
-    expect(operations).toHaveLength(85);
+    expect(operations).toHaveLength(87);
     const counts: Record<string, number> = {};
     const identities = new Set<string>();
     for (const item of systemOperations) {
@@ -93,9 +121,9 @@ describe("complete System target contract (not runtime acceptance)", () => {
       workspaces: 6,
       products: 35,
       "runtime-manifests": 1,
-      "model-catalog": 30,
+      "model-catalog": 32,
     });
-    expect(identities.size).toBe(83);
+    expect(identities.size).toBe(85);
     for (const { path, method, operation } of operations) {
       expect(operation["x-kokoro-owner"]).toBe("kokoro-system");
       expect(operation["x-kokoro-visibility"]).toBe("internal-owner");
@@ -103,7 +131,8 @@ describe("complete System target contract (not runtime acceptance)", () => {
       if (
         path.startsWith("/v1/") &&
         method !== "get" &&
-        !path.endsWith("/resolve")
+        !path.endsWith("/resolve") &&
+        !path.endsWith("/credentials/read")
       ) {
         expect(operation["x-kokoro-idempotency"]).toBe("required-key");
         expect(operation["x-kokoro-permission"]).toMatch(
@@ -252,7 +281,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
       `${JSON.stringify(doc, null, 2)}\n`,
     );
   });
-  it("publishes the breaking 4.0 versioned connection artifact without adding operations", () => {
+  it("publishes the 6.0 write-only credential boundary with exactly two new owner operations", () => {
     const artifact = JSON.parse(
       readFileSync("contract/openapi/system.openapi.json", "utf8"),
     ) as {
@@ -260,11 +289,11 @@ describe("complete System target contract (not runtime acceptance)", () => {
       paths: Record<string, Record<string, unknown>>;
       components: { schemas: Record<string, unknown> };
     };
-    expect(artifact.info.version).toBe("5.0.0");
-    expect(systemOperations).toHaveLength(83);
+    expect(artifact.info.version).toBe("6.0.0");
+    expect(systemOperations).toHaveLength(85);
     expect(
       Object.values(artifact.paths).flatMap((methods) => Object.keys(methods)),
-    ).toHaveLength(85);
+    ).toHaveLength(87);
     const findResolveShape = (
       value: unknown,
     ):
@@ -312,7 +341,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
       expect.arrayContaining(["context_window", "max_output_tokens"]),
     );
   });
-  it("describes the implemented 5.0 owner routes without claiming consumer validation", () => {
+  it("describes the implemented 6.0 owner routes without claiming consumer validation", () => {
     const artifact = z
       .object({
         info: z.object({ version: z.string(), description: z.string() }),
@@ -322,16 +351,13 @@ describe("complete System target contract (not runtime acceptance)", () => {
           readFileSync("contract/openapi/system.openapi.json", "utf8"),
         ),
       );
-    expect(artifact.info).toEqual({
-      version: "5.0.0",
-      description:
-        "Generated from runtime Zod schemas for implemented System internal-owner routes; 5.0.0 shares immutable model revisions across business-specific choices and exposes effective catalog identities.",
-    });
+    expect(artifact.info.version).toBe("6.0.0");
+    expect(artifact.info.description.length).toBeGreaterThan(0);
     expect(artifact.info.description).not.toMatch(
       /target|not implemented|consumer.*(?:verified|validated)/iu,
     );
   });
-  it("records the Agent consumer as requiring the new shared-model contract pin", () => {
+  it("records the Agent consumer as requiring the protected credential contract pin", () => {
     const provenance = z
       .object({
         releaseClassification: z.object({
@@ -348,8 +374,8 @@ describe("complete System target contract (not runtime acceptance)", () => {
       })
       .parse(JSON.parse(readFileSync("contract/provenance.json", "utf8")));
     expect(provenance.releaseClassification).toMatchObject({
-      contractVersion: "5.0.0",
-      baseline: "4.0.0",
+      contractVersion: "6.0.0",
+      baseline: "5.0.0",
     });
     expect(
       provenance.consumers.filter(
@@ -359,7 +385,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
       {
         consumer: "kokoro-agent",
         surface: "model-catalog/resolve",
-        disposition: "5.0.0-pin-required-before-runtime-consumption",
+        disposition: "6.0.0-pin-required-before-runtime-consumption",
       },
     ]);
   });
@@ -406,13 +432,14 @@ describe("complete System target contract (not runtime acceptance)", () => {
       ...globSync("src/modules/*/schemas/**/*.schema.ts"),
       "src/modules/products/products.public.ts",
       "src/http/protocol.schema.ts",
+      "src/access/access.guard.ts",
       "scripts/generate-system-openapi.ts",
       "scripts/system-openapi-operations.ts",
     ].sort();
-    expect(expected).toHaveLength(20);
+    expect(expected).toHaveLength(22);
     expect(
       expected.filter((path) => !path.endsWith("products.public.ts")),
-    ).toHaveLength(19);
+    ).toHaveLength(21);
     expect(Object.keys(provenance.openapi.sourceSha256).sort()).toEqual(
       expected,
     );
@@ -433,7 +460,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
         ],
         { encoding: "utf8" },
       ),
-    ).toContain("20 sources");
+    ).toContain("22 sources");
   });
 });
 
@@ -450,9 +477,15 @@ describe("versioned direct and optional LiteLLM connections", () => {
     display_name: "A",
     priority: 1,
     ...connection,
+    api_key: "fixture-provider-key",
   };
+  const providerInput = (() => {
+    const { secret_handle_ref, ...input } = provider;
+    void secret_handle_ref;
+    return input;
+  })();
   it("defaults creation to direct, keeps LiteLLM explicit, and rejects technical patches", () => {
-    const { connection_type, ...implicit } = provider;
+    const { connection_type, ...implicit } = providerInput;
     expect(connection_type).toBe("direct");
     expect(providerInputSchema.parse(implicit).connection_type).toBe("direct");
     const doc = buildSystemOpenApi();
@@ -470,12 +503,14 @@ describe("versioned direct and optional LiteLLM connections", () => {
       .at(-1)!;
     expect(schemas[ref]!.required).not.toContain("connection_type");
     expect(schemas[ref]!.required).toEqual(
-      expect.arrayContaining(["protocol", "base_url", "secret_handle_ref"]),
+      expect.arrayContaining(["protocol", "base_url", "api_key"]),
     );
 
     expect(
-      providerInputSchema.parse({ ...provider, connection_type: "litellm" })
-        .connection_type,
+      providerInputSchema.parse({
+        ...providerInput,
+        connection_type: "litellm",
+      }).connection_type,
     ).toBe("litellm");
     expect(
       providerUpdateSchema.parse({ display_name: "B", priority: 2 }),

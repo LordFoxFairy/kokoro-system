@@ -338,6 +338,27 @@ CREATE TABLE IF NOT EXISTS model_provider (
 );
 CREATE INDEX IF NOT EXISTS ix_model_provider_page ON model_provider (created_at DESC, id DESC) WHERE deleted_at IS NULL;
 
+-- One credential and permanent sensitive-creation marker per immutable provider.
+CREATE TABLE IF NOT EXISTS model_provider_credential (
+  provider_id UUID PRIMARY KEY,
+  secret_handle_ref VARCHAR(255) NOT NULL UNIQUE,
+  creation_key VARCHAR(128) NOT NULL UNIQUE,
+  creation_actor_id VARCHAR(160) NOT NULL,
+  creation_tenant_id VARCHAR(160) NOT NULL,
+  encryption_format TEXT NOT NULL DEFAULT 'aes-256-gcm-v1',
+  nonce BYTEA,
+  auth_tag BYTEA,
+  ciphertext BYTEA,
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  erased_at TIMESTAMPTZ(3),
+  CONSTRAINT ck_model_credential_format CHECK (encryption_format='aes-256-gcm-v1'),
+  CONSTRAINT ck_model_credential_identity CHECK (length(secret_handle_ref)>0 AND length(creation_key)>0 AND length(creation_actor_id)>0 AND length(creation_tenant_id)>0),
+  CONSTRAINT ck_model_credential_material CHECK (
+    (erased_at IS NULL AND nonce IS NOT NULL AND octet_length(nonce)=12 AND auth_tag IS NOT NULL AND octet_length(auth_tag)=16 AND ciphertext IS NOT NULL AND octet_length(ciphertext) BETWEEN 1 AND 4096)
+    OR (erased_at IS NOT NULL AND nonce IS NULL AND auth_tag IS NULL AND ciphertext IS NULL)
+  )
+);
+
 CREATE TABLE IF NOT EXISTS model_label (
   id UUID PRIMARY KEY,
   label_key VARCHAR(128) NOT NULL,

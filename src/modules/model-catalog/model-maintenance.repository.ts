@@ -27,11 +27,16 @@ export class ModelMaintenanceRepository {
     const rows = await tx.query<{ id: string }>(
       `SELECT id FROM model_provider WHERE deleted_at<CURRENT_TIMESTAMP-INTERVAL '30 days' AND secret_handle_ref<>'' ORDER BY id LIMIT 1000 FOR UPDATE SKIP LOCKED`,
     );
-    for (const row of rows.rows)
+    for (const row of rows.rows) {
+      await tx.query(
+        "UPDATE model_provider_credential SET nonce=NULL,auth_tag=NULL,ciphertext=NULL,erased_at=clock_timestamp() WHERE provider_id=$1 AND erased_at IS NULL",
+        [row.id],
+      );
       await tx.query(
         "UPDATE model_provider SET secret_handle_ref='' WHERE id=$1",
         [row.id],
       );
+    }
     return rows.rows.length;
   }
 }

@@ -1,3 +1,9 @@
+## MC-02 实施授权已确认（2026-10-20）
+
+用户已明确选择“采用 System 现有模块方案”：现 model-catalog 加密保存 API Key，后台只写不回显；Agent 按当前业务路由与精确修订受控领取，删除旧手工密钥文件读取，不新增服务。下方 MC-02 密钥候选的 owner／隔离边界据此进入实施；历史“待确认”文字不覆盖此次确认，实际完成仍以源码／正式生成物与验收为准。模型请求、工具执行和扣费继续暂停；只在隔离 worktree／自有测试资源验收，不切换正常服务或写入正常密钥。
+
+首个正式实现改 provider 创建输入为 api_key，由服务端生成 opaque ref；原非秘密 provider 投影保留。敏感创建将完整请求（含可信发起租户）经独立 HMAC 保护后交原 receipt 同事务处理，永久创建标记只限该用例，不另建通用命令框架。新增脱敏创建结果 GET 与 Agent-only 凭据读取 POST（只读事务、no-store、无重试）；全局资源 scope 不变，另保可信 actor tenant。独立 model-management 身份仅准模型目录／业务引用写和业务定义读取，拒绝密钥领取与其他 System 模块。私有材料固定启动加载，AES-256-GCM／独立HMAC；丢失或不匹配时敏感操作失败而普通目录仍可读。
+
 ## MC-02A 业务模型配置：已确认实施边界（2026-10-20）
 
 共享 revision 不再输入／返回 feature_key；resolve 保留受权业务 feature_key。label 管理的 display_name 改为 nullable 可选别名：创建缺失默认 null，更新缺失不改、null 清空；普通业务 catalog 的 display_name 仍为必填有效名称，由别名或精确目标 request_model 得到。

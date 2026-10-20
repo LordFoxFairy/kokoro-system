@@ -1,3 +1,11 @@
+## 2026-10-20 MC-02：System6 密钥底座（隔离交付，未激活）
+
+已按用户批准在现 model-catalog 内落地只写 API Key 创建、AES-GCM密文/AAD、独立HMAC收据、永久创建标记及脱敏查回；原provider/receipt/generation同PG事务。Agent-only领取从当前tenant policy选实际route后比较精确provider/revision/digest、handle及health，provider锁等待后取新快照；软删拒读，30日过期同事务擦除密文并保创建身份。固定私有启动材料、窄model-management身份，无新服务/依赖或全局管理提权。
+
+最终正规System6 artifact `10ff7ee82ca7405dcab473f3fd80e620aa6c4e0bc92e64111797144ce0fa4061`，provenance `ed2e312bc5bc3022111797771190e57133818af83c0bb7ad2024a615a4e033c5`，22来源、85业务+2probe。完整 `pnpm verify` 退出0：格式/lint/types/build/contract、225 PASS/0SKIP、fresh33断言/23表完整canonical。真实HTTP/PG含同键并发、原主体查回、receipt过期标记、注入失败全事务回滚、密文篡改、错版本/路由、health过期、真实锁等待后撤权与恢复/擦除；实际测试库库存核等、无残留。早期RED及fixture错误保留为诊断，不冒通过。
+
+正常源码/配置/库/进程不动；当前只证owner组件，不证Agent/BFF/App/Admin完整配置、正常页面或整链。模型、工具执行及扣费继续暂停，本批完整需求收尾前不push/merge。消费者下一步删除旧文件消费，固定新source/artifact，再完成表单和隔离链。
+
 ## 2026-10-20 MC-02A：共享模型与业务组合已通过本 owner 验证
 
 用户批准同一已发布模型配置供多业务复用。revision 去 feature 耦合；label/routing 承业务引用与租户默认／覆盖；别名可省略或 null，未设按精确 request_model 显示原名，PATCH 缺失保留；catalog 返回实际有效修订／真实 provider 身份，空绑定不扫描其他模型。无新表、服务或依赖，原发布／CAS／幂等／health/cache与全局引用保护保留。

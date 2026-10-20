@@ -5,8 +5,10 @@ import { ModelGenerationRepository } from "../../src/modules/model-catalog/model
 import { CacheService } from "../../src/cache/cache.service.js";
 import { commandDigest } from "../../src/database/command-digest.js";
 import { systemOperations } from "../../scripts/system-openapi-operations.js";
-import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { randomUUID, randomBytes } from "node:crypto";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { NestFactory } from "@nestjs/core";
@@ -24,6 +26,16 @@ const admin = new Client({ connectionString: adminUrl });
 const databaseUrl = new URL(adminUrl);
 databaseUrl.pathname = `/${databaseName}`;
 databaseUrl.searchParams.set("schema", "system_fixture");
+const credentialDirectory = mkdtempSync(join(tmpdir(), "kokoro-model-target-"));
+const credentialMaterial = join(credentialDirectory, "keys.json");
+writeFileSync(
+  credentialMaterial,
+  JSON.stringify({
+    encryption_key: randomBytes(32).toString("base64"),
+    idempotency_hmac_key: randomBytes(32).toString("base64"),
+  }),
+  { mode: 0o600 },
+);
 let app: NestExpressApplication;
 let base: string;
 const token = "system-test-bff-credential";
@@ -89,6 +101,7 @@ beforeAll(async () => {
       KOKORO_SYSTEM_BFF_SERVICE_TOKEN: token,
       KOKORO_SYSTEM_AGENT_SERVICE_TOKEN: "system-test-agent-credential",
       KOKORO_SYSTEM_ADMIN_SERVICE_TOKEN: "system-test-admin-credential",
+      KOKORO_SYSTEM_MODEL_KEY_MATERIAL_FILE: credentialMaterial,
     }),
     { logger: false },
   );
@@ -100,6 +113,7 @@ afterAll(async () => {
   if (app) await app.close();
   await admin.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
   await admin.end();
+  rmSync(credentialDirectory, { recursive: true, force: true });
 });
 
 const adminHeaders = {
@@ -115,7 +129,7 @@ async function seedRoute(
   connection = {
     connection_type: "litellm",
     base_url: "https://gateway.example/v1",
-    secret_handle_ref: "vault:route",
+    api_key: "fixture-key-route",
   },
   target = base,
 ) {
@@ -232,6 +246,12 @@ async function seedRoute(
     pid,
     rid,
     lid,
+    connection: {
+      protocol: provider.json.data?.protocol,
+      connection_type: provider.json.data?.connection_type,
+      base_url: provider.json.data?.base_url,
+      secret_handle_ref: provider.json.data?.secret_handle_ref,
+    },
     modelId: String(model.json.data?.id),
     featureId: String(f.json.data?.id),
   };
@@ -521,7 +541,7 @@ describe("real Nest Model catalog", () => {
         provider: "litellm",
         provider_key: "primary",
         display_name: "Primary",
-        secret_handle_ref: "vault:primary",
+        api_key: "fixture-key-primary",
         protocol: "openai_chat_completions",
         connection_type: "litellm",
         base_url: "https://gateway.example/v1",
@@ -580,7 +600,7 @@ describe("real Nest Model catalog", () => {
         provider: "litellm",
         provider_key: "revision-provider",
         display_name: "Provider",
-        secret_handle_ref: "vault:revision",
+        api_key: "fixture-key-revision",
         protocol: "openai_chat_completions",
         connection_type: "litellm",
         base_url: "https://gateway.example/v1",
@@ -724,7 +744,7 @@ describe("real Nest Model catalog", () => {
         provider: "litellm",
         provider_key: `bound-${suffix}`,
         display_name: "Execution bound",
-        secret_handle_ref: `vault:bound-${suffix}`,
+        api_key: `fixture-key-bound-${suffix}`,
         protocol: "openai_chat_completions",
         connection_type: "litellm",
         base_url: "https://gateway.example/v1",
@@ -952,7 +972,7 @@ describe("real Nest Model catalog", () => {
           provider: "litellm",
           provider_key: "routing-provider",
           display_name: "Provider",
-          secret_handle_ref: "vault:routing",
+          api_key: "fixture-key-routing",
           protocol: "openai_chat_completions",
           connection_type: "litellm",
           base_url: "https://gateway.example/v1",
@@ -1411,7 +1431,7 @@ describe("real Nest Model catalog", () => {
     const operations = systemOperations.filter(
       (op) => op.module === "model-catalog",
     );
-    expect(operations).toHaveLength(30);
+    expect(operations).toHaveLength(32);
     for (const op of operations) {
       const path = op.path
         .replace("/v1/system/", "")
@@ -1811,7 +1831,7 @@ describe("real Nest Model catalog", () => {
       provider: "litellm",
       provider_key: randomUUID(),
       display_name: "Lifecycle",
-      secret_handle_ref: "vault:lifecycle",
+      api_key: "fixture-key-lifecycle",
       protocol: "openai_chat_completions",
       connection_type: "litellm",
       base_url: "https://gateway.example/v1",
@@ -1883,12 +1903,12 @@ describe("real immutable model connection lifecycle", () => {
       {
         connection_type: "direct",
         base_url: "https://vendor.example/custom/v1",
-        secret_handle_ref: "vault:vendor-account",
+        api_key: "fixture-key-vendor",
       },
       {
         connection_type: "litellm",
         base_url: "https://gateway.example/custom/v1",
-        secret_handle_ref: "vault:gateway-account",
+        api_key: "fixture-key-gateway",
       },
     ]) {
       const route = await seedRoute(connection);
@@ -1900,10 +1920,7 @@ describe("real immutable model connection lifecycle", () => {
           adminHeaders,
         )
       ).json.data!;
-      expect(initial.connection).toEqual({
-        protocol: "openai_chat_completions",
-        ...connection,
-      });
+      expect(initial.connection).toEqual(route.connection);
       expect(initial.digest).toBe(
         commandDigest(revisionContent(revisionSchema.parse(initial))),
       );
@@ -2076,7 +2093,7 @@ describe("real immutable model connection lifecycle", () => {
         display_name: "New endpoint",
         protocol: "openai_chat_completions",
         base_url: "https://new.example/v1",
-        secret_handle_ref: "vault:new-account",
+        api_key: "fixture-key-new-account",
         priority: 1,
       },
       adminHeaders,
@@ -2094,7 +2111,7 @@ describe("real immutable model connection lifecycle", () => {
       protocol: "openai_chat_completions",
       connection_type: "direct",
       base_url: "https://new.example/v1",
-      secret_handle_ref: "vault:new-account",
+      secret_handle_ref: next.json.data?.secret_handle_ref,
     });
     expect(updated.json.data?.digest).toBe(
       commandDigest(revisionContent(revisionSchema.parse(updated.json.data))),
@@ -2124,7 +2141,7 @@ describe("real immutable model connection lifecycle", () => {
     const connection = {
       connection_type: "direct",
       base_url: "http://127.0.0.1:1234/custom/v1",
-      secret_handle_ref: "vault:loopback",
+      api_key: "fixture-key-loopback",
     };
     expect(
       (
@@ -2153,6 +2170,7 @@ describe("real immutable model connection lifecycle", () => {
         KOKORO_SYSTEM_BFF_SERVICE_TOKEN: token,
         KOKORO_SYSTEM_AGENT_SERVICE_TOKEN: "system-test-agent-credential",
         KOKORO_SYSTEM_ADMIN_SERVICE_TOKEN: "system-test-admin-credential",
+        KOKORO_SYSTEM_MODEL_KEY_MATERIAL_FILE: credentialMaterial,
       }),
       { logger: false },
     );
@@ -2184,7 +2202,7 @@ describe("real immutable model connection lifecycle", () => {
             target,
           )
         ).json.data?.connection,
-      ).toEqual({ protocol: "openai_chat_completions", ...connection });
+      ).toEqual(route.connection);
       const denied = await request(
         "model-catalog/resolve",
         "POST",

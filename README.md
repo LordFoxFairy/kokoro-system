@@ -32,3 +32,13 @@ pnpm verify
 镜像 RC：`docker build -t kokoro-system:rc .`，随后 `SYSTEM_SMOKE_IMAGE=kokoro-system:rc pnpm exec tsx scripts/system-runtime-smoke.ts --image`（Linux host network，独立数据库/namespace）。本机 Docker daemon 当前异常，RC 实跑仍未验；不把 CI 配置当执行结果。
 
 代码地图 [INDEX](INDEX.md)，运行维护 [RUNBOOK](docs/RUNBOOK.md)，唯一完整任务表 [IMPLEMENTATION_PLAN](docs/IMPLEMENTATION_PLAN.md)。
+
+## 模型密钥配置（System6，消费者仍需配对）
+
+模型连接创建输入为只写 `api_key`，服务端生成引用；不再让操作者手填 `secret_handle_ref`。统一提供方可供多个模型与业务引用。后台／普通目录不返回 Key，Agent 专用领取只在当前 tenant／业务路由和精确 provider／revision／digest 一致时成功；发布或保存不发送模型探测／推理请求。
+
+System部署私有 `KOKORO_SYSTEM_MODEL_KEY_MATERIAL_FILE` 是加密材料，不包含供应商 API Key。文件要求绝对路径、当前进程UID、单硬链接、非符号链接及0400/0600；最大4096字节，UTF-8 JSON只含 `encryption_key`、`idempotency_hmac_key`，均为不同的32字节规范Base64。进程只固定加载一次，不热换；配置缺失／损坏只阻敏感操作，非秘密目录仍可读。错误KEK在旧密文解密时拒绝，错误HMAC在原命令比较时拒绝，不自动重建、改写历史或回退Agent旧文件；不提供在线轮换。部署更换材料须另做停写、备份及受控重加密，勿直接替换现有材料。
+
+专用 `model-management` 身份仅开放本模型目录／业务引用管理闭集和业务定义读取；它既无其他System域权限，也无明文领取权限。正式BFF仍须验证当前平台管理员，独立配置该机器凭据后再使用；已有 `web-bff` 身份不因此升级为global管理员。
+
+创建结果未知后按原命令和主体查脱敏结果，404仅表示尚未确认，不证明已取消。Key不进浏览器持久恢复记录。原七日回执保原响应重放，永久创建标记阻止其过期后重新创建第二连接；过期后只能查原关联提供方当前状态。更换Key需新连接／修订。软删立即阻止新的领取；30日恢复窗口不被retention hold延长，维护同事务清密文及handle、保留非秘密查回标记。正常服务与后继Agent／BFF／后台尚未切此版本时，不把本仓隔离验收称作完整产品已上线。

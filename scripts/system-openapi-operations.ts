@@ -1,3 +1,4 @@
+import * as credentials from "../src/modules/model-catalog/schemas/credential.schema.js";
 import type { z } from "zod";
 import {
   pageQuerySchema as pageQuery,
@@ -453,6 +454,30 @@ add(
   resolve.resolveSchema,
   {
     body: resolve.resolveInputSchema,
+    mutation: false,
+    permission: "service-context",
+  },
+);
+add(
+  "model-catalog/provider-creations",
+  "get",
+  "getModelProviderCreation",
+  "model-catalog",
+  credentials.providerCreationSchema,
+  {
+    query: credentials.providerCreationQuerySchema,
+    scope: "global",
+    permission: "system:write",
+  },
+);
+add(
+  "model-catalog/credentials/read",
+  "post",
+  "readModelCredential",
+  "model-catalog",
+  credentials.credentialReadSchema,
+  {
+    body: credentials.credentialReadInputSchema,
     mutation: false,
     permission: "service-context",
   },

@@ -83,7 +83,7 @@ try {
   const tables = await database.query<{ count: string }>(
     "SELECT COUNT(*)::text AS count FROM pg_tables WHERE schemaname = 'system_fresh'",
   );
-  if (tables.rows[0]?.count !== "22")
+  if (tables.rows[0]?.count !== "23")
     throw new Error(`Unexpected target table count: ${tables.rows[0]?.count}`);
   assertions++;
   // Root-owned reference DDL is confined to this isolated fresh fixture.
@@ -267,7 +267,7 @@ try {
     "23514",
   );
   console.log(
-    `Fresh PostgreSQL schema verified: ${assertions} assertions, 22 tables; complete canonical catalog match; isolated ${databaseName}; business HTTP not tested`,
+    `Fresh PostgreSQL schema verified: ${assertions} assertions, 23 tables; complete canonical catalog match; isolated ${databaseName}; business HTTP not tested`,
   );
 } catch (error) {
   hasFailure = true;

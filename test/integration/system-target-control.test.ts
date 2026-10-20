@@ -326,6 +326,7 @@ describe("real Nest Sites/Workspace control", () => {
     const key = randomUUID();
     const context: RequestContext = {
       tenantId: null,
+      actorTenantId: null,
       actorId: "admin",
       service: "system-admin",
       permissions: ["system:write"],

@@ -11,6 +11,25 @@ import { requestIdSchema } from "../http/protocol.schema.js";
 import { ACCESS_RULE } from "./access.decorator.js";
 import type { AccessRule } from "./access.decorator.js";
 import type { OwnerRequest, RequestContext } from "./request-context.js";
+export const MODEL_MANAGEMENT_OPERATIONS: ReadonlySet<string> = new Set([
+  "listFeature",
+  "getFeature",
+  "getModelProviderCreation",
+  ...["ModelProvider", "ModelDefinition", "ModelLabel"].flatMap((name) =>
+    ["list", "get", "create", "update", "delete", "restore"].map(
+      (action) => action + name,
+    ),
+  ),
+  "listModelRevision",
+  "getModelRevision",
+  "createModelRevision",
+  "updateModelRevisionDraft",
+  "publishModelRevision",
+  "retireModelRevision",
+  "listRoutingPolicy",
+  "putRoutingPolicy",
+  "deleteRoutingPolicy",
+]);
 function header(request: OwnerRequest, name: string): string | undefined {
   const value = request.headers[name];
   if (Array.isArray(value))
@@ -46,13 +65,15 @@ export class AccessGuard implements CanActivate {
       throw new SystemError("INVALID_ARGUMENT", "Invalid x-request-id");
     const service = header(request, "x-kokoro-service");
     const secret =
-      service === "web-bff"
-        ? this.config.values.KOKORO_SYSTEM_BFF_SERVICE_TOKEN
-        : service === "kokoro-agent"
-          ? this.config.values.KOKORO_SYSTEM_AGENT_SERVICE_TOKEN
-          : service === "system-admin"
-            ? this.config.values.KOKORO_SYSTEM_ADMIN_SERVICE_TOKEN
-            : null;
+      service === "model-management"
+        ? this.config.values.KOKORO_SYSTEM_MODEL_MANAGEMENT_SERVICE_TOKEN
+        : service === "web-bff"
+          ? this.config.values.KOKORO_SYSTEM_BFF_SERVICE_TOKEN
+          : service === "kokoro-agent"
+            ? this.config.values.KOKORO_SYSTEM_AGENT_SERVICE_TOKEN
+            : service === "system-admin"
+              ? this.config.values.KOKORO_SYSTEM_ADMIN_SERVICE_TOKEN
+              : null;
     if (
       !secret ||
       !(
@@ -69,9 +90,18 @@ export class AccessGuard implements CanActivate {
     const caller = service as RequestContext["service"];
     if (
       caller === "kokoro-agent" &&
-      !["getModelCatalog", "resolveModel"].includes(rule.operation)
+      !["getModelCatalog", "resolveModel", "readModelCredential"].includes(
+        rule.operation,
+      )
     )
       throw new SystemError("FORBIDDEN", "Agent operation denied");
+    if (rule.operation === "readModelCredential" && caller !== "kokoro-agent")
+      throw new SystemError("FORBIDDEN", "Agent caller required");
+    if (
+      caller === "model-management" &&
+      !MODEL_MANAGEMENT_OPERATIONS.has(rule.operation)
+    )
+      throw new SystemError("FORBIDDEN", "Model management operation denied");
     let scope = rule.scope ?? "tenant";
     if (scope === "conditional") {
       if (request.method === "POST")
@@ -93,7 +123,11 @@ export class AccessGuard implements CanActivate {
         scope = selected === "global" ? "global" : "tenant";
       }
     }
-    if (scope === "global" && caller !== "system-admin")
+    if (
+      scope === "global" &&
+      caller !== "system-admin" &&
+      caller !== "model-management"
+    )
       throw new SystemError("FORBIDDEN", "Global operator required");
     const tenantId =
       scope === "global" ? null : header(request, "x-kokoro-tenant-id");
@@ -154,9 +188,13 @@ export class AccessGuard implements CanActivate {
         "INVALID_ARGUMENT",
         "Actor and Idempotency-Key required",
       );
+    const actorTenantId = header(request, "x-kokoro-tenant-id") ?? null;
+    if (actorTenantId !== null && actorTenantId.length > 160)
+      throw new SystemError("INVALID_ARGUMENT", "Invalid actor tenant");
     request.ownerContext = {
       tenantId: tenantId ?? null,
       actorId,
+      actorTenantId,
       service: caller,
       permissions,
       scope,

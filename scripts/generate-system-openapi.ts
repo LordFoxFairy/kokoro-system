@@ -1,3 +1,4 @@
+import { MODEL_MANAGEMENT_OPERATIONS } from "../src/access/access.guard.js";
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -81,18 +82,42 @@ export function buildSystemOpenApi(): Readonly<{
     const parameters: JsonObject[] = [
       parameter("x-kokoro-service", "header", true, {
         type: "string",
-        enum: ["web-bff", "kokoro-agent", "system-admin"],
+        enum:
+          operation.operationId === "readModelCredential"
+            ? ["kokoro-agent"]
+            : [
+                "web-bff",
+                "kokoro-agent",
+                "system-admin",
+                ...(MODEL_MANAGEMENT_OPERATIONS.has(operation.operationId)
+                  ? ["model-management"]
+                  : []),
+              ],
       }),
-      parameter("x-kokoro-tenant-id", "header", operation.scope === "tenant", {
-        type: "string",
-        minLength: 1,
-        maxLength: 160,
-      }),
-      parameter("x-kokoro-actor-id", "header", operation.mutation, {
-        type: "string",
-        minLength: 1,
-        maxLength: 160,
-      }),
+      parameter(
+        "x-kokoro-tenant-id",
+        "header",
+        operation.scope === "tenant" ||
+          ["createModelProvider", "getModelProviderCreation"].includes(
+            operation.operationId,
+          ),
+        {
+          type: "string",
+          minLength: 1,
+          maxLength: 160,
+        },
+      ),
+      parameter(
+        "x-kokoro-actor-id",
+        "header",
+        operation.mutation ||
+          operation.operationId === "getModelProviderCreation",
+        {
+          type: "string",
+          minLength: 1,
+          maxLength: 160,
+        },
+      ),
       parameter(
         "x-kokoro-iam-permissions",
         "header",
@@ -157,6 +182,20 @@ export function buildSystemOpenApi(): Readonly<{
     const responses: JsonObject = {
       [String(operation.status)]: response(operation.response, schemas),
     };
+    if (
+      ["getModelProviderCreation", "readModelCredential"].includes(
+        operation.operationId,
+      )
+    ) {
+      const success = responses[String(operation.status)] as JsonObject;
+      success.headers = {
+        ...(success.headers as JsonObject),
+        "Cache-Control": {
+          required: true,
+          schema: { type: "string", const: "no-store" },
+        },
+      };
+    }
     const errorStatuses = [400, 403, 404, 503];
     if (operation.mutation) errorStatuses.push(409);
     if (operation.cas !== "none") errorStatuses.push(428);
@@ -215,10 +254,10 @@ export function buildSystemOpenApi(): Readonly<{
     servers: [{ url: "/", description: "Same internal-owner origin" }],
     info: {
       title: "Kokoro System internal owner",
-      version: "5.0.0",
-      "x-kokoro-release-classification": "business-model-composition-breaking",
+      version: "6.0.0",
+      "x-kokoro-release-classification": "protected-model-credentials-breaking",
       description:
-        "Generated from runtime Zod schemas for implemented System internal-owner routes; 5.0.0 shares immutable model revisions across business-specific choices and exposes effective catalog identities.",
+        "Generated from runtime Zod schemas for implemented System internal-owner routes; 6.0.0 adds write-only encrypted model credentials, Agent-only exact current-route retrieval and narrowly scoped model management.",
     },
     paths,
     components: {
