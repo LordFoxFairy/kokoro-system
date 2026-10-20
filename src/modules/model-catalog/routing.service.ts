@@ -53,14 +53,10 @@ export class RoutingService {
           input.model_revision_id,
           true,
         );
-        if (
-          !revision.published_at ||
-          revision.retired_at ||
-          revision.feature_key !== label.feature_key
-        )
+        if (!revision.published_at || revision.retired_at)
           throw new SystemError(
             "INVALID_STATE",
-            "Route revision must be published with matching feature",
+            "Route revision must be published and active",
           );
       }
       const prior = await this.routing.find(tx, tenant, labelId);

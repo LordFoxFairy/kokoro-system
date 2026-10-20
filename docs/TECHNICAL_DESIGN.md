@@ -1,3 +1,71 @@
+## MC-02A 共享模型、业务组合：已确认目标（2026-10-20）
+
+用户已明确选择“共享模型配置，业务分别组合”。本 owner 源码已实现并通过最终隔离 verify：contract20、214测试／0跳过、fresh33断言／22表完整catalog与格式/lint/type/build。后继消费者与 Key 底座仍须推进；不把本片当完整模型产品／收费执行交付。
+
+- 复用现 provider/definition/revision/label/routing，不加组合实体或规则引擎。revision 去掉 feature_key，从物理模型内容／digest 中退出；业务归属由现 label.feature_key 承接，resolve 的 feature_key 继续来自受权业务选择，不从修订推导。已发布修订仍不可变；旧快照不重写，新契约与必要数据按已授权 clean-slate 配对，不做双读。
+- 同一 revision 可被不同 feature 的 label/default 或 tenant override 引用。label_key 继续是全局稳定内部选择标识，不充当提供方或展示别名；显示名称允许跨业务重复，无须把 key 唯一性改成业务私有。
+- label.display_name 明确为可选别名：新建省略或 null 表示使用原始 request_model，PATCH 缺失不改、显式 null 清别名。服务端 catalog 按 tenant override 优先、否则 label default 得到精确修订，投影真实 provider/model/revision 身份、request_model、有效 display_name 与默认项，不能从别名斜杠猜 provider。
+- 业务必须显式绑定一个有效发布修订；label 可保留未绑定草稿，但未绑定／已失效项不进可选列表，resolve 拒绝，不再扫描其他全局修订自动兜底。一次选择解析到一个明确配置，不实现自动故障切换或模型池。
+- 当前 tenant 必须有可见 routing；null override 仅继承 label default，不代表缺 policy 可回退全局。默认项隐藏／未绑定／失效时不自动提拔其他 label。新无 feature 摘要只用于新建或获准重建的修订，不保留旧 ID 后重算旧 digest；旧 Run/usage 继续按原冻结 reader 读取，正常切换前连同旧回执／缓存单独盘点。
+- 标签及路由配置继续锁现 feature 事实；revision 本身不再阻止某个业务退休。共享模型的删除／退休继续由所有真实 label／routing 引用保护，不因一个业务取消引用破坏另一业务。缓存新 namespace，保持 tenant/generation/健康与身份校验，执行准入和资金许可不变。
+
+写区：现 model-catalog schema/repository/service、products 的 feature 使用关系只读核验、database/schema.sql、原 OpenAPI generator/provenance、fresh-schema verifier 与现合同／真实 PG HTTP 测试。无新表、依赖或顶层模块。后继 BFF/App/Admin/Agent 必须以正规新 major 固定消费，未配对不重载正常 System，不将本分支源码冒成已合或 live。
+
+验收：同一 published revision 被两业务实际引用且 tenant 隔离；省略／清空别名默认原模型名而请求模型不变；显式 tenant override 的列表和 resolve 一致；空绑定不得任意选其他 revision；原发布不可变、CAS、幂等、health/cache fence、删除引用与 fresh canonical 全部保留。
+
+---
+
+## MC-02 范围澄清记录：模型管理是业务配置能力（2026-10-20）
+
+用户最新澄清优先于下方 Key 候选：模型模块要让各业务拿到自己的模型配置、组合与列表；Provider 集中配置连接供多个模型复用，别名可选且默认原模型名。下方新增存储／读取方案尚未获直接确认，不先以 Key 仓完成代替业务配置完成。
+
+优先沿现 feature/label/tenant routing 与 catalog/resolve 收敛业务可用集合、默认项和稳定选择身份；业务列表不含 Key，运行方在授权范围解析执行配置。别名只影响展示／业务命名，不改 request_model 或精确历史绑定。当前 revision 也绑定 feature、label_key 全局唯一、catalog display_name 必填；这些是待核实际复用／默认别名影响的现状，不预先宣称任意业务组合已实现，也不因“组合”另起服务、表或路由 DSL。
+
+## MC-02 直接填写 API Key：设计候选（2026-10-20，待确认，未实施）
+
+用户要求后台能直接配置服务地址、API Key 和模型，不再人工填写凭据引用。此节仅为密钥后继候选，没有敏感存储／读取生产实现；当前业务配置源码／System5候选见 MC-02A，System4已验只读／路由证据作为历史保留。此边界确认后，“System 永不持有实际密钥、Agent 从部署文件解析引用”退出目标设计，历史验收仍按原版本成立。
+
+### Owner 与租户
+
+- 复用 System `model-catalog`，不新增 Secret 服务、模块或网关。提供方、模型定义、修订与标签仍为平台级目录；`model_routing_policy` 才按受信 tenant 隔离。不是把每个模型自动变成租户私有资源。
+- App 只携带 Product 会话／access token；IAM 验证当前租户与成员事实，BFF fresh admission 检查固定产品租户。Admin 从该会话自动取得上下文，无 tenant 输入框，不用 Site／Project ID 代替 tenant。
+- 全局连接配置仍需正式平台管理员。BFF 使用接收方本地验证的独立模型管理机器凭据，只能操作已声明的模型管理闭集；不得把现 `web-bff` 升为通用 `system-admin`，也不把浏览器的角色或 tenant body 当授权。
+
+### 最小结构与失败边界
+
+1. 连接创建一次提交非秘密元数据与只写 API Key。System 在同一个现有 owner 事务内创建 provider、随机 opaque ref、受保护密文及脱敏幂等回执；任一步失败全部回滚。引用由服务生成，UI 不手填、不从 Key 推导。
+2. 加密采用 Node 原生 AES-256-GCM；主密钥由 System 私有部署文件提供，不写数据库、Git、进程参数或业务接口。文件加载采用有界、权限／属主与稳定读取检查；AAD 绑定不可变 provider 身份与凭据引用，错密钥、密文篡改或错绑定拒绝。未配置主密钥时敏感操作失败，不返回假成功；不让这一缺口误触其他只读管理接口。
+3. 密钥保存在 model-catalog 的一份专用凭据记录，不成为任意 JSON/KV secret 仓。普通目录／修订／resolve 不返回 Key，Redis／manifest／command receipt／model digest 不存 Key。幂等比较须使用服务端域分离密钥保护的摘要，不能把 Key 原文或可离线验证的裸 Key hash 交给现通用摘要直接持久化。
+4. Agent 用专用内部读取操作；System 先按现 tenant policy（tenant、feature、label）计算当前真正有效候选，再要求其 provider/revision/digest 与请求冻结值一致，不能将请求 revision 偷作候选 pin 绕过当前选择。published、未 retired、provider 有效、健康窗口和部署 URL 条件从本 owner 当前事实重核，不复用旧 resolve cache 冒充当前删除／健康状态。不一致就拒读，不返回另一条 route 的 Key。内部认证沿 ADR-035：已认证 Agent 机器身份受委托传递 tenant，这不是人类 token 或新的执行 permit，也不声称可识别被攻陷 Agent 的虚假委托。Agent 在既有受信执行准入后领取，System 只核本 owner 的领取条件；凭据不产生 Billing 许可，不进入 Run/checkpoint/evidence／普通日志。BFF/Admin 和普通目录 caller 均无该明文读取权限；配置或发布不发送上游探测／推理。
+5. API Key 表单只留当前受管内存；浏览器持久恢复记录只保留非秘密命令身份与主体／租户绑定。提交结果未知后禁止生成新 key 盲发；保留原命令身份并按正式操作查询脱敏结果。查询暂未命中不证明原写入永未提交；刷新不恢复 Key，不自动重发。此恢复查询与敏感创建共用 owner 事务事实，不能用 UI 的“看起来保存了”替代。
+6. 首片将凭据随 provider/ref 固定：任何 Key 变化，包括同账户换 Key，都新建 provider/ref/revision，不实现原位轮换。原连接继续绑定原 Key，不把新 Key 套到冻结历史。provider 软删线性化后拒绝新的凭据领取，不承诺撤销已领取的明文／在途调用；读取与删除／擦除按本 owner 锁序或版本重核协调，不跨网络持锁。30 日内合法恢复仅恢复同 ref 同密文；达到 30 日即稳定拒绝恢复，即使 retention hold 尚未擦除也不延长恢复窗口。到期维护同事务清 handle、nonce/tag/ciphertext，保留非秘密创建标记与 provider 身份；hold 仅暂停擦除，历史 revision/digest 不改写。
+
+### 审查收敛：主密钥、操作身份与未知结果
+
+加密 KEK 和敏感幂等 HMAC 密钥是不同的私有材料，由同一受限部署配置在启动时固定加载。未配／格式或权限错误时敏感创建与领取失败，非秘密目录／结果读取不依赖解密成功；不从旧 Agent 文件回退。运行中文件被替换不热换进程内快照；重启后只能以匹配的原材料读取旧密文／比较旧命令，错误材料拒绝而非重建。首片不提供在线 KEK/摘要密钥轮换；今后更换 KEK 必须另行停写、备份、逐行受控重加密及恢复演练，HMAC 密钥保持稳定，不因 KEK 变化重算旧命令身份。
+
+专用凭据记录在创建同事务保存原命令标记、创建时间、创建 actor 与发起 tenant，仅作审计／恢复，不将全局 provider 改为 tenant 私有。global 资源 scope 与发起方可信 tenant 分开保留，不能因原 RequestContext 对 global 使用 null 而丢失恢复绑定。创建标记随不可变 provider 身份保留，不随现 7 日 receipt 到期、密文擦除而删除；同一标记禁止再创建第二 provider。敏感创建分支先取现 receipt 相同的（scope_kind、scope_id、key）advisory 事务锁，再核永久标记与窗口内 receipt；不能按不同 actor／tenant 改槽绕过原命令，同槽不同身份稳定冲突。其他普通命令不新增永久标记或改变现有保留策略。
+
+结果查询是当前正式管理员资格下的原 operation/key＋受信原 actor／管理上下文 tenant 读取，不解密、不要求 KEK/HMAC 可用、不写 marker；仅返回关联 provider 当前 created/deleted/erased 等脱敏事实。此查询不能作为另一个全局目录写入口。保留依据是现 provider 身份本就不物理删除，不新增通用命令系统。
+
+| 观察结果 | 允许的恢复 | 禁止的推断／操作 |
+| --- | --- | --- |
+| 已收到正式 ACK，或按原 actor/tenant/命令查到关联 provider | 回读脱敏状态，结束原浏览器流程；若当前已删／已擦除，明确展示当前事实而非重放成新活连接 | 不回显 Key，不把当前资源状态冒充原 ACK 字节 |
+| ACK 丢失、原 Key/原正文仍在内存且在原 7 日 receipt 窗口内 | 只允许用户显式按原 key/body 重放，保持 HMAC 比较和原事务去重 | 不自动重发，不生成替代 key，不用已编辑正文覆盖原意图 |
+| 刷新后 Key 已丢失，或 receipt 已到期 | 仅按原主体／命令查询创建标记及关联资源当前脱敏状态；敏感创建超窗不重新执行 | 不在浏览器持久存 Key，不按过期 key 创建第二连接 |
+| 暂未查到、查询失败或主体不符 | 保留 unknown／锁定；原主体可继续查询，错主体不获得原操作事实 | 不把缺行当作 not_committed，不自动清理未知记录／声称已撤销 |
+| 首次提交已明确拒绝且确认未发生写入，之前未进入 unknown | 显式结束原流程后再发新命令 | 模糊超时／503 不属于确定拒绝；unknown 后的后继 4xx 不证明原请求未提交 |
+
+现有 7 日 completed receipt 仍负责窗口内原成功响应重放；创建标记只证明该敏感命令与 provider 的唯一关联，不复制完整响应 JSON、不恢复 Key、不放宽过期重放。缺行的 unknown 不提供“已取消”保证；首片不扩成通用取消／排队命令平台，这一产品限制必须在界面和验收中保留。
+
+### 写区、删除与验证
+
+System 写区限定现 model-catalog、access/config、command receipt 的必要敏感输入适配、canonical SQL、原生成器及相关测试；新机器契约仍由唯一运行时 Zod 正规生成，不在本段维护第二份 DTO。BFF、App、Admin、Agent 各自文档与固定消费者在该 owner 正式交付后配对。删除 Agent 手工模型密钥文件消费，不留文件／远端双读 fallback；必要旧模型数据按已授权范围备份后重建，不改其他 owner 或历史事实。
+
+验收先证明权限与 tenant/global 边界、原子写／回滚、同命令重放与不同 Key 冲突、ACK 丢失后脱敏查回、敏感字段不入日志／回执／浏览器持久化、缺主密钥／篡改／错绑定、删除后的拒读和 Agent 唯一新凭据路径，再做正常页面保存／刷新回读。全部正控使用隔离 fixture；正常模型、工具执行和扣费继续暂停。此设计候选不构成实现、完整业务 PASS 或远端合并证据。
+
+---
+
 ## MC-01：默认直连、LiteLLM 可选的连接设计（2026-10-16；候选源码与资源门已通过）
 
 用户已确定 Agent 默认直连配置地址，LiteLLM 是受支持的可选网关而非部署前置。实施基线 `1460820eab10ade1ca62cd9fdf18b8ac700c0d7a` 的 only-litellm 限制已由本工作树 System4 正规契约、owner 快照与 canonical SQL 替换；provider 创建默认 direct、技术字段不可编辑，revision/resolve 返回冻结连接与唯一 request_model。Node24完整pnpm verify已通过（contract19、完整212 tests、fresh33 assertions/22表完整catalog、格式/lint/type/build），包括隔离真实HTTP/PG/cache；不是正常服务或消费者切换证明。Agent/BFF/Admin尚未消费新版本，正常已有库未执行DDL。下方 R257 中计费保证的未决事项继续有效；连接配置不构成Billing许可，模型发送保持0。

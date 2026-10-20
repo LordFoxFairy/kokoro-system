@@ -34,7 +34,7 @@ export class ResolveService {
     const tenant = tenantScope(context);
     for (let attempt = 0; attempt < 3; attempt++) {
       const before = await this.generations(tenant),
-        key = `model-resolve:v4:${commandDigest({ tenant, feature: input.feature_key, label: input.label_key ?? null, allow_loopback_http: this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL, ...before })}`;
+        key = `model-resolve:v5:${commandDigest({ tenant, feature: input.feature_key, label: input.label_key ?? null, allow_loopback_http: this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL, ...before })}`;
       const cached = await this.cache.get(key);
       if (cached !== null) {
         const parsed = resolveCacheSchema.safeParse(JSON.parse(cached));
@@ -132,13 +132,15 @@ export class ResolveService {
             expires_at: Date.now() + 30000,
             ...before,
           };
-        const candidate = await this.resolver.candidate(
-          tx,
-          input.feature_key,
-          policy.revision_id,
-          this.config.values.KOKORO_SYSTEM_MODEL_HEALTH_MAX_AGE_MS,
-          this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL,
-        );
+        const candidate =
+          policy.revision_id === null
+            ? null
+            : await this.resolver.candidate(
+                tx,
+                policy.revision_id,
+                this.config.values.KOKORO_SYSTEM_MODEL_HEALTH_MAX_AGE_MS,
+                this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL,
+              );
         if (!candidate)
           return {
             kind: "error" as const,

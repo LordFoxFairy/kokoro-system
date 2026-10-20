@@ -39,5 +39,9 @@ export const catalogItemSchema = z.strictObject({
   display_name: z.string(),
   is_default: z.boolean(),
   feature_key: z.string(),
-  default_revision_id: z.uuid().nullable(),
+  model_id: z.uuid(),
+  revision_id: z.uuid(),
+  provider_id: z.uuid(),
+  provider: z.string().min(1).max(128),
+  request_model: z.string().min(1).max(255),
 });

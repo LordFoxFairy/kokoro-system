@@ -20,6 +20,10 @@ import {
   revisionContentSchema,
 } from "../../src/modules/model-catalog/schemas/revision.schema.js";
 import { connectionSchema } from "../../src/modules/model-catalog/schemas/connection.schema.js";
+import {
+  labelInputSchema,
+  labelUpdateSchema,
+} from "../../src/modules/model-catalog/schemas/label.schema.js";
 import { commandDigest } from "../../src/database/command-digest.js";
 import { resolveInputSchema } from "../../src/modules/model-catalog/schemas/resolve.schema.js";
 import {
@@ -32,6 +36,20 @@ import { systemOperations } from "../../scripts/system-openapi-operations.js";
 import { buildSystemOpenApi } from "../../scripts/generate-system-openapi.js";
 
 describe("complete System target contract (not runtime acceptance)", () => {
+  it("defaults optional business aliases and distinguishes clearing from an omitted patch", () => {
+    const label = {
+      label_key: "chat/fast",
+      feature_key: "chat",
+      default_revision_id: null,
+    };
+    expect(labelInputSchema.parse(label).display_name).toBeNull();
+    expect(labelUpdateSchema.parse({ display_name: null })).toEqual({
+      display_name: null,
+    });
+    expect(labelUpdateSchema.parse({ default_revision_id: null })).toEqual({
+      default_revision_id: null,
+    });
+  });
   it("runs the pinned Nest 12 Standard Schema pipe against the same runtime schema", async () => {
     const pipe = new StandardSchemaValidationPipe();
     const metadata = { type: "body" as const, schema: resolveInputSchema };
@@ -242,7 +260,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
       paths: Record<string, Record<string, unknown>>;
       components: { schemas: Record<string, unknown> };
     };
-    expect(artifact.info.version).toBe("4.0.0");
+    expect(artifact.info.version).toBe("5.0.0");
     expect(systemOperations).toHaveLength(83);
     expect(
       Object.values(artifact.paths).flatMap((methods) => Object.keys(methods)),
@@ -294,7 +312,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
       expect.arrayContaining(["context_window", "max_output_tokens"]),
     );
   });
-  it("describes the implemented 4.0 owner routes without claiming consumer validation", () => {
+  it("describes the implemented 5.0 owner routes without claiming consumer validation", () => {
     const artifact = z
       .object({
         info: z.object({ version: z.string(), description: z.string() }),
@@ -305,15 +323,15 @@ describe("complete System target contract (not runtime acceptance)", () => {
         ),
       );
     expect(artifact.info).toEqual({
-      version: "4.0.0",
+      version: "5.0.0",
       description:
-        "Generated from runtime Zod schemas for implemented System internal-owner routes; 4.0.0 binds model revisions to immutable direct or optional LiteLLM connections.",
+        "Generated from runtime Zod schemas for implemented System internal-owner routes; 5.0.0 shares immutable model revisions across business-specific choices and exposes effective catalog identities.",
     });
     expect(artifact.info.description).not.toMatch(
       /target|not implemented|consumer.*(?:verified|validated)/iu,
     );
   });
-  it("records the sole Agent consumer as pending 4.0 validation with the 3.0 history boundary", () => {
+  it("records the Agent consumer as requiring the new shared-model contract pin", () => {
     const provenance = z
       .object({
         releaseClassification: z.object({
@@ -330,8 +348,8 @@ describe("complete System target contract (not runtime acceptance)", () => {
       })
       .parse(JSON.parse(readFileSync("contract/provenance.json", "utf8")));
     expect(provenance.releaseClassification).toMatchObject({
-      contractVersion: "4.0.0",
-      baseline: "3.0.0",
+      contractVersion: "5.0.0",
+      baseline: "4.0.0",
     });
     expect(
       provenance.consumers.filter(
@@ -341,8 +359,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
       {
         consumer: "kokoro-agent",
         surface: "model-catalog/resolve",
-        disposition:
-          "4.0.0-pin-pending-owner-consumer-validation; prior-3.0.0-http-verification-is-historical",
+        disposition: "5.0.0-pin-required-before-runtime-consumption",
       },
     ]);
   });
@@ -522,7 +539,6 @@ describe("versioned direct and optional LiteLLM connections", () => {
       provider_model_name: "declared-vendor-model",
       request_model: "request-model",
       display_name: "A",
-      feature_key: "chat",
       input_modalities: ["text"],
       output_modalities: ["text"],
       context_window: 8192,
@@ -530,6 +546,9 @@ describe("versioned direct and optional LiteLLM connections", () => {
       priority: 1,
     };
     expect(revisionInputSchema.safeParse(input).success).toBe(true);
+    expect(
+      revisionInputSchema.safeParse({ ...input, feature_key: "chat" }).success,
+    ).toBe(false);
     expect(
       revisionInputSchema.safeParse({ ...input, connection }).success,
     ).toBe(false);

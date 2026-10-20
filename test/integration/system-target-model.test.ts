@@ -179,7 +179,6 @@ async function seedRoute(
         revision: 1,
         provider_model_name: "provider",
         display_name: "Route",
-        feature_key: feature,
         input_modalities: ["text"],
         output_modalities: ["text"],
 
@@ -238,6 +237,242 @@ async function seedRoute(
   };
 }
 describe("real Nest Model catalog", () => {
+  it("shares one immutable revision across businesses with explicit tenant choices and optional aliases", async () => {
+    const first = await seedRoute();
+    const second = await seedRoute();
+    const frozen = (
+      await request(
+        `model-catalog/revisions/${first.rid}`,
+        "GET",
+        undefined,
+        adminHeaders,
+      )
+    ).json.data;
+    const shared = await request(
+      `model-catalog/labels/${second.lid}`,
+      "PATCH",
+      { default_revision_id: first.rid },
+      { ...adminHeaders, "if-match": '"1"' },
+    );
+    expect(shared.response.status).toBe(200);
+    expect(shared.json.data?.display_name).toBe("Route");
+    expect(
+      (
+        await request(
+          `model-catalog/labels/${second.lid}`,
+          "PATCH",
+          { display_name: "Titles" },
+          { ...adminHeaders, "if-match": '"2"' },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          `model-catalog/labels/${first.lid}`,
+          "PATCH",
+          { display_name: null },
+          { ...adminHeaders, "if-match": '"1"' },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          `model-catalog/routing-policies/${second.lid}`,
+          "PUT",
+          {
+            model_revision_id: second.rid,
+            visible: true,
+            is_default: true,
+            priority: 0,
+          },
+          { "if-none-match": "*" },
+          "tenant-b",
+        )
+      ).response.status,
+    ).toBe(200);
+    for (const provider of [first.pid, second.pid]) {
+      expect(
+        (
+          await request(
+            `model-catalog/providers/${provider}/health`,
+            "PUT",
+            { status: "healthy", observed_at: new Date().toISOString() },
+            { ...adminHeaders, "if-none-match": "*" },
+          )
+        ).response.status,
+      ).toBe(200);
+    }
+    const catalog = async (feature: string, tenant = "tenant-a") => {
+      const result = await request(
+        `model-catalog/catalog?feature_key=${encodeURIComponent(feature)}`,
+        "GET",
+        undefined,
+        {},
+        tenant,
+      );
+      expect(result.response.status).toBe(200);
+      return result.json.data?.items as Array<Record<string, unknown>>;
+    };
+    expect(await catalog(first.feature)).toEqual([
+      expect.objectContaining({
+        revision_id: first.rid,
+        provider_id: first.pid,
+        display_name: "gateway",
+        request_model: "gateway",
+        is_default: true,
+      }),
+    ]);
+    expect(await catalog(second.feature)).toEqual([
+      expect.objectContaining({
+        revision_id: first.rid,
+        provider_id: first.pid,
+        display_name: "Titles",
+      }),
+    ]);
+    expect(await catalog(second.feature, "tenant-b")).toEqual([
+      expect.objectContaining({
+        revision_id: second.rid,
+        provider_id: second.pid,
+        display_name: "Titles",
+      }),
+    ]);
+    expect(await catalog(first.feature, "tenant-b")).toEqual([]);
+    for (const feature of [first.feature, second.feature]) {
+      const resolved = await request(
+        "model-catalog/resolve",
+        "POST",
+        { feature_key: feature },
+        agentHeaders,
+      );
+      expect(resolved.response.status).toBe(200);
+      expect(resolved.json.data).toMatchObject({
+        revision_id: first.rid,
+        provider_id: first.pid,
+        feature_key: feature,
+        request_model: "gateway",
+      });
+    }
+    expect(
+      (
+        await request(
+          "model-catalog/resolve",
+          "POST",
+          { feature_key: second.feature },
+          agentHeaders,
+          "tenant-b",
+        )
+      ).json.data,
+    ).toMatchObject({
+      revision_id: second.rid,
+      provider_id: second.pid,
+    });
+    expect(
+      (
+        await request(
+          `model-catalog/labels/${second.lid}`,
+          "PATCH",
+          { display_name: null },
+          { ...adminHeaders, "if-match": '"3"' },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect((await catalog(second.feature))[0]?.display_name).toBe("gateway");
+    const unboundKey = `unbound.${randomUUID()}`;
+    const unbound = await request(
+      "model-catalog/labels",
+      "POST",
+      {
+        label_key: unboundKey,
+        feature_key: second.feature,
+        default_revision_id: null,
+      },
+      adminHeaders,
+    );
+    expect(unbound.response.status).toBe(201);
+    expect(
+      (
+        await request(
+          `model-catalog/routing-policies/${String(unbound.json.data?.id)}`,
+          "PUT",
+          {
+            model_revision_id: null,
+            visible: true,
+            is_default: false,
+            priority: 0,
+          },
+          { "if-none-match": "*" },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect(await catalog(second.feature)).toHaveLength(1);
+    const rejected = await request(
+      "model-catalog/resolve",
+      "POST",
+      { feature_key: second.feature, label_key: unboundKey },
+      agentHeaders,
+    );
+    expect(rejected.response.status).toBe(503);
+    expect(rejected.json.error?.code).toBe("MODEL_UNAVAILABLE");
+    expect(
+      (
+        await request(
+          `model-catalog/revisions/${first.rid}`,
+          "GET",
+          undefined,
+          adminHeaders,
+        )
+      ).json.data,
+    ).toEqual(frozen);
+    expect(frozen).not.toHaveProperty("feature_key");
+    expect(
+      (
+        await request(
+          `model-catalog/routing-policies/${first.lid}`,
+          "DELETE",
+          undefined,
+          { "if-match": '"1"' },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          `model-catalog/labels/${first.lid}`,
+          "DELETE",
+          undefined,
+          { ...adminHeaders, "if-match": '"2"' },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect(
+      (
+        await request(`features/${first.featureId}/retire`, "POST", undefined, {
+          ...adminHeaders,
+          "if-match": '"1"',
+        })
+      ).response.status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          "model-catalog/resolve",
+          "POST",
+          { feature_key: second.feature },
+          agentHeaders,
+        )
+      ).json.data?.revision_id,
+    ).toBe(first.rid);
+    const stillUsed = await request(
+      `model-catalog/revisions/${first.rid}/retire`,
+      "POST",
+      undefined,
+      { ...adminHeaders, "if-match": '"2"' },
+    );
+    expect(stillUsed.response.status).toBe(409);
+    expect(stillUsed.json.error?.code).toBe("RESOURCE_IN_USE");
+  });
   it("owns definition/provider global CRUD and health CAS", async () => {
     const ah = {
       "x-kokoro-service": "system-admin",
@@ -359,7 +594,6 @@ describe("real Nest Model catalog", () => {
       revision: 1,
       provider_model_name: "provider-model",
       display_name: "Revision",
-      feature_key: "model.chat",
       input_modalities: ["text"],
       output_modalities: ["text"],
 
@@ -507,7 +741,6 @@ describe("real Nest Model catalog", () => {
         revision: 1,
         provider_model_name: "provider-bound",
         display_name: "Execution bound",
-        feature_key: feature,
         input_modalities: ["text"],
         output_modalities: ["text"],
 
@@ -575,7 +808,7 @@ describe("real Nest Model catalog", () => {
     }
   });
   it("enforces nullable draft and complete int32 execution-bound edges without side effects", async () => {
-    const { modelId, pid, feature } = await seedRoute();
+    const { modelId, pid } = await seedRoute();
     const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
     await db.connect();
     const snapshot = async () => {
@@ -605,7 +838,6 @@ describe("real Nest Model catalog", () => {
       revision,
       provider_model_name: `edge-${revision}`,
       display_name: `Edge ${revision}`,
-      feature_key: feature,
       input_modalities: ["text"],
       output_modalities: ["text"],
 
@@ -738,7 +970,6 @@ describe("real Nest Model catalog", () => {
           revision: 1,
           provider_model_name: "provider-route",
           display_name: "Route",
-          feature_key: "routing.chat",
           input_modalities: ["text"],
           output_modalities: ["text"],
 
@@ -858,7 +1089,11 @@ describe("real Nest Model catalog", () => {
         display_name: "Default",
         is_default: true,
         feature_key: "routing.chat",
-        default_revision_id: rid,
+        model_id: model.json.data?.id,
+        provider_id: pid,
+        provider: "litellm",
+        revision_id: rid,
+        request_model: "gateway-route",
       },
     ]);
     await request(
@@ -904,7 +1139,7 @@ describe("real Nest Model catalog", () => {
     expect(first.response.status).toBe(200);
     const generation = String(first.json.data?.generation);
     const tenantGeneration = String(first.json.data?.tenant_generation);
-    const key = `model-resolve:v4:${commandDigest({
+    const key = `model-resolve:v5:${commandDigest({
       tenant: "tenant-a",
       allow_loopback_http: false,
       feature,
@@ -1416,7 +1651,7 @@ describe("real Nest Model catalog", () => {
     }
   });
   it("rejects PostgreSQL integer overflow before attempting a revision write", async () => {
-    const { modelId, pid, feature } = await seedRoute();
+    const { modelId, pid } = await seedRoute();
     const result = await request(
       "model-catalog/revisions",
       "POST",
@@ -1426,7 +1661,6 @@ describe("real Nest Model catalog", () => {
         revision: 2147483648,
         provider_model_name: "overflow",
         display_name: "Overflow",
-        feature_key: feature,
         input_modalities: ["text"],
         output_modalities: ["text"],
 
@@ -1448,7 +1682,6 @@ describe("real Nest Model catalog", () => {
       revision: 2,
       provider_model_name: "draft",
       display_name: "Draft",
-      feature_key: feature,
       input_modalities: ["text"],
       output_modalities: ["text"],
 

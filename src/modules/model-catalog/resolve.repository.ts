@@ -23,8 +23,7 @@ export class ResolveRepository {
   }
   public async candidate(
     tx: TransactionContext,
-    feature: string,
-    pinned: string | null,
+    pinned: string,
     maxAge: number,
     allowLoopbackHttp: boolean,
   ) {
@@ -41,8 +40,8 @@ export class ResolveRepository {
       max_output_tokens: number;
       health_valid_until: Date;
     }>(
-      "SELECT r.model_id,r.id AS revision_id,r.revision,r.digest,r.provider_id,r.provider_model_name,r.request_model,jsonb_build_object('protocol',r.connection_protocol,'connection_type',r.connection_type,'base_url',r.connection_base_url,'secret_handle_ref',r.connection_secret_handle_ref) AS connection,r.context_window,r.max_output_tokens,h.observed_at+($3::bigint*INTERVAL '1 millisecond') AS health_valid_until FROM model_revision r JOIN model_definition m ON m.id=r.model_id JOIN model_provider p ON p.id=r.provider_id JOIN model_provider_health_state h ON h.provider_id=p.id WHERE r.feature_key=$1 AND ($2::uuid IS NULL OR r.id=$2) AND r.published_at IS NOT NULL AND r.retired_at IS NULL AND m.deleted_at IS NULL AND p.deleted_at IS NULL AND r.context_window IS NOT NULL AND r.max_output_tokens IS NOT NULL AND r.max_output_tokens<=r.context_window AND ($4::boolean OR r.connection_base_url LIKE 'https://%') AND p.secret_handle_ref<>'' AND h.status='healthy' AND h.observed_at>CURRENT_TIMESTAMP-($3::bigint*INTERVAL '1 millisecond') AND h.observed_at<=CURRENT_TIMESTAMP+INTERVAL '5 seconds' ORDER BY r.priority,r.id LIMIT 1",
-      [feature, pinned, maxAge, allowLoopbackHttp],
+      "SELECT r.model_id,r.id AS revision_id,r.revision,r.digest,r.provider_id,r.provider_model_name,r.request_model,jsonb_build_object('protocol',r.connection_protocol,'connection_type',r.connection_type,'base_url',r.connection_base_url,'secret_handle_ref',r.connection_secret_handle_ref) AS connection,r.context_window,r.max_output_tokens,h.observed_at+($2::bigint*INTERVAL '1 millisecond') AS health_valid_until FROM model_revision r JOIN model_definition m ON m.id=r.model_id JOIN model_provider p ON p.id=r.provider_id JOIN model_provider_health_state h ON h.provider_id=p.id WHERE r.id=$1 AND r.published_at IS NOT NULL AND r.retired_at IS NULL AND m.deleted_at IS NULL AND p.deleted_at IS NULL AND r.context_window IS NOT NULL AND r.max_output_tokens IS NOT NULL AND r.max_output_tokens<=r.context_window AND ($3::boolean OR r.connection_base_url LIKE 'https://%') AND p.secret_handle_ref<>'' AND h.status='healthy' AND h.observed_at>CURRENT_TIMESTAMP-($2::bigint*INTERVAL '1 millisecond') AND h.observed_at<=CURRENT_TIMESTAMP+INTERVAL '5 seconds'",
+      [pinned, maxAge, allowLoopbackHttp],
     );
     return result.rows[0] ?? null;
   }

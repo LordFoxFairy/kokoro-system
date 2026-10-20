@@ -1,3 +1,14 @@
+## 2026-10-20 MC-02A 本 owner 验收
+
+绑定当前MC-02A停写源码及System5 artifact `a83b37269e9e4fa7fb5310a1836975e20ab9eaee965a66c83e35bb1ca1b9e5df`／provenance `97b20e57f66010ba456fac59fe1dd62d90c17325c82d3da80be455ea9d3cf747`；source commit由交付记录绑定，不预填。Node24.20.0、pnpm12.3.4。
+
+- `pnpm verify` 最终exit0：格式／lint／types／build、contract20、完整16文件214PASS／0SKIP、fresh33断言／22表完整canonical相等。
+- 真实隔离HTTP/PG：同published revision被两业务引用；tenant override列表／resolve一致且缺policy tenant为空；无别名／清别名原名展示，正文request_model及原revision/digest不变；无绑定拒绝而不自动选其他模型。首业务解除引用后退休不破坏第二业务，仍被共享的revision退休409。
+- 原合同缺省别名与无feature输入2有效RED；原共享引用409有效RED。主会话最终资源门及focused生命周期均PASS，测试库inventory前后一致；只用自建随机测试库／Redis namespace，不重启正常服务。
+- 独立只读审查无确定P0–P2；85操作inventory不变，55非model操作含递归schema不变，原published/事务/CAS/缓存负控保留。首次README摘要及fixture配对失败诊断保留，最终通过不抹去历史失败。
+
+不涵盖消费者System5升级、正常页面／Schema切换、Key保存／读取、模型／工具执行或扣费。后继完整业务与Root交付仍待，禁止用本owner门代替整产品PASS。
+
 ## 2026-10-20 System4 消费配对与正常结构验收
 
 在Draft源码 `dafbc66c9ab5e55b556dbd1dd71c79cef354f69c` 上重跑 Node24.20／pnpm12.3.4 完整 `verify`：格式、lint、type、build、contract全部exit0，16文件212 PASS／0SKIP；fresh schema33断言／22表完整canonical catalog匹配。BFF已本地提交 `15e4a7423ceed83dbb09d02e24e802ac78d9ed9e` Public20固定消费System4，只替换revision表示且仍四操作；App/Admin对应同一artifact正在收口，不扩provider/revision创建发布UI。

@@ -14,7 +14,6 @@ import type { PageInput } from "../../http/pagination.js";
 import { DefinitionRepository } from "./definition.repository.js";
 import { ProviderRepository } from "./provider.repository.js";
 import { RevisionRepository } from "./revision.repository.js";
-import { FeatureReferenceRepository } from "./feature-reference.repository.js";
 import { ModelGenerationRepository } from "./model-generation.repository.js";
 import { revisionContent } from "./revision-content.js";
 import {
@@ -32,8 +31,6 @@ export class RevisionService {
     @Inject(DefinitionRepository) private readonly models: DefinitionRepository,
     @Inject(ProviderRepository) private readonly providers: ProviderRepository,
     @Inject(RevisionRepository) private readonly revisions: RevisionRepository,
-    @Inject(FeatureReferenceRepository)
-    private readonly features: FeatureReferenceRepository,
     @Inject(ModelGenerationRepository)
     private readonly generation: ModelGenerationRepository,
   ) {}
@@ -54,7 +51,6 @@ export class RevisionService {
         "INVALID_ARGUMENT",
         "Revision integer exceeds storage range",
       );
-    await this.features.lock(tx, [input.feature_key]);
     await this.models.find(tx, input.model_id, false, true);
     const provider = await this.providers.find(
       tx,

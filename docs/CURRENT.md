@@ -1,3 +1,13 @@
+## 2026-10-20 MC-02A：共享模型与业务组合已通过本 owner 验证
+
+用户批准同一已发布模型配置供多业务复用。revision 去 feature 耦合；label/routing 承业务引用与租户默认／覆盖；别名可省略或 null，未设按精确 request_model 显示原名，PATCH 缺失保留；catalog 返回实际有效修订／真实 provider 身份，空绑定不扫描其他模型。无新表、服务或依赖，原发布／CAS／幂等／health/cache与全局引用保护保留。
+
+原代码实际合同2失败、共享业务HTTP409 RED后修复；新增仅现合同1用例＋现HTTP1用例，原风险fixture按新契约配对。最终 Node24.20／pnpm12.3.4 `pnpm verify` 全0：contract20、16文件214PASS／0SKIP、fresh33断言／22表完整canonical、format/lint/type/build。独审无确定P0–P2，85操作inventory、55非model操作递归表示、22表身份不变；资源门前后库inventory相等。
+
+System5 artifact `a83b37269e9e4fa7fb5310a1836975e20ab9eaee965a66c83e35bb1ca1b9e5df`，provenance `97b20e57f66010ba456fac59fe1dd62d90c17325c82d3da80be455ea9d3cf747`。第一次完整门仅README摘要未更新失败；其后最终完整门通过。首个model suite中三项fixture错配（目录新字段、v5cache key、过度移除局部feature变量）均保留诊断后定向修正，不隐藏失败。
+
+此为本地owner候选，不是远端发布或完整模型产品闭环：BFF/App/Admin/Agent尚未消费System5，正常System不重载、不执行DDL，既有System4已验链不替代新组合验收。API Key保存／读取仍为独立候选；模型、工具执行、扣费保持暂停。
+
 ## 2026-10-20 System4 消费配对与正常结构验收
 
 在Draft源码 `dafbc66c9ab5e55b556dbd1dd71c79cef354f69c` 上重跑 Node24.20／pnpm12.3.4 完整 `verify`：格式、lint、type、build、contract全部exit0，16文件212 PASS／0SKIP；fresh schema33断言／22表完整canonical catalog匹配。BFF已本地提交 `15e4a7423ceed83dbb09d02e24e802ac78d9ed9e` Public20固定消费System4，只替换revision表示且仍四操作；App/Admin对应同一artifact正在收口，不扩provider/revision创建发布UI。

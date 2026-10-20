@@ -1,3 +1,35 @@
+## MC-02A 当前执行：共享配置与业务组合（2026-10-20）
+
+用户已确认“共享模型配置，业务分别组合”。主会话是唯一 writer，沿当前 feature 分支；不碰对方自动化／连接器、正常数据库／进程或实际调用。
+
+- [x] 三面设计收敛 owner、目录、API/数据/状态／删除／验证；无新表或服务。
+- [x] 现合同回归2例取得缺别名／无feature输入RED→GREEN；现HTTP/PG共享业务场景409→200，含tenant override／别名清空／未绑定拒绝及首业务退休不影响共享引用，未另建suite。
+- [x] 现 schema/revision-content/repository/service 删除修订业务耦合；catalog 显式有效修订／真实 provider 投影；resolve 去掉未绑定扫描，保原取消／缓存／health／权限与事务。
+- [x] canonical SQL、feature使用关系／maintenance、fresh verifier和既有fixture配对；无新表／依赖，不删独有风险。
+- [x] 原 generator/provenance 发布 System5候选，83/2 inventory；主会话最终完整verify退出0：contract20、16文件214 PASS／0SKIP、fresh33／22表完整canonical与格式/lint/type/build；独审无确定P0–P2、55非model操作递归表示保持，测试库inventory前后相等。消费者／正常运行仍未切。
+- [ ] 后续 BFF/Agent/Admin/App 按固定提交／digest 消费，删除别名推 provider 等旧投影；Key 真实保存旅程继续独立收口，本批完整验收前不 push/merge 或重载正常组合。
+
+## MC-02 用户最新澄清：先闭合业务模型配置（2026-10-20）
+
+本节优先于下方 Key 候选的实施顺序；用户尚未直接批准新增密钥存储／读取边界。
+
+- [x] 源码核对统一 Provider 多模型、feature/label/tenant policy、业务 catalog／Agent resolve 基础，并记录现 revision/feature 耦合及 display_name 必填的实际限制。
+- [ ] 收敛各业务模型集合／默认项／选择身份与可选别名默认原名的语义，证明现配置如何由业务入口受控领取；优先复用现有结构，不机械新增组合平台。
+- [ ] 以该业务配置旅程确认必要契约／数据变化，才继续下方密钥底座与各消费者；Key 写入本身不作为模型模块全部完成。
+
+## MC-02 当前新增需求：直接配置 API Key（2026-10-20）
+
+用户要求后台配置地址、API Key 和模型；已核实当前没有密钥写入产品链，不能把 System4 的 opaque handle 或路由编辑页当完整密钥管理。
+
+- [x] 对照现源码核清租户边界：Product 会话经 IAM/BFF 校验，provider/revision 为全局目录，routing 才按受信 tenant 隔离；无手填 tenant 要求。
+- [x] 在现 TECHNICAL_DESIGN/API_CONTRACT/DATA_MODEL 增补 MC-02 候选；不另建 Secret 服务、Root schema 或可编辑 DTO 中心。
+- [ ] 确认新增 System 受保护存储／Agent 专用读取边界。已提交用户异步确认；初审四项已按固定 Key 随新连接、固定启动 KEK／独立 HMAC、现 tenant policy 当前候选精确比较、永久敏感创建标记及未知恢复决策表补候选，三面复审中，尚未实施。
+- [ ] 通过设计门后先更新 owner 正式运行时 Zod／canonical SQL，增加原子凭据写入、脱敏查回和窄身份控制，再按原生成器发布 breaking artifact；不先改消费者猜字段。
+- [ ] 依 owner 固定提交／digest 升级 BFF、App、Admin、Agent；新表单自动使用当前登录 tenant，敏感 Key 不进入浏览器持久恢复记录；删除旧 Agent 文件消费，不做双读兼容。
+- [ ] 主会话冻结后复验必要 owner 门与隔离真 HTTP/PG/认证链、页面保存及回读；正常模型、工具执行、扣费继续暂停，现只读／路由证据不替代新密钥链。
+
+本次仅新增三面候选及任务顺序，不改生产源码、生成物、数据库、配置或运行进程；本批已有候选提交／正常只读配对继续有效，但 PR/merge 仍待完整需求闭环。此前计划的“只读四操作消费，不扩 provider 创建”仅描述前一阶段，不再作为本新增需求的完成标准。
+
 ## 2026-10-20 PR 收尾边界
 
 已有 MC-01 四提交通过完整本 owner 隔离 verify 后发布 Draft PR，未合并/未部署。BFF Public19 的 revision 投影仍对应 System3，是本次新确认的消费者配对缺口，下一步应正规升级公开契约及 Admin 而非构造兼容字段；Agent 已有 System4 固定消费，不能据此冒称整个组合配对。正常旧数据与 schema 切换不在此次 Draft 交付中。

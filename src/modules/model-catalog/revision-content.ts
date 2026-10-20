@@ -12,7 +12,6 @@ export function revisionContent(
     revision: value.revision,
     provider_model_name: value.provider_model_name,
     display_name: value.display_name,
-    feature_key: value.feature_key,
     input_modalities: value.input_modalities,
     output_modalities: value.output_modalities,
     request_model: value.request_model,

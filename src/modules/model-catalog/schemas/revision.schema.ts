@@ -7,7 +7,6 @@ export const revisionInputSchema = z.strictObject({
   revision: z.int().positive(),
   provider_model_name: z.string().min(1).max(255),
   display_name: z.string().min(1).max(160),
-  feature_key: z.string().min(1).max(128),
   input_modalities: z
     .array(z.enum(["text", "image", "audio", "video"]))
     .min(1)

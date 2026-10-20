@@ -341,7 +341,7 @@ CREATE INDEX IF NOT EXISTS ix_model_provider_page ON model_provider (created_at 
 CREATE TABLE IF NOT EXISTS model_label (
   id UUID PRIMARY KEY,
   label_key VARCHAR(128) NOT NULL,
-  display_name VARCHAR(160) NOT NULL,
+  display_name VARCHAR(160),
   feature_key VARCHAR(128) NOT NULL,
   default_revision_id UUID,
   version BIGINT NOT NULL DEFAULT 1,
@@ -363,7 +363,6 @@ CREATE TABLE IF NOT EXISTS model_revision (
   revision INTEGER NOT NULL,
   provider_model_name VARCHAR(255) NOT NULL,
   display_name VARCHAR(160) NOT NULL,
-  feature_key VARCHAR(128) NOT NULL,
   input_modalities JSONB NOT NULL,
   output_modalities JSONB NOT NULL,
   request_model VARCHAR(255) NOT NULL,
@@ -396,7 +395,6 @@ CREATE TABLE IF NOT EXISTS model_revision (
   CONSTRAINT ck_model_revision_retirement CHECK (retired_at IS NULL OR published_at IS NOT NULL),
   CONSTRAINT ck_model_revision_modalities CHECK (jsonb_typeof(input_modalities) = 'array' AND jsonb_typeof(output_modalities) = 'array')
 );
-CREATE INDEX IF NOT EXISTS ix_model_revision_resolution ON model_revision (feature_key, priority, id) WHERE published_at IS NOT NULL AND retired_at IS NULL;
 CREATE INDEX IF NOT EXISTS ix_model_revision_provider ON model_revision (provider_id, id);
 CREATE INDEX IF NOT EXISTS ix_model_revision_page ON model_revision (created_at DESC, id DESC);
 

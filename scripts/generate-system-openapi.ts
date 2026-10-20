@@ -215,10 +215,10 @@ export function buildSystemOpenApi(): Readonly<{
     servers: [{ url: "/", description: "Same internal-owner origin" }],
     info: {
       title: "Kokoro System internal owner",
-      version: "4.0.0",
-      "x-kokoro-release-classification": "model-connection-breaking",
+      version: "5.0.0",
+      "x-kokoro-release-classification": "business-model-composition-breaking",
       description:
-        "Generated from runtime Zod schemas for implemented System internal-owner routes; 4.0.0 binds model revisions to immutable direct or optional LiteLLM connections.",
+        "Generated from runtime Zod schemas for implemented System internal-owner routes; 5.0.0 shares immutable model revisions across business-specific choices and exposes effective catalog identities.",
     },
     paths,
     components: {

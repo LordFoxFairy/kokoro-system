@@ -222,7 +222,7 @@ try {
   assertions++;
   const revision = randomUUID();
   await database.query(
-    "INSERT INTO model_revision (id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,connection_protocol,connection_type,connection_base_url,connection_secret_handle_ref,request_model,context_window,max_output_tokens,digest,published_at) VALUES ($1,$2,$3,1,'model','Model','chat','[\"text\"]','[\"text\"]','openai_chat_completions','litellm','https://gateway.example/v1','vault:fixture','gateway',8192,2048,$4,CURRENT_TIMESTAMP(3))",
+    "INSERT INTO model_revision (id,model_id,provider_id,revision,provider_model_name,display_name,input_modalities,output_modalities,connection_protocol,connection_type,connection_base_url,connection_secret_handle_ref,request_model,context_window,max_output_tokens,digest,published_at) VALUES ($1,$2,$3,1,'model','Model','[\"text\"]','[\"text\"]','openai_chat_completions','litellm','https://gateway.example/v1','vault:fixture','gateway',8192,2048,$4,CURRENT_TIMESTAMP(3))",
     [revision, randomUUID(), randomUUID(), "a".repeat(64)],
   );
   await rejected(
