@@ -1,3 +1,9 @@
+## 2026-10-20 保留的 System4 源码正式进入 Draft PR
+
+原 codex/model-connections 的既定 MC-01 实现 7f479f6 未合 main，本次完整保留该四提交历史，不把它当试验删除。隔离重跑 Node24.20 / pnpm12.3.4 完整 verify exit0，含格式、lint、type、build、契约、全部测试与 fresh schema；不修改正常资源。
+
+暂不 merge 或更新 Root System pin：Agent main 已固定该 System4 版本，但 BFF Public19 管理 revision 仍要求 System3 的 transport/gateway_model_name，正式 System4 删除并改为 connection/request_model。须在既有模型连接方案内完成公开契约与 Admin 消费者原子配对，禁止制造旧字段 fallback。正常旧 schema/历史发布记录处置另待核实；本 Draft 不激活连接、不切正常服务、不发送模型/工具或扣费请求。
+
 ## R215 模型执行上限切片验收（2026-10-04）
 
 实施前基线 `9a4e98eb9aed5513312090cf0e8e3f9c1d674bda` 的resolve执行上限字段为0。本切片已实现canonical两界、revision/resolve、正规3.0.0 artifact/provenance及HTTP/raw SQL/cache/contract断言。历史证据保留full-owner 199通过/1旧fixture失败、fresh同类失败，以及checksum合法关系错误cache被200接受的真实业务RED；修正后Root41905在冻结源码上已完成check/contract、16文件202通过/0失败/0跳过、fresh 23 assertions/22 tables完整canonical全绿，source/database/Redis终态一致，独审0P0/P1/P2，本切片获Root单仓验收。本地交付commit状态见Root CURRENT/progress；远端尚未push，Agent消费者未pin，3310未更新。

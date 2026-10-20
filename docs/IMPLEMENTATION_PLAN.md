@@ -1,3 +1,7 @@
+## 2026-10-20 PR 收尾边界
+
+已有 MC-01 四提交通过完整本 owner 隔离 verify 后发布 Draft PR，未合并/未部署。BFF Public19 的 revision 投影仍对应 System3，是本次新确认的消费者配对缺口，下一步应正规升级公开契约及 Admin 而非构造兼容字段；Agent 已有 System4 固定消费，不能据此冒称整个组合配对。正常旧数据与 schema 切换不在此次 Draft 交付中。
+
 ## MC-01 当前增量：默认 direct、LiteLLM 可选（2026-10-15）
 
 **目标**：落实用户已批准的连接拓扑，保持 System 配置/路由、Agent 执行、Billing 资金、IAM 身份的原 owner；完整 Skills/MCP 目标不缩减。此节复用本仓唯一计划，不另建任务中心。
