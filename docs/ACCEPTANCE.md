@@ -1,3 +1,11 @@
+## 2026-10-20 System4 消费配对与正常结构验收
+
+在Draft源码 `dafbc66c9ab5e55b556dbd1dd71c79cef354f69c` 上重跑 Node24.20／pnpm12.3.4 完整 `verify`：格式、lint、type、build、contract全部exit0，16文件212 PASS／0SKIP；fresh schema33断言／22表完整canonical catalog匹配。BFF已本地提交 `15e4a7423ceed83dbb09d02e24e802ac78d9ed9e` Public20固定消费System4，只替换revision表示且仍四操作；App/Admin对应同一artifact正在收口，不扩provider/revision创建发布UI。
+
+正常System经只读／冻结核实模型definition/provider/revision/label/routing/health均零行，3条命令receipt均completed。先备份恢复演练，再只重建两张空模型表及其原index／新connection guard，22表原行hash一致；受影响模型catalog与当前canonical逐对象相等，其余catalog严格保持原样。不使用trace、旧网关名或Agent全局地址推测连接，不重算旧digest，不建旧字段／旧数据兼容层。此前整库catalog比较发现其他旧CHECK表达式解析形式差异，原样保留，不扩大成其他20表重建；不据此称正常全owner已做全量canonical替换。
+
+正常System与BFF已配对ready，retention hold保持true、原机器配置字节不变。隔离真实IAM正式管理员资格→BFF→System4/PG已验目录读取、CAS、原key回放、冲突、非法session拒绝；临时库与IAM key inventory清理前后一致。第一轮seed使用未启用的HTTP loopback被正式拒绝，改为无网络请求的HTTPS fixture元数据后通过；未放宽部署开关。Admin/Product桥和实际页面证据另记。此为管理／配置验收，不含任何模型推理、工具或扣费；Agent始终disabled。远端PR/Root组合与后继页面另验，不以本地配对冒称已merge。
+
 # System 验收证据
 
 当前 R6 交付：`dcfa8468446108c17cd65b32fc028af261472c99`（起始基线 `280d5d0567c94de33e32f0e85f163fbcf75ede20`）。下述G5为已验历史，末尾R6为当前提交证据。G5代码起始基线`51bc22dac4b32da86984e7147caaae5e4db6a34a`；Root committed HEAD 跨仓证据在 Root `docs/CURRENT.md` 绑定最终 SHA。历史G1–G4完整证据见唯一 IMPLEMENTATION_PLAN，不与当前结果混用。
