@@ -1,9 +1,11 @@
+import { ProviderModelDiscoveryService } from "./provider-model-discovery.service.js";
 import {
   Body,
   Controller,
   Delete,
   Get,
   HttpCode,
+  Header,
   Inject,
   Param,
   Patch,
@@ -25,6 +27,8 @@ import {
 export class ProviderController {
   public constructor(
     @Inject(ProviderService) private readonly providers: ProviderService,
+    @Inject(ProviderModelDiscoveryService)
+    private readonly discovery: ProviderModelDiscoveryService,
   ) {}
   @Get()
   @Access({ operation: "listModelProvider", permission: "system:read" })
@@ -54,6 +58,19 @@ export class ProviderController {
     @Param("provider_id", { schema: z.uuid() }) id: string,
   ) {
     return this.providers.get(context, id);
+  }
+  @Get(":provider_id/upstream-models")
+  @Header("Cache-Control", "no-store")
+  @Access({
+    operation: "listModelProviderUpstreamModels",
+    scope: "global",
+    permission: "system:write",
+    mutation: false,
+  })
+  public upstreamModels(
+    @Param("provider_id", { schema: z.uuid() }) id: string,
+  ) {
+    return this.discovery.list(id);
   }
   @Patch(":provider_id")
   @Access({

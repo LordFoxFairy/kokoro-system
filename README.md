@@ -2,7 +2,7 @@
 
 Kokoro 内部控制面：Site/域名/Policy、Workspace、Product/App/Feature、配置发布与 Runtime Manifest、模型目录与可执行路由。只返回路由，不执行推理、不拥有价格、IAM 或 BFF 公共 API。
 
-当前实现：Node **24.13.0**、pnpm **12.3.4**、Nest **12.0.1** Express、Zod→OpenAPI、PostgreSQL SQL-first、Redis。83 业务操作与 2 probes；唯一入口 `src/main.ts`。阶段证据及未验项见 [CURRENT](docs/CURRENT.md)、[ACCEPTANCE](docs/ACCEPTANCE.md)。
+当前实现：Node **24.13.0**、pnpm **12.3.4**、Nest **12.0.1** Express、Zod→OpenAPI、PostgreSQL SQL-first、Redis。86 业务操作与 2 probes；唯一入口 `src/main.ts`。阶段证据及未验项见 [CURRENT](docs/CURRENT.md)、[ACCEPTANCE](docs/ACCEPTANCE.md)。
 
 ## 本地源码启动
 
@@ -42,3 +42,7 @@ System部署私有 `KOKORO_SYSTEM_MODEL_KEY_MATERIAL_FILE` 是加密材料，不
 专用 `model-management` 身份仅开放本模型目录／业务引用管理闭集和业务定义读取；它既无其他System域权限，也无明文领取权限。正式BFF仍须验证当前平台管理员，独立配置该机器凭据后再使用；已有 `web-bff` 身份不因此升级为global管理员。
 
 创建结果未知后按原命令和主体查脱敏结果，404仅表示尚未确认，不证明已取消。Key不进浏览器持久恢复记录。原七日回执保原响应重放，永久创建标记阻止其过期后重新创建第二连接；过期后只能查原关联提供方当前状态。更换Key需新连接／修订。软删立即阻止新的领取；30日恢复窗口不被retention hold延长，维护同事务清密文及handle、保留非秘密查回标记。正常服务与后继Agent／BFF／后台尚未切此版本时，不把本仓隔离验收称作完整产品已上线。
+
+## 提供方模型发现（System6.1）
+
+后台显式刷新会由上述管理GET读取已保存连接的候选模型ID，不自动导入／发布／改默认项或价格。Key留在System，普通目录和Agent领取边界不变；部署的非公网DNS主机需在`KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS`精确许可，默认空且无wildcard，loopback仍由原开关控制。候选验收与正常接线状态见[CURRENT](docs/CURRENT.md)。

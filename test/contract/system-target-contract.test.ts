@@ -104,7 +104,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
           operation: operation as Record<string, unknown>,
         })),
     );
-    expect(operations).toHaveLength(87);
+    expect(operations).toHaveLength(88);
     const counts: Record<string, number> = {};
     const identities = new Set<string>();
     for (const item of systemOperations) {
@@ -121,9 +121,9 @@ describe("complete System target contract (not runtime acceptance)", () => {
       workspaces: 6,
       products: 35,
       "runtime-manifests": 1,
-      "model-catalog": 32,
+      "model-catalog": 33,
     });
-    expect(identities.size).toBe(85);
+    expect(identities.size).toBe(86);
     for (const { path, method, operation } of operations) {
       expect(operation["x-kokoro-owner"]).toBe("kokoro-system");
       expect(operation["x-kokoro-visibility"]).toBe("internal-owner");
@@ -281,7 +281,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
       `${JSON.stringify(doc, null, 2)}\n`,
     );
   });
-  it("publishes the 6.0 write-only credential boundary with exactly two new owner operations", () => {
+  it("preserves the 6.0 write-only credential boundary alongside explicit discovery", () => {
     const artifact = JSON.parse(
       readFileSync("contract/openapi/system.openapi.json", "utf8"),
     ) as {
@@ -289,11 +289,11 @@ describe("complete System target contract (not runtime acceptance)", () => {
       paths: Record<string, Record<string, unknown>>;
       components: { schemas: Record<string, unknown> };
     };
-    expect(artifact.info.version).toBe("6.0.0");
-    expect(systemOperations).toHaveLength(85);
+    expect(artifact.info.version).toBe("6.1.0");
+    expect(systemOperations).toHaveLength(86);
     expect(
       Object.values(artifact.paths).flatMap((methods) => Object.keys(methods)),
-    ).toHaveLength(87);
+    ).toHaveLength(88);
     const findResolveShape = (
       value: unknown,
     ):
@@ -341,7 +341,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
       expect.arrayContaining(["context_window", "max_output_tokens"]),
     );
   });
-  it("describes the implemented 6.0 owner routes without claiming consumer validation", () => {
+  it("describes the implemented 6.1 owner routes without claiming consumer validation", () => {
     const artifact = z
       .object({
         info: z.object({ version: z.string(), description: z.string() }),
@@ -351,7 +351,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
           readFileSync("contract/openapi/system.openapi.json", "utf8"),
         ),
       );
-    expect(artifact.info.version).toBe("6.0.0");
+    expect(artifact.info.version).toBe("6.1.0");
     expect(artifact.info.description.length).toBeGreaterThan(0);
     expect(artifact.info.description).not.toMatch(
       /target|not implemented|consumer.*(?:verified|validated)/iu,
@@ -374,8 +374,8 @@ describe("complete System target contract (not runtime acceptance)", () => {
       })
       .parse(JSON.parse(readFileSync("contract/provenance.json", "utf8")));
     expect(provenance.releaseClassification).toMatchObject({
-      contractVersion: "6.0.0",
-      baseline: "5.0.0",
+      contractVersion: "6.1.0",
+      baseline: "6.0.0",
     });
     expect(
       provenance.consumers.filter(
@@ -436,10 +436,10 @@ describe("complete System target contract (not runtime acceptance)", () => {
       "scripts/generate-system-openapi.ts",
       "scripts/system-openapi-operations.ts",
     ].sort();
-    expect(expected).toHaveLength(22);
+    expect(expected).toHaveLength(23);
     expect(
       expected.filter((path) => !path.endsWith("products.public.ts")),
-    ).toHaveLength(21);
+    ).toHaveLength(22);
     expect(Object.keys(provenance.openapi.sourceSha256).sort()).toEqual(
       expected,
     );
@@ -460,7 +460,7 @@ describe("complete System target contract (not runtime acceptance)", () => {
         ],
         { encoding: "utf8" },
       ),
-    ).toContain("22 sources");
+    ).toContain("23 sources");
   });
 });
 

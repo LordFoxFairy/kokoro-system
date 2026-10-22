@@ -93,7 +93,7 @@ describe("System target native Nest boundaries", () => {
         .map((operation) => `${operation.method} ${operation.path}`)
         .sort(),
     );
-    expect(new Set(actual).size).toBe(85);
+    expect(new Set(actual).size).toBe(86);
   });
   it("keeps SQL in owner repositories and forbids cross-module writes/deep imports", () => {
     const owners: Record<string, readonly string[]> = {

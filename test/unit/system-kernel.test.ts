@@ -142,3 +142,93 @@ describe("R39 R1 owner database URL configuration", () => {
     expect(() => new SystemConfig({ ...environment, ...invalid })).toThrow();
   });
 });
+
+it("defaults provider discovery private-host permission to an empty immutable deployment list", () => {
+  const config = new SystemConfig({
+    DATABASE_URL: "postgresql://localhost/fixture?schema=fixture",
+    REDIS_URL: "redis://localhost/6",
+    KOKORO_SYSTEM_BFF_SERVICE_TOKEN: "fixture-bff-token",
+    KOKORO_SYSTEM_AGENT_SERVICE_TOKEN: "fixture-agent-token",
+    KOKORO_SYSTEM_ADMIN_SERVICE_TOKEN: "fixture-admin-token",
+  });
+  expect(config.values).toHaveProperty(
+    "KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS",
+    [],
+  );
+  expect(
+    Object.isFrozen(config.values.KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS),
+  ).toBe(true);
+});
+it("accepts only bounded exact canonical DNS names for deployment private-host permission", () => {
+  const env = {
+    DATABASE_URL: "postgresql://localhost/fixture?schema=fixture",
+    REDIS_URL: "redis://localhost/6",
+    KOKORO_SYSTEM_BFF_SERVICE_TOKEN: "fixture-bff-token",
+    KOKORO_SYSTEM_AGENT_SERVICE_TOKEN: "fixture-agent-token",
+    KOKORO_SYSTEM_ADMIN_SERVICE_TOKEN: "fixture-admin-token",
+  };
+  const valid = new SystemConfig({
+    ...env,
+    KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS:
+      "gateway.fixture.invalid,model.internal",
+  });
+  expect(valid.values).toHaveProperty(
+    "KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS",
+    ["gateway.fixture.invalid", "model.internal"],
+  );
+  const boundary = [
+    "a".repeat(63),
+    "b".repeat(63),
+    "c".repeat(63),
+    "d".repeat(61),
+  ].join(".");
+  expect(
+    new SystemConfig({
+      ...env,
+      KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS: boundary,
+    }).values.KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS,
+  ).toEqual([boundary]);
+  expect(
+    new SystemConfig({
+      ...env,
+      KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS: Array.from(
+        { length: 32 },
+        (_, index) => `a${index}.invalid`,
+      ).join(","),
+    }).values.KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS,
+  ).toHaveLength(32);
+  for (const value of [
+    "127.0.0.1",
+    "198.18.0.1",
+    "[::1]",
+    "::1",
+    "https://gateway.fixture.invalid",
+    "gateway.fixture.invalid:443",
+    "gateway.fixture.invalid/path",
+    "user@gateway.fixture.invalid",
+    "*.fixture.invalid",
+    "Gateway.fixture.invalid",
+    ".fixture.invalid",
+    "fixture.invalid.",
+    " gateway.fixture.invalid",
+    "gateway.fixture.invalid ",
+    "a,,b",
+    "a,",
+    ",a",
+    "a,a",
+    "-a.invalid",
+    "a-.invalid",
+    "a_b.invalid",
+    "a".repeat(64) + ".invalid",
+    "a.".repeat(127) + "a",
+    Array.from({ length: 33 }, (_, index) => `a${index}.invalid`).join(","),
+  ])
+    expect(
+      () =>
+        new SystemConfig({
+          ...env,
+          KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS: value,
+        }),
+      value,
+    ).toThrow();
+});

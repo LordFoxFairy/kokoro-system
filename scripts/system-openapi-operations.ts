@@ -1,3 +1,4 @@
+import { providerModelDiscoverySchema } from "../src/modules/model-catalog/schemas/provider-model-discovery.schema.js";
 import * as credentials from "../src/modules/model-catalog/schemas/credential.schema.js";
 import type { z } from "zod";
 import {
@@ -482,4 +483,14 @@ add(
     permission: "service-context",
   },
 );
+
+add(
+  "model-catalog/providers/{provider_id}/upstream-models",
+  "get",
+  "listModelProviderUpstreamModels",
+  "model-catalog",
+  providerModelDiscoverySchema,
+  { scope: "global", permission: "system:write", mutation: false },
+);
+
 export const systemOperations: readonly SystemOperation[] = operations;

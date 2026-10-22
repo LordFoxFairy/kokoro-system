@@ -1,4 +1,38 @@
+import { isIP } from "node:net";
 import { z } from "zod";
+const discoveryPrivateHostsSchema = z
+  .string()
+  .max(8127)
+  .default("")
+  .transform((value) => (value === "" ? [] : value.split(",")))
+  .pipe(
+    z
+      .array(
+        z
+          .string()
+          .min(1)
+          .max(253)
+          .regex(
+            /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/u,
+          )
+          .refine((host) => {
+            try {
+              return (
+                isIP(host) === 0 &&
+                new URL(`https://${host}/`).hostname === host
+              );
+            } catch {
+              return false;
+            }
+          }, "Canonical DNS hostname required"),
+      )
+      .max(32),
+  )
+  .refine(
+    (hosts) => new Set(hosts).size === hosts.length,
+    "Duplicate discovery hostname",
+  )
+  .transform((hosts) => Object.freeze(hosts));
 export const systemEnvironmentSchema = z
   .object({
     KOKORO_SYSTEM_MAINTENANCE_INTERVAL_MS: z.coerce
@@ -27,6 +61,7 @@ export const systemEnvironmentSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((value) => value === "true"),
+    KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS: discoveryPrivateHostsSchema,
     KOKORO_SYSTEM_MODEL_HEALTH_MAX_AGE_MS: z.coerce
       .number()
       .int()

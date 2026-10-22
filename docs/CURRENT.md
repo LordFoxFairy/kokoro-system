@@ -1,3 +1,11 @@
+## 2026-10-22 提供方模型发现候选（System6.1）
+
+新增显式管理读取 `GET /v1/system/model-catalog/providers/{provider_id}/upstream-models`，使用已有加密Key返回候选ID，不要求先创建业务路由，不回传Key／原始上游正文，不发布或修改模型／价格／健康。原System6.0的87个operation及66个既有schema逐项保持；BFF/Admin仍待固定新发布物接线。
+
+单总10秒、1MiB／2000项、禁止重定向、固定已核DNS地址及原Host/TLS；默认拒非公网解析。自有HTTP／PG测试和实际部署DNS证明需要精确私网许可：`KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS`默认空，最多32个canonical DNS主机，仅HTTPS原主机精确匹配才允许RFC1918／ULA／benchmark解析结果，仍拒元数据／危险地址，loopback仍须原开关。不自动许可所有已配置provider，实际部署名单只留私有配置。
+
+主方完整`pnpm verify`exit0：255测试PASS，fresh schema33断言通过，215输入无漂移、测试数据库清单前后相等；独立审查P2均已修并复核。真实已配置提供方的专用transport读取28项，原配置模型存在；与最终冻结transport字节相同，零模型生成／工具／积分。正常服务加载和后台BFF／UI不由这些证据替代；本片无Schema变更。
+
 ## 2026-10-20 MC-02：System6 密钥底座（隔离交付，未激活）
 
 已按用户批准在现 model-catalog 内落地只写 API Key 创建、AES-GCM密文/AAD、独立HMAC收据、永久创建标记及脱敏查回；原provider/receipt/generation同PG事务。Agent-only领取从当前tenant policy选实际route后比较精确provider/revision/digest、handle及health，provider锁等待后取新快照；软删拒读，30日过期同事务擦除密文并保创建身份。固定私有启动材料、窄model-management身份，无新服务/依赖或全局管理提权。

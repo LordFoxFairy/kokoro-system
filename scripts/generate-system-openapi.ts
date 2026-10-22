@@ -85,22 +85,26 @@ export function buildSystemOpenApi(): Readonly<{
         enum:
           operation.operationId === "readModelCredential"
             ? ["kokoro-agent"]
-            : [
-                "web-bff",
-                "kokoro-agent",
-                "system-admin",
-                ...(MODEL_MANAGEMENT_OPERATIONS.has(operation.operationId)
-                  ? ["model-management"]
-                  : []),
-              ],
+            : operation.operationId === "listModelProviderUpstreamModels"
+              ? ["model-management", "system-admin"]
+              : [
+                  "web-bff",
+                  "kokoro-agent",
+                  "system-admin",
+                  ...(MODEL_MANAGEMENT_OPERATIONS.has(operation.operationId)
+                    ? ["model-management"]
+                    : []),
+                ],
       }),
       parameter(
         "x-kokoro-tenant-id",
         "header",
         operation.scope === "tenant" ||
-          ["createModelProvider", "getModelProviderCreation"].includes(
-            operation.operationId,
-          ),
+          [
+            "createModelProvider",
+            "getModelProviderCreation",
+            "listModelProviderUpstreamModels",
+          ].includes(operation.operationId),
         {
           type: "string",
           minLength: 1,
@@ -111,7 +115,10 @@ export function buildSystemOpenApi(): Readonly<{
         "x-kokoro-actor-id",
         "header",
         operation.mutation ||
-          operation.operationId === "getModelProviderCreation",
+          [
+            "getModelProviderCreation",
+            "listModelProviderUpstreamModels",
+          ].includes(operation.operationId),
         {
           type: "string",
           minLength: 1,
@@ -183,9 +190,11 @@ export function buildSystemOpenApi(): Readonly<{
       [String(operation.status)]: response(operation.response, schemas),
     };
     if (
-      ["getModelProviderCreation", "readModelCredential"].includes(
-        operation.operationId,
-      )
+      [
+        "getModelProviderCreation",
+        "readModelCredential",
+        "listModelProviderUpstreamModels",
+      ].includes(operation.operationId)
     ) {
       const success = responses[String(operation.status)] as JsonObject;
       success.headers = {
@@ -212,9 +221,11 @@ export function buildSystemOpenApi(): Readonly<{
       "x-kokoro-permission": operation.permission,
       "x-kokoro-scope": operation.scope,
       description:
-        operation.scope === "conditional"
-          ? "Config POST uses body.scope_type; other Config operations use query.scope (default tenant). Global scope requires authenticated system-admin, ignores tenant header and writes no tenant identity. Tenant scope requires trusted tenant header. Global Config has no release."
-          : `${operation.scope} scope; global requires authenticated system-admin`,
+        operation.operationId === "listModelProviderUpstreamModels"
+          ? "Management-only global write read; trusted actor and actor tenant required. No body, query, command headers, persistence or automatic retry. Candidate IDs are not published models or capability guarantees."
+          : operation.scope === "conditional"
+            ? "Config POST uses body.scope_type; other Config operations use query.scope (default tenant). Global scope requires authenticated system-admin, ignores tenant header and writes no tenant identity. Tenant scope requires trusted tenant header. Global Config has no release."
+            : `${operation.scope} scope; global requires authenticated system-admin`,
       "x-kokoro-precondition": operation.cas,
       security: [{ serviceBearer: [] }, { serviceSecret: [] }],
       parameters,
@@ -254,10 +265,10 @@ export function buildSystemOpenApi(): Readonly<{
     servers: [{ url: "/", description: "Same internal-owner origin" }],
     info: {
       title: "Kokoro System internal owner",
-      version: "6.0.0",
-      "x-kokoro-release-classification": "protected-model-credentials-breaking",
+      version: "6.1.0",
+      "x-kokoro-release-classification": "provider-model-discovery-additive",
       description:
-        "Generated from runtime Zod schemas for implemented System internal-owner routes; 6.0.0 adds write-only encrypted model credentials, Agent-only exact current-route retrieval and narrowly scoped model management.",
+        "Generated from runtime Zod schemas for implemented System internal-owner routes; 6.1.0 adds explicit management-only provider model discovery; existing encrypted credentials and Agent current-route retrieval are unchanged.",
     },
     paths,
     components: {

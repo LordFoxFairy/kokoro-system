@@ -1,3 +1,4 @@
+import type { Response } from "express";
 import { timingSafeEqual, randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import type { CanActivate, ExecutionContext } from "@nestjs/common";
@@ -15,6 +16,7 @@ export const MODEL_MANAGEMENT_OPERATIONS: ReadonlySet<string> = new Set([
   "listFeature",
   "getFeature",
   "getModelProviderCreation",
+  "listModelProviderUpstreamModels",
   ...["ModelProvider", "ModelDefinition", "ModelLabel"].flatMap((name) =>
     ["list", "get", "create", "update", "delete", "restore"].map(
       (action) => action + name,
@@ -57,6 +59,11 @@ export class AccessGuard implements CanActivate {
       execution.getHandler(),
     );
     if (!rule) return true;
+    if (rule.operation === "listModelProviderUpstreamModels")
+      execution
+        .switchToHttp()
+        .getResponse<Response>()
+        .setHeader("Cache-Control", "no-store");
     const request = execution.switchToHttp().getRequest<OwnerRequest>();
     const requestId = requestIdSchema.safeParse(
       header(request, "x-request-id") ?? randomUUID(),
@@ -102,6 +109,60 @@ export class AccessGuard implements CanActivate {
       !MODEL_MANAGEMENT_OPERATIONS.has(rule.operation)
     )
       throw new SystemError("FORBIDDEN", "Model management operation denied");
+    if (rule.operation === "listModelProviderUpstreamModels") {
+      if (!["model-management", "system-admin"].includes(caller))
+        throw new SystemError("FORBIDDEN", "Model management caller required");
+      if (
+        !header(request, "x-kokoro-actor-id") ||
+        header(request, "x-kokoro-actor-id")!.length > 160 ||
+        !header(request, "x-kokoro-tenant-id")
+      )
+        throw new SystemError(
+          "INVALID_ARGUMENT",
+          "Trusted management context required",
+        );
+      const counts = new Map<string, number>();
+      for (
+        let index = 0;
+        index < (request.rawHeaders?.length ?? 0);
+        index += 2
+      ) {
+        const name = request.rawHeaders[index]!.toLowerCase();
+        counts.set(name, (counts.get(name) ?? 0) + 1);
+      }
+      if (
+        [
+          "authorization",
+          "x-kokoro-service",
+          "x-kokoro-internal-secret",
+          "x-kokoro-actor-id",
+          "x-kokoro-tenant-id",
+          "x-kokoro-iam-permissions",
+          "x-request-id",
+        ].some((name) => (counts.get(name) ?? 0) > 1)
+      )
+        throw new SystemError(
+          "INVALID_ARGUMENT",
+          "Duplicate discovery context header",
+        );
+      if (
+        request.method !== "GET" ||
+        request.body !== undefined ||
+        Object.keys(request.query).length !== 0 ||
+        [
+          "idempotency-key",
+          "if-match",
+          "if-none-match",
+          "content-length",
+          "transfer-encoding",
+          "content-type",
+        ].some((name) => request.headers[name] !== undefined)
+      )
+        throw new SystemError(
+          "INVALID_ARGUMENT",
+          "Provider discovery read shape is invalid",
+        );
+    }
     let scope = rule.scope ?? "tenant";
     if (scope === "conditional") {
       if (request.method === "POST")

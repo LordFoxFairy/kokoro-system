@@ -24,3 +24,5 @@
 | `test/unit`, `test/contract`, `test/architecture`, `test/integration`       | 纯规则、wire、83 原生 route/写表边界、真实 PG/Redis/生命周期/维护                                                  |
 
 依赖：Controller → 同模块 Service → 同模块 Repository；跨模块业务投影通过公开 Service；同库完整性只读 SQL 遵循统一父锁顺序。旧全局层/RPC/generated/SDK 不再存在。文档见 [docs/INDEX](docs/INDEX.md)。
+
+模型上游候选：`src/modules/model-catalog/provider-model-discovery.service.ts` 编排短读/解密/有界并发；同名 `.transport.ts` 固定DNS与有界HTTP只读；`schemas/provider-model-discovery.schema.ts` 是唯一新wire来源。GET显式读取，不修改模型/业务组合或执行推理。

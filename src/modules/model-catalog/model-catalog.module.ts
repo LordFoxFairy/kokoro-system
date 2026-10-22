@@ -1,3 +1,4 @@
+import { ProviderModelDiscoveryService } from "./provider-model-discovery.service.js";
 import { SystemConfig } from "../../config/system-config.js";
 import { ModelCredentialCrypto } from "./model-credential-crypto.js";
 import { ModelCredentialRepository } from "./model-credential.repository.js";
@@ -48,6 +49,7 @@ import { HealthRepository } from "./health.repository.js";
     },
     ModelCredentialRepository,
     ModelCredentialService,
+    ProviderModelDiscoveryService,
     ModelMaintenanceRepository,
     ModelMaintenanceService,
     CatalogRepository,

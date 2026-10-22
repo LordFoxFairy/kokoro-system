@@ -1,3 +1,11 @@
+## MODEL-1 上游模型候选读取（2026-10-22，实施设计）
+
+新增 `GET /v1/system/model-catalog/providers/{provider_id}/upstream-models`，operation `listModelProviderUpstreamModels`，global `system:write`，仅 `model-management`／`system-admin`。无body/query、无CAS／幂等回执；成功沿标准envelope，data只含`provider_id`和`items:[{id}]`，运行时字段约束唯一来源为后继Zod schema，不在此复制机器定义。所有结果no-store，浏览器不得直接访问owner。
+
+已删除／擦除的provider为NOT_FOUND；无效或失败的上游读取为既有MODEL_UNAVAILABLE，响应不含上游正文／Key／敏感URL。未发送到许可地址为POLICY_DENIED；缺密钥材料沿原SYSTEM_UNAVAILABLE。非成功不伪造空列表。现有Agent-only凭据读取认证和路由约束不变。
+
+BFF后继为平台管理员专用`GET /v1/admin/model-providers/{provider_id}/upstream-models`，再经App同源桥到Admin；先固定System6.1发布物，不允许通用URL代理。Admin显式刷新候选与现“刷新本地目录”分开，选择候选后仍使用现创建/发布命令。无推理／充值／扣费副作用，读取不自动修改已发布事实。 非公网解析仅可由System部署侧精确主机清单显式许可；该清单不进入本API输入／输出，不允许客户端自报豁免，也不改变元数据／危险地址拒绝与原loopback开关。
+
 ## MC-02 实施授权已确认（2026-10-20）
 
 用户已明确选择“采用 System 现有模块方案”：现 model-catalog 加密保存 API Key，后台只写不回显；Agent 按当前业务路由与精确修订受控领取，删除旧手工密钥文件读取，不新增服务。下方 MC-02 密钥候选的 owner／隔离边界据此进入实施；历史“待确认”文字不覆盖此次确认，实际完成仍以源码／正式生成物与验收为准。模型请求、工具执行和扣费继续暂停；只在隔离 worktree／自有测试资源验收，不切换正常服务或写入正常密钥。

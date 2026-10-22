@@ -1431,7 +1431,7 @@ describe("real Nest Model catalog", () => {
     const operations = systemOperations.filter(
       (op) => op.module === "model-catalog",
     );
-    expect(operations).toHaveLength(32);
+    expect(operations).toHaveLength(33);
     for (const op of operations) {
       const path = op.path
         .replace("/v1/system/", "")

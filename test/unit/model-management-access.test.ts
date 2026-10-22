@@ -40,7 +40,10 @@ function admit(
   const context = {
     getHandler: () => handler,
     getClass: () => Controller,
-    switchToHttp: () => ({ getRequest: () => request }),
+    switchToHttp: () => ({
+      getRequest: () => request,
+      getResponse: () => ({ setHeader: () => undefined }),
+    }),
   } as unknown as ExecutionContext;
   return {
     run: () =>
@@ -112,4 +115,56 @@ describe("narrow model-management machine identity", () => {
         }),
     ).toThrow();
   });
+});
+
+it("admits only the explicit global-write provider discovery read with trusted actor context", () => {
+  const rule: AccessRule = {
+    operation: "listModelProviderUpstreamModels",
+    permission: "system:write",
+    scope: "global",
+    mutation: false,
+  };
+  const { run } = admit(rule);
+  expect(run()).toBe(true);
+  for (const service of ["web-bff", "kokoro-agent"] as const) {
+    const token =
+      service === "web-bff"
+        ? environment.KOKORO_SYSTEM_BFF_SERVICE_TOKEN
+        : environment.KOKORO_SYSTEM_AGENT_SERVICE_TOKEN;
+    expect(() => admit(rule, service, token).run()).toThrow();
+  }
+  for (const name of [
+    "idempotency-key",
+    "if-match",
+    "if-none-match",
+    "content-length",
+    "transfer-encoding",
+    "content-type",
+  ]) {
+    const attempt = admit(rule);
+    attempt.request.headers[name] = name === "content-length" ? "0" : "fixture";
+    expect(() => attempt.run()).toThrow();
+  }
+  for (const name of ["x-kokoro-actor-id", "x-kokoro-tenant-id"]) {
+    const attempt = admit(rule);
+    delete attempt.request.headers[name];
+    expect(() => attempt.run()).toThrow();
+  }
+  const readOnly = admit(rule);
+  readOnly.request.headers["x-kokoro-iam-permissions"] = "system:read";
+  expect(() => readOnly.run()).toThrow();
+  const body = admit(rule);
+  body.request.body = {};
+  expect(() => body.run()).toThrow();
+});
+
+it("rejects discovery actor IDs above the declared 160-character boundary", () => {
+  const attempt = admit({
+    operation: "listModelProviderUpstreamModels",
+    permission: "system:write",
+    scope: "global",
+    mutation: false,
+  });
+  attempt.request.headers["x-kokoro-actor-id"] = "a".repeat(161);
+  expect(() => attempt.run()).toThrow();
 });

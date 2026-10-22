@@ -54,6 +54,15 @@ export class ModelCredentialRepository {
     );
     return result.rows[0] ?? null;
   }
+  public async discoveryCredential(tx: TransactionContext, providerId: string) {
+    const result = await tx.query<
+      SealedModelCredential & { base_url: string; secret_handle_ref: string }
+    >(
+      "SELECT p.base_url,c.secret_handle_ref,c.nonce,c.auth_tag,c.ciphertext FROM model_provider p JOIN model_provider_credential c ON c.provider_id=p.id AND c.secret_handle_ref=p.secret_handle_ref WHERE p.id=$1 AND p.deleted_at IS NULL AND c.erased_at IS NULL",
+      [providerId],
+    );
+    return result.rows[0] ?? null;
+  }
   public async currentCredential(
     tx: TransactionContext,
     tenant: string,

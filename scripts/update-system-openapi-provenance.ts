@@ -38,19 +38,18 @@ provenance.openapi = {
   sourceSha256: Object.fromEntries(sources.map((path) => [path, digest(path)])),
 };
 provenance.releaseClassification = {
-  contractVersion: "6.0.0",
+  contractVersion: "6.1.0",
   httpRouteGeneration: "v1",
-  baseline: "5.0.0",
-  classification: "protected-model-credentials-breaking",
-  change:
-    "write-only-provider-keys-and-agent-current-route-credential-retrieval",
+  baseline: "6.0.0",
+  classification: "provider-model-discovery-additive",
+  change: "explicit-management-provider-upstream-model-discovery",
   publishedCompatibilityRequired: false,
 };
 provenance.consumers = [
   {
     consumer: "kokoro-bff",
     surface: "runtime-manifest/model-catalog",
-    disposition: "6.0.0-pin-required-before-runtime-consumption",
+    disposition: "6.1.0-pin-required-before-provider-discovery-consumption",
   },
   {
     consumer: "kokoro-agent",

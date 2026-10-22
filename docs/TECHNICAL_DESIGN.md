@@ -1,3 +1,16 @@
+## MODEL-1 提供方上游模型发现（2026-10-22，实施设计）
+
+沿已批准的共享提供方→共享模型修订→业务组合设计，在现 model-catalog 内增加显式候选读取；不新增服务、Schema、缓存或自动同步后台任务。当前“刷新目录”只重读本地事实，不代表读取上游。
+
+- System 独占存储连接和解密；新增 provider 专用 discovery Service 编排，独立小型 HTTP 读取函数负责 DNS／网络／响应边界；SQL仍归现 ModelCredentialRepository。禁止通过 Agent-only 的领取接口发现模型，该接口要求已存在发布和业务路由，会形成创建死结。
+- 仅 management／system-admin、global system:write 可读。从已保存且未删除／擦除的 provider 同一快照取 immutable URL、handle 与密文，沿原AES-GCM解密；不会返回Key、handle、上游URL、原始响应或供应商错误。普通业务、Agent、web-bff不获得权限。删除前已取得快照的请求不宣称与远端发送跨系统原子；回传候选前再核provider仍有效，删除后不回传旧结果。
+- 请求仅GET已配置API base后附加`/models`；不接受浏览器传URL／Key／请求模型。无自动重试、重定向、Cookie、环境代理或模型推理。解析固定DNS地址并在实际连接沿用该地址（TLS仍验原主机），拒私网、链路本地、保留／映射地址；只有现显式loopback开发开关可访问loopback地址。禁止因localhost名称默认放行其他私网。真实当前提供方使用HTTPS且部署DNS返回198.18/15基准测试地址，原严格默认会拒绝；新增仅部署侧的`KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS`精确DNS主机清单（默认空、最多32个canonical小写DNS名，拒IP／port／path／userinfo／wildcard／重复／空项）。匹配已存HTTPS连接原主机时，才允许其DNS结果中的RFC1918、IPv6 ULA与198.18/15地址；仍拒元数据／链路本地／未指定／映射／转换／组播／文档地址，loopback仍只由原开关控制。清单不来自浏览器／目录字段、不自动信任所有已保存provider；固定DNS地址、原Host与TLS验证保持。此为明确部署许可，不把非公网解析伪装成公网，不引入代理／另一个解析服务。
+- 单次总预算10秒含DNS/headers/body；调用方断开取消socket；上游body上限1MiB，模型最多2000项，模型ID1–255字符且拒控制字符／首尾空白／重复；严格检查OpenAI兼容`data[].id`后只投影ID。额外模型属性不进入本方输出。响应分页不跟随供应商URL；声明有后页时明确失败，不把截断候选当完整。
+- 发现不改provider健康、模型、revision、route、默认项或价格。没有完整能力／价格元数据时不推断；页面选择候选后仍走现有创建／发布与业务引用命令。结果仅当前读取有效，失败保留已有本地配置，不把失败变空数组。
+- 输出schema归本模块Zod，正式System6.1新增只读operation，原6.0逐operation行为承接；消费者须固定发布物再接线，不增加运行时旧版本fallback。
+
+验证：传输固定DNS和真实loopback HTTP、重定向无二次请求、预算/中断/大小/截断/坏JSON/重复ID/错误脱敏；真实隔离PG+Nest读取已存密钥、未建业务路由仍可发现，删/擦除/权限/未知query拒绝且无目录写；正规生成无漂移。局部测试和候选实现不代表正常后台已可刷新。
+
 ## MC-02 实施授权已确认（2026-10-20）
 
 用户已明确选择“采用 System 现有模块方案”：现 model-catalog 加密保存 API Key，后台只写不回显；Agent 按当前业务路由与精确修订受控领取，删除旧手工密钥文件读取，不新增服务。下方 MC-02 密钥候选的 owner／隔离边界据此进入实施；历史“待确认”文字不覆盖此次确认，实际完成仍以源码／正式生成物与验收为准。模型请求、工具执行和扣费继续暂停；只在隔离 worktree／自有测试资源验收，不切换正常服务或写入正常密钥。
