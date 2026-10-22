@@ -1,3 +1,5 @@
+import { providerModelDiscoverySchema } from "../src/modules/model-catalog/schemas/provider-model-discovery.schema.js";
+import * as credentials from "../src/modules/model-catalog/schemas/credential.schema.js";
 import type { z } from "zod";
 import {
   pageQuerySchema as pageQuery,
@@ -457,4 +459,38 @@ add(
     permission: "service-context",
   },
 );
+add(
+  "model-catalog/provider-creations",
+  "get",
+  "getModelProviderCreation",
+  "model-catalog",
+  credentials.providerCreationSchema,
+  {
+    query: credentials.providerCreationQuerySchema,
+    scope: "global",
+    permission: "system:write",
+  },
+);
+add(
+  "model-catalog/credentials/read",
+  "post",
+  "readModelCredential",
+  "model-catalog",
+  credentials.credentialReadSchema,
+  {
+    body: credentials.credentialReadInputSchema,
+    mutation: false,
+    permission: "service-context",
+  },
+);
+
+add(
+  "model-catalog/providers/{provider_id}/upstream-models",
+  "get",
+  "listModelProviderUpstreamModels",
+  "model-catalog",
+  providerModelDiscoverySchema,
+  { scope: "global", permission: "system:write", mutation: false },
+);
+
 export const systemOperations: readonly SystemOperation[] = operations;

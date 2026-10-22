@@ -1,16 +1,19 @@
 import { z } from "zod";
 
-export const labelInputSchema = z.strictObject({
+const labelContentSchema = z.strictObject({
   label_key: z.string().min(1).max(128),
-  display_name: z.string().min(1).max(160),
+  display_name: z.string().min(1).max(160).nullable(),
   feature_key: z.string().min(1).max(128),
   default_revision_id: z.uuid().nullable(),
 });
-export const labelUpdateSchema = labelInputSchema
+export const labelInputSchema = labelContentSchema.extend({
+  display_name: labelContentSchema.shape.display_name.default(null),
+});
+export const labelUpdateSchema = labelContentSchema
   .omit({ label_key: true, feature_key: true })
   .partial()
   .refine((v) => Object.keys(v).length > 0, "empty patch");
-export const labelSchema = labelInputSchema.extend({
+export const labelSchema = labelContentSchema.extend({
   id: z.uuid(),
   version: z.string().regex(/^[1-9][0-9]*$/u),
   created_at: z.iso.datetime(),

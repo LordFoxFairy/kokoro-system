@@ -1,10 +1,14 @@
+import { revisionSchema } from "../../src/modules/model-catalog/schemas/revision.schema.js";
+import { revisionContent } from "../../src/modules/model-catalog/revision-content.js";
 import { parseSystemDatabaseUrl } from "../../src/config/database-url.js";
 import { ModelGenerationRepository } from "../../src/modules/model-catalog/model-generation.repository.js";
 import { CacheService } from "../../src/cache/cache.service.js";
 import { commandDigest } from "../../src/database/command-digest.js";
 import { systemOperations } from "../../scripts/system-openapi-operations.js";
-import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { randomUUID, randomBytes } from "node:crypto";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { NestFactory } from "@nestjs/core";
@@ -22,6 +26,16 @@ const admin = new Client({ connectionString: adminUrl });
 const databaseUrl = new URL(adminUrl);
 databaseUrl.pathname = `/${databaseName}`;
 databaseUrl.searchParams.set("schema", "system_fixture");
+const credentialDirectory = mkdtempSync(join(tmpdir(), "kokoro-model-target-"));
+const credentialMaterial = join(credentialDirectory, "keys.json");
+writeFileSync(
+  credentialMaterial,
+  JSON.stringify({
+    encryption_key: randomBytes(32).toString("base64"),
+    idempotency_hmac_key: randomBytes(32).toString("base64"),
+  }),
+  { mode: 0o600 },
+);
 let app: NestExpressApplication;
 let base: string;
 const token = "system-test-bff-credential";
@@ -45,8 +59,9 @@ async function request(
   body?: unknown,
   extra: Record<string, string> = {},
   tenant = "tenant-a",
+  target = base,
 ) {
-  const response = await fetch(`${base}/v1/system/${path}`, {
+  const response = await fetch(`${target}/v1/system/${path}`, {
     method,
     headers: Object.fromEntries(
       Object.entries(headers(tenant, extra)).filter(
@@ -86,6 +101,7 @@ beforeAll(async () => {
       KOKORO_SYSTEM_BFF_SERVICE_TOKEN: token,
       KOKORO_SYSTEM_AGENT_SERVICE_TOKEN: "system-test-agent-credential",
       KOKORO_SYSTEM_ADMIN_SERVICE_TOKEN: "system-test-admin-credential",
+      KOKORO_SYSTEM_MODEL_KEY_MATERIAL_FILE: credentialMaterial,
     }),
     { logger: false },
   );
@@ -97,6 +113,7 @@ afterAll(async () => {
   if (app) await app.close();
   await admin.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
   await admin.end();
+  rmSync(credentialDirectory, { recursive: true, force: true });
 });
 
 const adminHeaders = {
@@ -108,16 +125,29 @@ const agentHeaders = {
   authorization: "Bearer system-test-agent-credential",
   "x-kokoro-iam-permissions": "",
 };
-async function seedRoute() {
+async function seedRoute(
+  connection = {
+    connection_type: "litellm",
+    base_url: "https://gateway.example/v1",
+    api_key: "fixture-key-route",
+  },
+  target = base,
+) {
+  const call = (
+    path: string,
+    method = "GET",
+    body?: unknown,
+    extra: Record<string, string> = {},
+  ) => request(path, method, body, extra, "tenant-a", target);
   const suffix = randomUUID(),
     feature = `feature.${suffix}`;
-  const product = await request(
+  const product = await call(
     "products",
     "POST",
     { product_key: suffix, name: "Route" },
     adminHeaders,
   );
-  const f = await request(
+  const f = await call(
     "features",
     "POST",
     {
@@ -134,27 +164,27 @@ async function seedRoute() {
     adminHeaders,
   );
   expect(f.response.status).toBe(201);
-  const model = await request(
+  const model = await call(
     "model-catalog/definitions",
     "POST",
     { model_key: suffix, display_name: "Route" },
     adminHeaders,
   );
-  const provider = await request(
+  const provider = await call(
       "model-catalog/providers",
       "POST",
       {
         provider: "litellm",
         provider_key: suffix,
         display_name: "Route",
-        secret_handle_ref: "vault:route",
-        transport: "litellm",
+        protocol: "openai_chat_completions",
+        ...connection,
         priority: 1,
       },
       adminHeaders,
     ),
     pid = String(provider.json.data?.id);
-  const revision = await request(
+  const revision = await call(
       "model-catalog/revisions",
       "POST",
       {
@@ -163,11 +193,10 @@ async function seedRoute() {
         revision: 1,
         provider_model_name: "provider",
         display_name: "Route",
-        feature_key: feature,
         input_modalities: ["text"],
         output_modalities: ["text"],
-        transport: "litellm",
-        gateway_model_name: "gateway",
+
+        request_model: "gateway",
         context_window: 8192,
         max_output_tokens: 2048,
         priority: 1,
@@ -178,15 +207,13 @@ async function seedRoute() {
   expect(revision.response.status).toBe(201);
   expect(
     (
-      await request(
-        `model-catalog/revisions/${rid}/publish`,
-        "POST",
-        undefined,
-        { ...adminHeaders, "if-match": '"1"' },
-      )
+      await call(`model-catalog/revisions/${rid}/publish`, "POST", undefined, {
+        ...adminHeaders,
+        "if-match": '"1"',
+      })
     ).response.status,
   ).toBe(200);
-  const label = await request(
+  const label = await call(
       "model-catalog/labels",
       "POST",
       {
@@ -201,7 +228,7 @@ async function seedRoute() {
   expect(label.response.status).toBe(201);
   expect(
     (
-      await request(
+      await call(
         `model-catalog/routing-policies/${lid}`,
         "PUT",
         {
@@ -219,11 +246,253 @@ async function seedRoute() {
     pid,
     rid,
     lid,
+    connection: {
+      protocol: provider.json.data?.protocol,
+      connection_type: provider.json.data?.connection_type,
+      base_url: provider.json.data?.base_url,
+      secret_handle_ref: provider.json.data?.secret_handle_ref,
+    },
     modelId: String(model.json.data?.id),
     featureId: String(f.json.data?.id),
   };
 }
 describe("real Nest Model catalog", () => {
+  it("shares one immutable revision across businesses with explicit tenant choices and optional aliases", async () => {
+    const first = await seedRoute();
+    const second = await seedRoute();
+    const frozen = (
+      await request(
+        `model-catalog/revisions/${first.rid}`,
+        "GET",
+        undefined,
+        adminHeaders,
+      )
+    ).json.data;
+    const shared = await request(
+      `model-catalog/labels/${second.lid}`,
+      "PATCH",
+      { default_revision_id: first.rid },
+      { ...adminHeaders, "if-match": '"1"' },
+    );
+    expect(shared.response.status).toBe(200);
+    expect(shared.json.data?.display_name).toBe("Route");
+    expect(
+      (
+        await request(
+          `model-catalog/labels/${second.lid}`,
+          "PATCH",
+          { display_name: "Titles" },
+          { ...adminHeaders, "if-match": '"2"' },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          `model-catalog/labels/${first.lid}`,
+          "PATCH",
+          { display_name: null },
+          { ...adminHeaders, "if-match": '"1"' },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          `model-catalog/routing-policies/${second.lid}`,
+          "PUT",
+          {
+            model_revision_id: second.rid,
+            visible: true,
+            is_default: true,
+            priority: 0,
+          },
+          { "if-none-match": "*" },
+          "tenant-b",
+        )
+      ).response.status,
+    ).toBe(200);
+    for (const provider of [first.pid, second.pid]) {
+      expect(
+        (
+          await request(
+            `model-catalog/providers/${provider}/health`,
+            "PUT",
+            { status: "healthy", observed_at: new Date().toISOString() },
+            { ...adminHeaders, "if-none-match": "*" },
+          )
+        ).response.status,
+      ).toBe(200);
+    }
+    const catalog = async (feature: string, tenant = "tenant-a") => {
+      const result = await request(
+        `model-catalog/catalog?feature_key=${encodeURIComponent(feature)}`,
+        "GET",
+        undefined,
+        {},
+        tenant,
+      );
+      expect(result.response.status).toBe(200);
+      return result.json.data?.items as Array<Record<string, unknown>>;
+    };
+    expect(await catalog(first.feature)).toEqual([
+      expect.objectContaining({
+        revision_id: first.rid,
+        provider_id: first.pid,
+        display_name: "gateway",
+        request_model: "gateway",
+        is_default: true,
+      }),
+    ]);
+    expect(await catalog(second.feature)).toEqual([
+      expect.objectContaining({
+        revision_id: first.rid,
+        provider_id: first.pid,
+        display_name: "Titles",
+      }),
+    ]);
+    expect(await catalog(second.feature, "tenant-b")).toEqual([
+      expect.objectContaining({
+        revision_id: second.rid,
+        provider_id: second.pid,
+        display_name: "Titles",
+      }),
+    ]);
+    expect(await catalog(first.feature, "tenant-b")).toEqual([]);
+    for (const feature of [first.feature, second.feature]) {
+      const resolved = await request(
+        "model-catalog/resolve",
+        "POST",
+        { feature_key: feature },
+        agentHeaders,
+      );
+      expect(resolved.response.status).toBe(200);
+      expect(resolved.json.data).toMatchObject({
+        revision_id: first.rid,
+        provider_id: first.pid,
+        feature_key: feature,
+        request_model: "gateway",
+      });
+    }
+    expect(
+      (
+        await request(
+          "model-catalog/resolve",
+          "POST",
+          { feature_key: second.feature },
+          agentHeaders,
+          "tenant-b",
+        )
+      ).json.data,
+    ).toMatchObject({
+      revision_id: second.rid,
+      provider_id: second.pid,
+    });
+    expect(
+      (
+        await request(
+          `model-catalog/labels/${second.lid}`,
+          "PATCH",
+          { display_name: null },
+          { ...adminHeaders, "if-match": '"3"' },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect((await catalog(second.feature))[0]?.display_name).toBe("gateway");
+    const unboundKey = `unbound.${randomUUID()}`;
+    const unbound = await request(
+      "model-catalog/labels",
+      "POST",
+      {
+        label_key: unboundKey,
+        feature_key: second.feature,
+        default_revision_id: null,
+      },
+      adminHeaders,
+    );
+    expect(unbound.response.status).toBe(201);
+    expect(
+      (
+        await request(
+          `model-catalog/routing-policies/${String(unbound.json.data?.id)}`,
+          "PUT",
+          {
+            model_revision_id: null,
+            visible: true,
+            is_default: false,
+            priority: 0,
+          },
+          { "if-none-match": "*" },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect(await catalog(second.feature)).toHaveLength(1);
+    const rejected = await request(
+      "model-catalog/resolve",
+      "POST",
+      { feature_key: second.feature, label_key: unboundKey },
+      agentHeaders,
+    );
+    expect(rejected.response.status).toBe(503);
+    expect(rejected.json.error?.code).toBe("MODEL_UNAVAILABLE");
+    expect(
+      (
+        await request(
+          `model-catalog/revisions/${first.rid}`,
+          "GET",
+          undefined,
+          adminHeaders,
+        )
+      ).json.data,
+    ).toEqual(frozen);
+    expect(frozen).not.toHaveProperty("feature_key");
+    expect(
+      (
+        await request(
+          `model-catalog/routing-policies/${first.lid}`,
+          "DELETE",
+          undefined,
+          { "if-match": '"1"' },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          `model-catalog/labels/${first.lid}`,
+          "DELETE",
+          undefined,
+          { ...adminHeaders, "if-match": '"2"' },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect(
+      (
+        await request(`features/${first.featureId}/retire`, "POST", undefined, {
+          ...adminHeaders,
+          "if-match": '"1"',
+        })
+      ).response.status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          "model-catalog/resolve",
+          "POST",
+          { feature_key: second.feature },
+          agentHeaders,
+        )
+      ).json.data?.revision_id,
+    ).toBe(first.rid);
+    const stillUsed = await request(
+      `model-catalog/revisions/${first.rid}/retire`,
+      "POST",
+      undefined,
+      { ...adminHeaders, "if-match": '"2"' },
+    );
+    expect(stillUsed.response.status).toBe(409);
+    expect(stillUsed.json.error?.code).toBe("RESOURCE_IN_USE");
+  });
   it("owns definition/provider global CRUD and health CAS", async () => {
     const ah = {
       "x-kokoro-service": "system-admin",
@@ -272,8 +541,10 @@ describe("real Nest Model catalog", () => {
         provider: "litellm",
         provider_key: "primary",
         display_name: "Primary",
-        secret_handle_ref: "vault:primary",
-        transport: "litellm",
+        api_key: "fixture-key-primary",
+        protocol: "openai_chat_completions",
+        connection_type: "litellm",
+        base_url: "https://gateway.example/v1",
         priority: 10,
       },
       ah,
@@ -329,8 +600,10 @@ describe("real Nest Model catalog", () => {
         provider: "litellm",
         provider_key: "revision-provider",
         display_name: "Provider",
-        secret_handle_ref: "vault:revision",
-        transport: "litellm",
+        api_key: "fixture-key-revision",
+        protocol: "openai_chat_completions",
+        connection_type: "litellm",
+        base_url: "https://gateway.example/v1",
         priority: 1,
       },
       ah,
@@ -341,11 +614,10 @@ describe("real Nest Model catalog", () => {
       revision: 1,
       provider_model_name: "provider-model",
       display_name: "Revision",
-      feature_key: "model.chat",
       input_modalities: ["text"],
       output_modalities: ["text"],
-      transport: "litellm",
-      gateway_model_name: "gateway-model",
+
+      request_model: "gateway-model",
       context_window: 8000,
       max_output_tokens: 2000,
       priority: 10,
@@ -472,8 +744,10 @@ describe("real Nest Model catalog", () => {
         provider: "litellm",
         provider_key: `bound-${suffix}`,
         display_name: "Execution bound",
-        secret_handle_ref: `vault:bound-${suffix}`,
-        transport: "litellm",
+        api_key: `fixture-key-bound-${suffix}`,
+        protocol: "openai_chat_completions",
+        connection_type: "litellm",
+        base_url: "https://gateway.example/v1",
         priority: 1,
       },
       adminHeaders,
@@ -487,11 +761,10 @@ describe("real Nest Model catalog", () => {
         revision: 1,
         provider_model_name: "provider-bound",
         display_name: "Execution bound",
-        feature_key: feature,
         input_modalities: ["text"],
         output_modalities: ["text"],
-        transport: "litellm",
-        gateway_model_name: "gateway-bound",
+
+        request_model: "gateway-bound",
         context_window: null,
         max_output_tokens: null,
         priority: 1,
@@ -555,7 +828,7 @@ describe("real Nest Model catalog", () => {
     }
   });
   it("enforces nullable draft and complete int32 execution-bound edges without side effects", async () => {
-    const { modelId, pid, feature } = await seedRoute();
+    const { modelId, pid } = await seedRoute();
     const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
     await db.connect();
     const snapshot = async () => {
@@ -585,11 +858,10 @@ describe("real Nest Model catalog", () => {
       revision,
       provider_model_name: `edge-${revision}`,
       display_name: `Edge ${revision}`,
-      feature_key: feature,
       input_modalities: ["text"],
       output_modalities: ["text"],
-      transport: "litellm",
-      gateway_model_name: `edge-${revision}`,
+
+      request_model: `edge-${revision}`,
       context_window: contextWindow,
       max_output_tokens: maxOutputTokens,
       priority: revision,
@@ -700,8 +972,10 @@ describe("real Nest Model catalog", () => {
           provider: "litellm",
           provider_key: "routing-provider",
           display_name: "Provider",
-          secret_handle_ref: "vault:routing",
-          transport: "litellm",
+          api_key: "fixture-key-routing",
+          protocol: "openai_chat_completions",
+          connection_type: "litellm",
+          base_url: "https://gateway.example/v1",
           priority: 1,
         },
         ah,
@@ -716,11 +990,10 @@ describe("real Nest Model catalog", () => {
           revision: 1,
           provider_model_name: "provider-route",
           display_name: "Route",
-          feature_key: "routing.chat",
           input_modalities: ["text"],
           output_modalities: ["text"],
-          transport: "litellm",
-          gateway_model_name: "gateway-route",
+
+          request_model: "gateway-route",
           context_window: 16384,
           max_output_tokens: 4096,
           priority: 1,
@@ -790,7 +1063,7 @@ describe("real Nest Model catalog", () => {
     );
     expect(resolved.response.status).toBe(200);
     expect(resolved.json.data?.revision_id).toBe(rid);
-    expect(resolved.json.data?.gateway_model_name).toBe("gateway-route");
+    expect(resolved.json.data?.request_model).toBe("gateway-route");
     expect(resolved.json.data?.context_window).toBe(16384);
     expect(resolved.json.data?.max_output_tokens).toBe(4096);
     expect(resolved.json.data).not.toHaveProperty("secret_handle_ref");
@@ -836,7 +1109,11 @@ describe("real Nest Model catalog", () => {
         display_name: "Default",
         is_default: true,
         feature_key: "routing.chat",
-        default_revision_id: rid,
+        model_id: model.json.data?.id,
+        provider_id: pid,
+        provider: "litellm",
+        revision_id: rid,
+        request_model: "gateway-route",
       },
     ]);
     await request(
@@ -882,8 +1159,9 @@ describe("real Nest Model catalog", () => {
     expect(first.response.status).toBe(200);
     const generation = String(first.json.data?.generation);
     const tenantGeneration = String(first.json.data?.tenant_generation);
-    const key = `model-resolve:${commandDigest({
+    const key = `model-resolve:v5:${commandDigest({
       tenant: "tenant-a",
+      allow_loopback_http: false,
       feature,
       label: null,
       generation,
@@ -1153,7 +1431,7 @@ describe("real Nest Model catalog", () => {
     const operations = systemOperations.filter(
       (op) => op.module === "model-catalog",
     );
-    expect(operations).toHaveLength(30);
+    expect(operations).toHaveLength(33);
     for (const op of operations) {
       const path = op.path
         .replace("/v1/system/", "")
@@ -1393,7 +1671,7 @@ describe("real Nest Model catalog", () => {
     }
   });
   it("rejects PostgreSQL integer overflow before attempting a revision write", async () => {
-    const { modelId, pid, feature } = await seedRoute();
+    const { modelId, pid } = await seedRoute();
     const result = await request(
       "model-catalog/revisions",
       "POST",
@@ -1403,11 +1681,10 @@ describe("real Nest Model catalog", () => {
         revision: 2147483648,
         provider_model_name: "overflow",
         display_name: "Overflow",
-        feature_key: feature,
         input_modalities: ["text"],
         output_modalities: ["text"],
-        transport: "litellm",
-        gateway_model_name: "overflow",
+
+        request_model: "overflow",
         context_window: null,
         max_output_tokens: null,
         priority: 1,
@@ -1425,11 +1702,10 @@ describe("real Nest Model catalog", () => {
       revision: 2,
       provider_model_name: "draft",
       display_name: "Draft",
-      feature_key: feature,
       input_modalities: ["text"],
       output_modalities: ["text"],
-      transport: "litellm",
-      gateway_model_name: "draft",
+
+      request_model: "draft",
       context_window: null,
       max_output_tokens: null,
       priority: 5,
@@ -1555,8 +1831,10 @@ describe("real Nest Model catalog", () => {
       provider: "litellm",
       provider_key: randomUUID(),
       display_name: "Lifecycle",
-      secret_handle_ref: "vault:lifecycle",
-      transport: "litellm",
+      api_key: "fixture-key-lifecycle",
+      protocol: "openai_chat_completions",
+      connection_type: "litellm",
+      base_url: "https://gateway.example/v1",
       priority: 1,
     };
     const provider = await request(
@@ -1571,7 +1849,7 @@ describe("real Nest Model catalog", () => {
         await request(
           `model-catalog/providers/${providerId}`,
           "PATCH",
-          { priority: 7, secret_handle_ref: "vault:rotated" },
+          { priority: 7 },
           { ...adminHeaders, "if-match": '"1"' },
         )
       ).response.status,
@@ -1616,5 +1894,325 @@ describe("real Nest Model catalog", () => {
       expect(
         (await request(`model-catalog/${path}?limit=1`)).response.status,
       ).toBe(200);
+  });
+});
+
+describe("real immutable model connection lifecycle", () => {
+  it("keeps same-path direct and LiteLLM addresses/accounts separate through snapshot, metadata edits and cache", async () => {
+    for (const connection of [
+      {
+        connection_type: "direct",
+        base_url: "https://vendor.example/custom/v1",
+        api_key: "fixture-key-vendor",
+      },
+      {
+        connection_type: "litellm",
+        base_url: "https://gateway.example/custom/v1",
+        api_key: "fixture-key-gateway",
+      },
+    ]) {
+      const route = await seedRoute(connection);
+      const initial = (
+        await request(
+          `model-catalog/revisions/${route.rid}`,
+          "GET",
+          undefined,
+          adminHeaders,
+        )
+      ).json.data!;
+      expect(initial.connection).toEqual(route.connection);
+      expect(initial.digest).toBe(
+        commandDigest(revisionContent(revisionSchema.parse(initial))),
+      );
+      expect(
+        (
+          await request(
+            `model-catalog/providers/${route.pid}`,
+            "PATCH",
+            { display_name: "Metadata only" },
+            { ...adminHeaders, "if-match": '"1"' },
+          )
+        ).response.status,
+      ).toBe(200);
+      for (const patch of [
+        { base_url: "https://other.example/custom/v1" },
+        { secret_handle_ref: "vault:other" },
+      ]) {
+        expect(
+          (
+            await request(
+              `model-catalog/providers/${route.pid}`,
+              "PATCH",
+              patch,
+              { ...adminHeaders, "if-match": '"2"' },
+            )
+          ).response.status,
+        ).toBe(400);
+      }
+      expect(
+        (
+          await request(
+            `model-catalog/providers/${route.pid}/health`,
+            "PUT",
+            { status: "healthy", observed_at: new Date().toISOString() },
+            { ...adminHeaders, "if-none-match": "*" },
+          )
+        ).response.status,
+      ).toBe(200);
+      const reads = [];
+      for (let i = 0; i < 2; i++)
+        reads.push(
+          await request(
+            "model-catalog/resolve",
+            "POST",
+            { feature_key: route.feature },
+            agentHeaders,
+          ),
+        );
+      expect(reads.map((r) => r.response.status)).toEqual([200, 200]);
+      expect(reads[1]!.json.data).toEqual(reads[0]!.json.data);
+      expect(reads[0]!.json.data).toMatchObject({
+        connection: initial.connection,
+        digest: initial.digest,
+        request_model: "gateway",
+        provider_model_name: "provider",
+      });
+      expect(reads[0]!.json.data).not.toHaveProperty("gateway_model_name");
+      const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
+      await db.connect();
+      try {
+        for (const sql of [
+          "UPDATE system_fixture.model_provider SET base_url='https://other.example/v1' WHERE id=$1",
+          "UPDATE system_fixture.model_provider SET secret_handle_ref='vault:other' WHERE id=$1",
+          "DELETE FROM system_fixture.model_provider WHERE id=$1",
+        ]) {
+          await expect(db.query(sql, [route.pid])).rejects.toMatchObject({
+            code: "23514",
+          });
+        }
+        await expect(
+          db.query(
+            "UPDATE system_fixture.model_revision SET connection_secret_handle_ref='vault:other' WHERE id=$1",
+            [route.rid],
+          ),
+        ).rejects.toMatchObject({ code: "23514" });
+      } finally {
+        await db.end();
+      }
+      expect(
+        (
+          await request(
+            `model-catalog/revisions/${route.rid}`,
+            "GET",
+            undefined,
+            adminHeaders,
+          )
+        ).json.data,
+      ).toEqual(initial);
+    }
+  });
+  it("rejects caller/corrupt snapshots and only owner-builds a draft's new-provider snapshot", async () => {
+    const route = await seedRoute();
+    const old = revisionSchema.parse(
+      (
+        await request(
+          `model-catalog/revisions/${route.rid}`,
+          "GET",
+          undefined,
+          adminHeaders,
+        )
+      ).json.data,
+    );
+    const { connection, ...input } = revisionContent(old);
+    const body = { ...input, revision: 2 };
+    expect(
+      (
+        await request(
+          "model-catalog/revisions",
+          "POST",
+          { ...body, connection },
+          adminHeaders,
+        )
+      ).response.status,
+    ).toBe(400);
+    const draft = await request(
+      "model-catalog/revisions",
+      "POST",
+      body,
+      adminHeaders,
+    );
+    expect(draft.response.status).toBe(201);
+    const id = String(draft.json.data?.id);
+    const db = new Client(parseSystemDatabaseUrl(databaseUrl.href));
+    await db.connect();
+    try {
+      await db.query(
+        "UPDATE system_fixture.model_revision SET connection_base_url='https://wrong.example/v1' WHERE id=$1",
+        [id],
+      );
+      const before = (
+        await db.query(
+          "SELECT generation::text FROM system_fixture.model_cache_generation",
+        )
+      ).rows;
+      const rejected = await request(
+        `model-catalog/revisions/${id}/publish`,
+        "POST",
+        undefined,
+        { ...adminHeaders, "if-match": '"1"' },
+      );
+      expect(rejected.response.status).toBe(409);
+      expect(rejected.json.error?.code).toBe("INVALID_STATE");
+      expect(
+        (
+          await db.query(
+            "SELECT generation::text FROM system_fixture.model_cache_generation",
+          )
+        ).rows,
+      ).toEqual(before);
+      expect(
+        (
+          await request(
+            `model-catalog/revisions/${id}`,
+            "GET",
+            undefined,
+            adminHeaders,
+          )
+        ).json.data?.published_at,
+      ).toBeNull();
+    } finally {
+      await db.end();
+    }
+    // Omitting topology on the wire defaults only this new connection to direct.
+    const next = await request(
+      "model-catalog/providers",
+      "POST",
+      {
+        provider: "vendor",
+        provider_key: randomUUID(),
+        display_name: "New endpoint",
+        protocol: "openai_chat_completions",
+        base_url: "https://new.example/v1",
+        api_key: "fixture-key-new-account",
+        priority: 1,
+      },
+      adminHeaders,
+    );
+    expect(next.response.status).toBe(201);
+    expect(next.json.data?.connection_type).toBe("direct");
+    const updated = await request(
+      `model-catalog/revisions/${id}`,
+      "PATCH",
+      { provider_id: next.json.data?.id, request_model: "new-request-model" },
+      { ...adminHeaders, "if-match": '"1"' },
+    );
+    expect(updated.response.status).toBe(200);
+    expect(updated.json.data?.connection).toEqual({
+      protocol: "openai_chat_completions",
+      connection_type: "direct",
+      base_url: "https://new.example/v1",
+      secret_handle_ref: next.json.data?.secret_handle_ref,
+    });
+    expect(updated.json.data?.digest).toBe(
+      commandDigest(revisionContent(revisionSchema.parse(updated.json.data))),
+    );
+    expect(
+      (
+        await request(
+          `model-catalog/revisions/${id}/publish`,
+          "POST",
+          undefined,
+          { ...adminHeaders, "if-match": '"2"' },
+        )
+      ).response.status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          `model-catalog/revisions/${route.rid}`,
+          "GET",
+          undefined,
+          adminHeaders,
+        )
+      ).json.data?.connection,
+    ).toEqual(connection);
+  });
+  it("requires explicit deployment permission for loopback creation and resolve, including another deployment's cache", async () => {
+    const connection = {
+      connection_type: "direct",
+      base_url: "http://127.0.0.1:1234/custom/v1",
+      api_key: "fixture-key-loopback",
+    };
+    expect(
+      (
+        await request(
+          "model-catalog/providers",
+          "POST",
+          {
+            provider: "test",
+            provider_key: randomUUID(),
+            display_name: "Loopback",
+            protocol: "openai_chat_completions",
+            priority: 1,
+            ...connection,
+          },
+          adminHeaders,
+        )
+      ).response.status,
+    ).toBe(400);
+    const allowed = await NestFactory.create<NestExpressApplication>(
+      AppModule.forRoot({
+        DATABASE_URL: databaseUrl.href,
+        REDIS_URL: process.env.TEST_REDIS_URL ?? "redis://localhost:6379/2",
+        KOKORO_SYSTEM_REDIS_NAMESPACE: databaseName,
+        KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL: "true",
+        KOKORO_SYSTEM_MODEL_HEALTH_MAX_AGE_MS: "2000",
+        KOKORO_SYSTEM_BFF_SERVICE_TOKEN: token,
+        KOKORO_SYSTEM_AGENT_SERVICE_TOKEN: "system-test-agent-credential",
+        KOKORO_SYSTEM_ADMIN_SERVICE_TOKEN: "system-test-admin-credential",
+        KOKORO_SYSTEM_MODEL_KEY_MATERIAL_FILE: credentialMaterial,
+      }),
+      { logger: false },
+    );
+    configureHttp(allowed);
+    await allowed.listen(0, "127.0.0.1");
+    try {
+      const target = await allowed.getUrl();
+      const route = await seedRoute(connection, target);
+      expect(
+        (
+          await request(
+            `model-catalog/providers/${route.pid}/health`,
+            "PUT",
+            { status: "healthy", observed_at: new Date().toISOString() },
+            { ...adminHeaders, "if-none-match": "*" },
+            "tenant-a",
+            target,
+          )
+        ).response.status,
+      ).toBe(200);
+      expect(
+        (
+          await request(
+            "model-catalog/resolve",
+            "POST",
+            { feature_key: route.feature },
+            agentHeaders,
+            "tenant-a",
+            target,
+          )
+        ).json.data?.connection,
+      ).toEqual(route.connection);
+      const denied = await request(
+        "model-catalog/resolve",
+        "POST",
+        { feature_key: route.feature },
+        agentHeaders,
+      );
+      expect(denied.response.status).toBe(503);
+      expect(denied.json.error?.code).toBe("MODEL_UNAVAILABLE");
+    } finally {
+      await allowed.close();
+    }
   });
 });

@@ -1,3 +1,4 @@
+import { MODEL_MANAGEMENT_OPERATIONS } from "../src/access/access.guard.js";
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -11,9 +12,13 @@ import {
 import { systemOperations } from "./system-openapi-operations.js";
 
 type JsonObject = Record<string, unknown>;
-function json(schema: z.ZodType): JsonObject {
+function json(
+  schema: z.ZodType,
+  io: "input" | "output" = "output",
+): JsonObject {
   const result = z.toJSONSchema(schema, {
     target: "draft-2020-12",
+    io,
     unrepresentable: "throw",
   });
   delete result.$schema;
@@ -33,8 +38,12 @@ const requestIdHeader = {
     schema: json(requestIdSchema),
   },
 };
-function component(schema: z.ZodType, schemas: JsonObject): JsonObject {
-  const value = json(schema);
+function component(
+  schema: z.ZodType,
+  schemas: JsonObject,
+  io: "input" | "output" = "output",
+): JsonObject {
+  const value = json(schema, io);
   const key = `schema_${createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16)}`;
   schemas[key] = value;
   return { $ref: `#/components/schemas/${key}` };
@@ -73,18 +82,49 @@ export function buildSystemOpenApi(): Readonly<{
     const parameters: JsonObject[] = [
       parameter("x-kokoro-service", "header", true, {
         type: "string",
-        enum: ["web-bff", "kokoro-agent", "system-admin"],
+        enum:
+          operation.operationId === "readModelCredential"
+            ? ["kokoro-agent"]
+            : operation.operationId === "listModelProviderUpstreamModels"
+              ? ["model-management", "system-admin"]
+              : [
+                  "web-bff",
+                  "kokoro-agent",
+                  "system-admin",
+                  ...(MODEL_MANAGEMENT_OPERATIONS.has(operation.operationId)
+                    ? ["model-management"]
+                    : []),
+                ],
       }),
-      parameter("x-kokoro-tenant-id", "header", operation.scope === "tenant", {
-        type: "string",
-        minLength: 1,
-        maxLength: 160,
-      }),
-      parameter("x-kokoro-actor-id", "header", operation.mutation, {
-        type: "string",
-        minLength: 1,
-        maxLength: 160,
-      }),
+      parameter(
+        "x-kokoro-tenant-id",
+        "header",
+        operation.scope === "tenant" ||
+          [
+            "createModelProvider",
+            "getModelProviderCreation",
+            "listModelProviderUpstreamModels",
+          ].includes(operation.operationId),
+        {
+          type: "string",
+          minLength: 1,
+          maxLength: 160,
+        },
+      ),
+      parameter(
+        "x-kokoro-actor-id",
+        "header",
+        operation.mutation ||
+          [
+            "getModelProviderCreation",
+            "listModelProviderUpstreamModels",
+          ].includes(operation.operationId),
+        {
+          type: "string",
+          minLength: 1,
+          maxLength: 160,
+        },
+      ),
       parameter(
         "x-kokoro-iam-permissions",
         "header",
@@ -149,6 +189,22 @@ export function buildSystemOpenApi(): Readonly<{
     const responses: JsonObject = {
       [String(operation.status)]: response(operation.response, schemas),
     };
+    if (
+      [
+        "getModelProviderCreation",
+        "readModelCredential",
+        "listModelProviderUpstreamModels",
+      ].includes(operation.operationId)
+    ) {
+      const success = responses[String(operation.status)] as JsonObject;
+      success.headers = {
+        ...(success.headers as JsonObject),
+        "Cache-Control": {
+          required: true,
+          schema: { type: "string", const: "no-store" },
+        },
+      };
+    }
     const errorStatuses = [400, 403, 404, 503];
     if (operation.mutation) errorStatuses.push(409);
     if (operation.cas !== "none") errorStatuses.push(428);
@@ -165,9 +221,11 @@ export function buildSystemOpenApi(): Readonly<{
       "x-kokoro-permission": operation.permission,
       "x-kokoro-scope": operation.scope,
       description:
-        operation.scope === "conditional"
-          ? "Config POST uses body.scope_type; other Config operations use query.scope (default tenant). Global scope requires authenticated system-admin, ignores tenant header and writes no tenant identity. Tenant scope requires trusted tenant header. Global Config has no release."
-          : `${operation.scope} scope; global requires authenticated system-admin`,
+        operation.operationId === "listModelProviderUpstreamModels"
+          ? "Management-only global write read; trusted actor and actor tenant required. No body, query, command headers, persistence or automatic retry. Candidate IDs are not published models or capability guarantees."
+          : operation.scope === "conditional"
+            ? "Config POST uses body.scope_type; other Config operations use query.scope (default tenant). Global scope requires authenticated system-admin, ignores tenant header and writes no tenant identity. Tenant scope requires trusted tenant header. Global Config has no release."
+            : `${operation.scope} scope; global requires authenticated system-admin`,
       "x-kokoro-precondition": operation.cas,
       security: [{ serviceBearer: [] }, { serviceSecret: [] }],
       parameters,
@@ -177,7 +235,9 @@ export function buildSystemOpenApi(): Readonly<{
       item.requestBody = {
         required: true,
         content: {
-          "application/json": { schema: component(operation.body, schemas) },
+          "application/json": {
+            schema: component(operation.body, schemas, "input"),
+          },
         },
       };
     paths[operation.path] ??= {};
@@ -205,10 +265,10 @@ export function buildSystemOpenApi(): Readonly<{
     servers: [{ url: "/", description: "Same internal-owner origin" }],
     info: {
       title: "Kokoro System internal owner",
-      version: "3.0.0",
-      "x-kokoro-release-classification": "execution-bound-breaking",
+      version: "6.1.0",
+      "x-kokoro-release-classification": "provider-model-discovery-additive",
       description:
-        "Generated from runtime Zod schemas for implemented System internal-owner routes; 3.0.0 adds required model execution capability bounds.",
+        "Generated from runtime Zod schemas for implemented System internal-owner routes; 6.1.0 adds explicit management-only provider model discovery; existing encrypted credentials and Agent current-route retrieval are unchanged.",
     },
     paths,
     components: {

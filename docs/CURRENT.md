@@ -1,3 +1,43 @@
+## 2026-10-22 提供方模型发现候选（System6.1）
+
+新增显式管理读取 `GET /v1/system/model-catalog/providers/{provider_id}/upstream-models`，使用已有加密Key返回候选ID，不要求先创建业务路由，不回传Key／原始上游正文，不发布或修改模型／价格／健康。原System6.0的87个operation及66个既有schema逐项保持；BFF/Admin仍待固定新发布物接线。
+
+单总10秒、1MiB／2000项、禁止重定向、固定已核DNS地址及原Host/TLS；默认拒非公网解析。自有HTTP／PG测试和实际部署DNS证明需要精确私网许可：`KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS`默认空，最多32个canonical DNS主机，仅HTTPS原主机精确匹配才允许RFC1918／ULA／benchmark解析结果，仍拒元数据／危险地址，loopback仍须原开关。不自动许可所有已配置provider，实际部署名单只留私有配置。
+
+主方完整`pnpm verify`exit0：255测试PASS，fresh schema33断言通过，215输入无漂移、测试数据库清单前后相等；独立审查P2均已修并复核。真实已配置提供方的专用transport读取28项，原配置模型存在；与最终冻结transport字节相同，零模型生成／工具／积分。正常服务加载和后台BFF／UI不由这些证据替代；本片无Schema变更。
+
+## 2026-10-20 MC-02：System6 密钥底座（隔离交付，未激活）
+
+已按用户批准在现 model-catalog 内落地只写 API Key 创建、AES-GCM密文/AAD、独立HMAC收据、永久创建标记及脱敏查回；原provider/receipt/generation同PG事务。Agent-only领取从当前tenant policy选实际route后比较精确provider/revision/digest、handle及health，provider锁等待后取新快照；软删拒读，30日过期同事务擦除密文并保创建身份。固定私有启动材料、窄model-management身份，无新服务/依赖或全局管理提权。
+
+最终正规System6 artifact `10ff7ee82ca7405dcab473f3fd80e620aa6c4e0bc92e64111797144ce0fa4061`，provenance `ed2e312bc5bc3022111797771190e57133818af83c0bb7ad2024a615a4e033c5`，22来源、85业务+2probe。完整 `pnpm verify` 退出0：格式/lint/types/build/contract、225 PASS/0SKIP、fresh33断言/23表完整canonical。真实HTTP/PG含同键并发、原主体查回、receipt过期标记、注入失败全事务回滚、密文篡改、错版本/路由、health过期、真实锁等待后撤权与恢复/擦除；实际测试库库存核等、无残留。早期RED及fixture错误保留为诊断，不冒通过。
+
+正常源码/配置/库/进程不动；当前只证owner组件，不证Agent/BFF/App/Admin完整配置、正常页面或整链。模型、工具执行及扣费继续暂停，本批完整需求收尾前不push/merge。消费者下一步删除旧文件消费，固定新source/artifact，再完成表单和隔离链。
+
+## 2026-10-20 MC-02A：共享模型与业务组合已通过本 owner 验证
+
+用户批准同一已发布模型配置供多业务复用。revision 去 feature 耦合；label/routing 承业务引用与租户默认／覆盖；别名可省略或 null，未设按精确 request_model 显示原名，PATCH 缺失保留；catalog 返回实际有效修订／真实 provider 身份，空绑定不扫描其他模型。无新表、服务或依赖，原发布／CAS／幂等／health/cache与全局引用保护保留。
+
+原代码实际合同2失败、共享业务HTTP409 RED后修复；新增仅现合同1用例＋现HTTP1用例，原风险fixture按新契约配对。最终 Node24.20／pnpm12.3.4 `pnpm verify` 全0：contract20、16文件214PASS／0SKIP、fresh33断言／22表完整canonical、format/lint/type/build。独审无确定P0–P2，85操作inventory、55非model操作递归表示、22表身份不变；资源门前后库inventory相等。
+
+System5 artifact `a83b37269e9e4fa7fb5310a1836975e20ab9eaee965a66c83e35bb1ca1b9e5df`，provenance `97b20e57f66010ba456fac59fe1dd62d90c17325c82d3da80be455ea9d3cf747`。第一次完整门仅README摘要未更新失败；其后最终完整门通过。首个model suite中三项fixture错配（目录新字段、v5cache key、过度移除局部feature变量）均保留诊断后定向修正，不隐藏失败。
+
+此为本地owner候选，不是远端发布或完整模型产品闭环：BFF/App/Admin/Agent尚未消费System5，正常System不重载、不执行DDL，既有System4已验链不替代新组合验收。API Key保存／读取仍为独立候选；模型、工具执行、扣费保持暂停。
+
+## 2026-10-20 System4 消费配对与正常结构验收
+
+在Draft源码 `dafbc66c9ab5e55b556dbd1dd71c79cef354f69c` 上重跑 Node24.20／pnpm12.3.4 完整 `verify`：格式、lint、type、build、contract全部exit0，16文件212 PASS／0SKIP；fresh schema33断言／22表完整canonical catalog匹配。BFF已本地提交 `15e4a7423ceed83dbb09d02e24e802ac78d9ed9e` Public20固定消费System4，只替换revision表示且仍四操作；App/Admin对应同一artifact正在收口，不扩provider/revision创建发布UI。
+
+正常System经只读／冻结核实模型definition/provider/revision/label/routing/health均零行，3条命令receipt均completed。先备份恢复演练，再只重建两张空模型表及其原index／新connection guard，22表原行hash一致；受影响模型catalog与当前canonical逐对象相等，其余catalog严格保持原样。不使用trace、旧网关名或Agent全局地址推测连接，不重算旧digest，不建旧字段／旧数据兼容层。此前整库catalog比较发现其他旧CHECK表达式解析形式差异，原样保留，不扩大成其他20表重建；不据此称正常全owner已做全量canonical替换。
+
+正常System与BFF已配对ready，retention hold保持true、原机器配置字节不变。隔离真实IAM正式管理员资格→BFF→System4/PG已验目录读取、CAS、原key回放、冲突、非法session拒绝；临时库与IAM key inventory清理前后一致。第一轮seed使用未启用的HTTP loopback被正式拒绝，改为无网络请求的HTTPS fixture元数据后通过；未放宽部署开关。Admin/Product桥和实际页面证据另记。此为管理／配置验收，不含任何模型推理、工具或扣费；Agent始终disabled。远端PR/Root组合与后继页面另验，不以本地配对冒称已merge。
+
+## 2026-10-20 保留的 System4 源码正式进入 Draft PR
+
+原 codex/model-connections 的既定 MC-01 实现 7f479f6 未合 main，本次完整保留该四提交历史，不把它当试验删除。隔离重跑 Node24.20 / pnpm12.3.4 完整 verify exit0，含格式、lint、type、build、契约、全部测试与 fresh schema；不修改正常资源。
+
+暂不 merge 或更新 Root System pin：Agent main 已固定该 System4 版本，但 BFF Public19 管理 revision 仍要求 System3 的 transport/gateway_model_name，正式 System4 删除并改为 connection/request_model。须在既有模型连接方案内完成公开契约与 Admin 消费者原子配对，禁止制造旧字段 fallback。正常旧 schema/历史发布记录处置另待核实；本 Draft 不激活连接、不切正常服务、不发送模型/工具或扣费请求。
+
 ## R215 模型执行上限切片验收（2026-10-04）
 
 实施前基线 `9a4e98eb9aed5513312090cf0e8e3f9c1d674bda` 的resolve执行上限字段为0。本切片已实现canonical两界、revision/resolve、正规3.0.0 artifact/provenance及HTTP/raw SQL/cache/contract断言。历史证据保留full-owner 199通过/1旧fixture失败、fresh同类失败，以及checksum合法关系错误cache被200接受的真实业务RED；修正后Root41905在冻结源码上已完成check/contract、16文件202通过/0失败/0跳过、fresh 23 assertions/22 tables完整canonical全绿，source/database/Redis终态一致，独审0P0/P1/P2，本切片获Root单仓验收。本地交付commit状态见Root CURRENT/progress；远端尚未push，Agent消费者未pin，3310未更新。

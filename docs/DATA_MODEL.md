@@ -1,3 +1,61 @@
+## MODEL-1 上游模型发现（2026-10-22）
+
+不加表／列／迁移。 非公网提供方主机许可仅为受控部署配置，非provider业务字段或自动推断事实。provider候选是外部瞬时读取，非持久模型目录事实；现model_provider与model_provider_credential同owner JOIN读取未删除、未擦除且handle一致的连接，原密文及创建审计不变。候选读取不推进目录generation、不写健康或价格；选中后按现模型定义／不可变revision／label／tenant routing归属写入。删除与外发不是跨系统事务，结果返回前重核有效provider，错误不触发本地清空或自动建模。
+
+## MC-02 实施授权已确认（2026-10-20）
+
+用户已明确选择“采用 System 现有模块方案”：现 model-catalog 加密保存 API Key，后台只写不回显；Agent 按当前业务路由与精确修订受控领取，删除旧手工密钥文件读取，不新增服务。下方 MC-02 密钥候选的 owner／隔离边界据此进入实施；历史“待确认”文字不覆盖此次确认，实际完成仍以源码／正式生成物与验收为准。模型请求、工具执行和扣费继续暂停；只在隔离 worktree／自有测试资源验收，不切换正常服务或写入正常密钥。
+
+首个正式实现改 provider 创建输入为 api_key，由服务端生成 opaque ref；原非秘密 provider 投影保留。敏感创建将完整请求（含可信发起租户）经独立 HMAC 保护后交原 receipt 同事务处理，永久创建标记只限该用例，不另建通用命令框架。新增脱敏创建结果 GET 与 Agent-only 凭据读取 POST（只读事务、no-store、无重试）；全局资源 scope 不变，另保可信 actor tenant。独立 model-management 身份仅准模型目录／业务引用写和业务定义读取，拒绝密钥领取与其他 System 模块。私有材料固定启动加载，AES-256-GCM／独立HMAC；丢失或不匹配时敏感操作失败而普通目录仍可读。
+
+## MC-02A 共享修订与可选别名：已确认实施边界（2026-10-20）
+
+唯一 canonical 仍为 database/schema.sql，本片不新增表。model_revision 删除 feature_key 及对应索引/写入/摘要内容；model_label.feature_key 与 tenant model_routing_policy 保留业务引用及唯一默认约束。多个业务可以引用同一 published revision；label 的全局稳定 key 不与可重复的展示别名混为一谈。
+
+model_label.display_name 改为 nullable，null 表示无别名，目录按有效 revision.request_model 投影原名；缺失 PATCH 不覆盖，显式 null 清空。现标签默认修订／租户覆盖可保留未绑定草稿，但业务列表与 resolve 必须先得显式有效目标，空引用不匹配任意全局 revision。模型修订发布／退休和 provider 生命周期继续按全部 label/routing 引用保护；features 的使用关系不再把共享 revision 视作业务私有。
+
+本片 fresh schema／隔离资源先验，不执行正常 DDL；旧 published digest 或历史 usage 不回填为新含义，不引入旧列兼容。正常切换前重新盘点影响、按已有授权备份／必要范围重建，并以完整新版本组合验收。
+
+---
+
+## MC-02 最新范围澄清（2026-10-20）
+
+Provider 配置统一复用，模型修订与业务组合／列表分工，不把一模型一提供方或 Key 仓当完整模型管理。当前 schema 支持 provider 多 revision，但 revision 有 feature_key、label_key 全局唯一、label display_name 必填；需要先核跨业务复用、稳定选择身份与“未设别名默认原模型名”的实际影响。优先用现 feature/label/routing，未确认真实数据需求前不新增组合资源、跨 owner 表或第二份模型配置。
+
+用户对上次存储问题的答复是上述产品语义澄清，下方受保护凭据记录仍为候选，不作为 DDL 或旧凭据文件退役的实施批准。
+
+## MC-02 凭据存储：数据设计候选（2026-10-20，待确认）
+
+System 现 canonical `database/schema.sql` 仍为唯一事实源。当前 model_provider 无 tenant 列，model_revision 保存不可变连接快照，model_routing_policy 按 tenant 隔离；此次不把提供方改成租户私有，也不借“默认 tenant”跨范围选取资源。
+
+后继拟在同一 model-catalog 增加专用受保护凭据记录，与 provider／随机 opaque ref 严格绑定；保存认证加密密文、必要 nonce/tag 和明确加密格式标识，不保存原 Key、可离线验证的裸 Key hash 或主密钥。主密钥归部署私有文件，不归任一业务表；元数据和密文不进入 Redis 路由快照或 published revision digest。
+
+provider、凭据及原命令脱敏结果同事务提交；唯一性与并发幂等由 PG 约束／原锁承接。密钥命令的比较摘要先通过独立、稳定的服务端 HMAC 密钥保护，不直接复用现 commandDigest 对原 Key 求裸 SHA，也不随加密 KEK 更换而重算。两份材料只作为固定启动快照，首版无热换或在线轮换；错误材料拒绝敏感操作，不改旧密文／摘要。
+
+专用凭据记录同时保留唯一创建命令标记、创建时间、创建 actor、发起 tenant 等非秘密审计事实，作为原命令到 provider 的唯一关联；该 tenant 不是 provider 所有权。标记身份与现 receipt 的 scope_kind/scope_id/key 一致，先取同 advisory 事务锁，不按 actor／tenant 改槽生成新操作。恢复查询核原 operation/key、actor／管理上下文 tenant 及当前管理员资格，回读关联 provider 的当前脱敏状态，不解密或依赖 KEK/HMAC，不复制完整 ACK JSON。7 日 receipt 仍是窗口内原响应重放的唯一 owner 事实，其他普通命令不加永久标记。创建标记随 provider 永久身份保留，过期敏感命令不创建第二连接；查无标记仍为 unknown，不认定原请求不会迟到提交。global scope 与发起 tenant 分开处理，不因 global context 原 tenantId=null 丢失身份。具体列／约束及索引确认后一次落 canonical，不另建 Root schema 或跨仓 SQL。
+
+provider 软删线性化后拒绝新领取，读取与删除／擦除只在 owner 本地协调锁／版本核验，不承诺撤销已领取明文或在途调用。数据库时钟下 30 日内合法恢复仅保留同 ref 同密文；达到 30 日稳定拒绝恢复，retention hold 不延长恢复窗口。到期维护同事务清空 provider handle 及 nonce/tag/ciphertext，保留创建命令标记／时间／主体／provider 身份等非秘密事实。hold 仅暂停擦除。历史修订不改写 digest 或补新账户／地址。首片任意换 Key（包括同账户）均新 provider/ref/revision，不提供原位轮换或另建版本平台；新存储上线时 Agent 的旧凭据文件路径退出，不导入旧文件或建双读兼容层。
+
+现正常提供方／修订为零行的历史盘点不代替本次切换前重新核验。此节只为待确认候选，不执行 DDL、重建、数据迁移或正常密钥写入。
+
+---
+
+## MC-01：模型连接持久事实（2026-10-16；canonical已改、正常库未切换）
+
+唯一canonical仍database/schema.sql。实施基线1460820的固定transport/gateway执行名已在候选中原子替换：provider普通列protocol/connection_type/base_url/secret_handle_ref；revision普通列connection_protocol/connection_type/connection_base_url/connection_secret_handle_ref及request_model，wire由SQL投影具名connection。无新表/FK/JSON配置袋/双写；fresh33 assertions/22表完整catalog匹配已过，正常共享库与历史published digest未改。
+
+目标只扩现 model_provider 与 model_revision，不新增通用配置表、跨 owner 表或外键。provider 是稳定技术连接身份：协议、direct/litellm 类型、规范 API base URL、opaque credential reference；实际密钥由 Agent 的部署 secret 独占。技术字段自创建固定，换连接/账户走新 provider；原显示名/优先级、软删/恢复和管理 version 继续各自含义。
+
+revision 保存创建时由 owner 读取的连接快照及唯一请求模型标识，与既有限额一起纳入 digest。快照是同 owner 的不可变历史证据，不是第二个可编辑配置中心；采用具名、带约束的普通列，不建任意 JSONB 配置袋。新 request_model 是唯一执行输入，provider_model_name 保留声明目标元数据；gateway 专属执行名称与 transport 固定值在新 canonical schema 中原子替换。
+
+创建 revision、发布与 provider 生命周期继续在原事务内锁定父事实，保 CAS/幂等/generation 与 published immutable trigger。provider 元数据更新不改变技术快照，provider 级 health 不跨技术连接复用；删除/恢复和到期维护不得重写已发布 revision 快照或摘要。现删除超过 30 天后清空 provider.secret_handle_ref 的维护操作，作为已超过恢复窗口的 provider 到期脱敏例外保留；其不再有恢复/resolve 资格。revision 保留原不透明引用与摘要，不保存密钥，也不通过该历史引用恢复执行；有效服务调用仍须 provider 未删且凭据可用。
+
+secret 轮换只替换同一不透明引用背后的同账户密钥，不把 key/hash 放进 SQL/digest/日志；账户变化需新引用与新连接。System 不持有真实账户证明、价格、用量、hold 或结算事实，原 R257 未决收费保证不由本片填补。
+
+切换前核实际 model/provider/revision、活动消费者与缓存。新鲜隔离 schema 验证不授权清理现存应用库；旧 published revision 不猜地址、不从全局 Agent env 倒填。既有数据的明确处置与回滚资源未批准前，不对共享库执行 DDL 或破坏性操作。
+
+---
+
 ## R257 当前技术路由保证设计门（2026-10-06；仅文档，未发布保证）
 
 对齐Root 15:33裁决及本仓TECHNICAL_DESIGN/API_CONTRACT同名R257前缀。基线 `955bd587f46a771e43a4330d202d90a7d2d67262`；唯一canonical仍 `database/schema.sql`，本片零DDL、零新entity/table/index、零普通数据/配置写。三原正文逐字节保留，以下只是后继数据放置与生命周期提案，不冒新schema或已部署保证。

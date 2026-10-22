@@ -3,7 +3,8 @@ import type { Precondition } from "../http/conditional-request.js";
 export type RequestContext = Readonly<{
   tenantId: string | null;
   actorId: string;
-  service: "web-bff" | "kokoro-agent" | "system-admin";
+  actorTenantId: string | null;
+  service: "web-bff" | "kokoro-agent" | "system-admin" | "model-management";
   permissions: readonly string[];
   scope: "tenant" | "global";
   requestId: string;

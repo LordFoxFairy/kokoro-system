@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { connectionSchema } from "./connection.schema.js";
 
 export const resolveInputSchema = z.strictObject({
   label_key: z.string().min(1).max(128).optional(),
@@ -16,8 +17,8 @@ export const resolveSchema = z
     tenant_generation: z.string().regex(/^[1-9][0-9]*$/u),
     provider_id: z.uuid(),
     provider_model_name: z.string(),
-    transport: z.literal("litellm"),
-    gateway_model_name: z.string(),
+    request_model: z.string().min(1).max(255),
+    connection: connectionSchema,
     label_key: z.string(),
     feature_key: z.string(),
   })
@@ -38,5 +39,9 @@ export const catalogItemSchema = z.strictObject({
   display_name: z.string(),
   is_default: z.boolean(),
   feature_key: z.string(),
-  default_revision_id: z.uuid().nullable(),
+  model_id: z.uuid(),
+  revision_id: z.uuid(),
+  provider_id: z.uuid(),
+  provider: z.string().min(1).max(128),
+  request_model: z.string().min(1).max(255),
 });

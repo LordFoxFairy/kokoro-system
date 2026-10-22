@@ -60,9 +60,10 @@ export class LabelRepository {
     input: z.infer<typeof labelUpdateSchema>,
   ) {
     const result = await tx.query(
-      `UPDATE model_label SET display_name=COALESCE($2,display_name),default_revision_id=CASE WHEN $3 THEN $4::uuid ELSE default_revision_id END,version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=$1 RETURNING ${columns}`,
+      `UPDATE model_label SET display_name=CASE WHEN $2 THEN $3::text ELSE display_name END,default_revision_id=CASE WHEN $4 THEN $5::uuid ELSE default_revision_id END,version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=$1 RETURNING ${columns}`,
       [
         id,
+        Object.hasOwn(input, "display_name"),
         input.display_name ?? null,
         Object.hasOwn(input, "default_revision_id"),
         input.default_revision_id ?? null,

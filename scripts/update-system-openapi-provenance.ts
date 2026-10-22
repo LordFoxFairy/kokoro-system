@@ -21,6 +21,7 @@ const sources = [
     }),
   "src/modules/products/products.public.ts",
   "src/http/protocol.schema.ts",
+  "src/access/access.guard.ts",
   "scripts/generate-system-openapi.ts",
   "scripts/system-openapi-operations.ts",
 ].sort();
@@ -37,24 +38,23 @@ provenance.openapi = {
   sourceSha256: Object.fromEntries(sources.map((path) => [path, digest(path)])),
 };
 provenance.releaseClassification = {
-  contractVersion: "3.0.0",
+  contractVersion: "6.1.0",
   httpRouteGeneration: "v1",
-  baseline: "2.0.0",
-  classification: "execution-bound-breaking",
-  change: "publish-model-execution-capability-bounds",
+  baseline: "6.0.0",
+  classification: "provider-model-discovery-additive",
+  change: "explicit-management-provider-upstream-model-discovery",
   publishedCompatibilityRequired: false,
 };
 provenance.consumers = [
   {
     consumer: "kokoro-bff",
     surface: "runtime-manifest/model-catalog",
-    disposition: "3.0.0-pin-required-before-runtime-consumption",
+    disposition: "6.1.0-pin-required-before-provider-discovery-consumption",
   },
   {
     consumer: "kokoro-agent",
     surface: "model-catalog/resolve",
-    disposition:
-      "3.0.0-pin-pending-owner-consumer-validation; prior-2.0.0-http-verification-is-historical",
+    disposition: "6.0.0-pin-required-before-runtime-consumption",
   },
   {
     consumer: "control-plane-service-callers",

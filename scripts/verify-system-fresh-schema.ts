@@ -83,7 +83,7 @@ try {
   const tables = await database.query<{ count: string }>(
     "SELECT COUNT(*)::text AS count FROM pg_tables WHERE schemaname = 'system_fresh'",
   );
-  if (tables.rows[0]?.count !== "22")
+  if (tables.rows[0]?.count !== "23")
     throw new Error(`Unexpected target table count: ${tables.rows[0]?.count}`);
   assertions++;
   // Root-owned reference DDL is confined to this isolated fresh fixture.
@@ -191,10 +191,44 @@ try {
     "INSERT INTO model_routing_policy (id,tenant_id,label_id,feature_key,visible,is_default) VALUES ($1,'t',$2,'chat',true,true)";
   await database.query(routing, [randomUUID(), randomUUID()]);
   await rejected(routing, [randomUUID(), randomUUID()], "23505");
+  const provider = randomUUID();
+  await database.query(
+    "INSERT INTO model_provider(id,provider,provider_key,display_name,protocol,connection_type,base_url,secret_handle_ref) VALUES($1,'fixture','stable','Stable','openai_chat_completions','direct','https://model.example/v1','vault:fixture')",
+    [provider],
+  );
+  assertions++;
+  for (const sql of [
+    "UPDATE model_provider SET base_url='https://other.example/v1' WHERE id=$1",
+    "UPDATE model_provider SET connection_type='litellm' WHERE id=$1",
+    "UPDATE model_provider SET secret_handle_ref='vault:other' WHERE id=$1",
+    "UPDATE model_provider SET secret_handle_ref='' WHERE id=$1",
+    "UPDATE model_provider SET secret_handle_ref='',deleted_at=clock_timestamp()-INTERVAL '31 days' WHERE id=$1",
+    "DELETE FROM model_provider WHERE id=$1",
+  ])
+    await rejected(sql, [provider], "23514");
+  await database.query(
+    "UPDATE model_provider SET deleted_at=clock_timestamp()-INTERVAL '31 days' WHERE id=$1",
+    [provider],
+  );
+  await rejected(
+    "UPDATE model_provider SET secret_handle_ref='',base_url='https://other.example/v1' WHERE id=$1",
+    [provider],
+    "23514",
+  );
+  await database.query(
+    "UPDATE model_provider SET secret_handle_ref='' WHERE id=$1",
+    [provider],
+  );
+  assertions++;
   const revision = randomUUID();
   await database.query(
-    "INSERT INTO model_revision (id,model_id,provider_id,revision,provider_model_name,display_name,feature_key,input_modalities,output_modalities,transport,gateway_model_name,context_window,max_output_tokens,digest,published_at) VALUES ($1,$2,$3,1,'model','Model','chat','[\"text\"]','[\"text\"]','litellm','gateway',8192,2048,$4,CURRENT_TIMESTAMP(3))",
+    "INSERT INTO model_revision (id,model_id,provider_id,revision,provider_model_name,display_name,input_modalities,output_modalities,connection_protocol,connection_type,connection_base_url,connection_secret_handle_ref,request_model,context_window,max_output_tokens,digest,published_at) VALUES ($1,$2,$3,1,'model','Model','[\"text\"]','[\"text\"]','openai_chat_completions','litellm','https://gateway.example/v1','vault:fixture','gateway',8192,2048,$4,CURRENT_TIMESTAMP(3))",
     [revision, randomUUID(), randomUUID(), "a".repeat(64)],
+  );
+  await rejected(
+    "UPDATE model_revision SET connection_base_url=$1 WHERE id=$2",
+    ["https://other.example/v1", revision],
+    "23514",
   );
   await rejected(
     "UPDATE model_revision SET digest=$1 WHERE id=$2",
@@ -233,7 +267,7 @@ try {
     "23514",
   );
   console.log(
-    `Fresh PostgreSQL schema verified: ${assertions} assertions, 22 tables; complete canonical catalog match; isolated ${databaseName}; business HTTP not tested`,
+    `Fresh PostgreSQL schema verified: ${assertions} assertions, 23 tables; complete canonical catalog match; isolated ${databaseName}; business HTTP not tested`,
   );
 } catch (error) {
   hasFailure = true;

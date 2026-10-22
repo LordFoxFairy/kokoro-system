@@ -1,3 +1,22 @@
+## 2026-10-20 MC-02A 本 owner 验收
+
+绑定当前MC-02A停写源码及System5 artifact `a83b37269e9e4fa7fb5310a1836975e20ab9eaee965a66c83e35bb1ca1b9e5df`／provenance `97b20e57f66010ba456fac59fe1dd62d90c17325c82d3da80be455ea9d3cf747`；source commit由交付记录绑定，不预填。Node24.20.0、pnpm12.3.4。
+
+- `pnpm verify` 最终exit0：格式／lint／types／build、contract20、完整16文件214PASS／0SKIP、fresh33断言／22表完整canonical相等。
+- 真实隔离HTTP/PG：同published revision被两业务引用；tenant override列表／resolve一致且缺policy tenant为空；无别名／清别名原名展示，正文request_model及原revision/digest不变；无绑定拒绝而不自动选其他模型。首业务解除引用后退休不破坏第二业务，仍被共享的revision退休409。
+- 原合同缺省别名与无feature输入2有效RED；原共享引用409有效RED。主会话最终资源门及focused生命周期均PASS，测试库inventory前后一致；只用自建随机测试库／Redis namespace，不重启正常服务。
+- 独立只读审查无确定P0–P2；85操作inventory不变，55非model操作含递归schema不变，原published/事务/CAS/缓存负控保留。首次README摘要及fixture配对失败诊断保留，最终通过不抹去历史失败。
+
+不涵盖消费者System5升级、正常页面／Schema切换、Key保存／读取、模型／工具执行或扣费。后继完整业务与Root交付仍待，禁止用本owner门代替整产品PASS。
+
+## 2026-10-20 System4 消费配对与正常结构验收
+
+在Draft源码 `dafbc66c9ab5e55b556dbd1dd71c79cef354f69c` 上重跑 Node24.20／pnpm12.3.4 完整 `verify`：格式、lint、type、build、contract全部exit0，16文件212 PASS／0SKIP；fresh schema33断言／22表完整canonical catalog匹配。BFF已本地提交 `15e4a7423ceed83dbb09d02e24e802ac78d9ed9e` Public20固定消费System4，只替换revision表示且仍四操作；App/Admin对应同一artifact正在收口，不扩provider/revision创建发布UI。
+
+正常System经只读／冻结核实模型definition/provider/revision/label/routing/health均零行，3条命令receipt均completed。先备份恢复演练，再只重建两张空模型表及其原index／新connection guard，22表原行hash一致；受影响模型catalog与当前canonical逐对象相等，其余catalog严格保持原样。不使用trace、旧网关名或Agent全局地址推测连接，不重算旧digest，不建旧字段／旧数据兼容层。此前整库catalog比较发现其他旧CHECK表达式解析形式差异，原样保留，不扩大成其他20表重建；不据此称正常全owner已做全量canonical替换。
+
+正常System与BFF已配对ready，retention hold保持true、原机器配置字节不变。隔离真实IAM正式管理员资格→BFF→System4/PG已验目录读取、CAS、原key回放、冲突、非法session拒绝；临时库与IAM key inventory清理前后一致。第一轮seed使用未启用的HTTP loopback被正式拒绝，改为无网络请求的HTTPS fixture元数据后通过；未放宽部署开关。Admin/Product桥和实际页面证据另记。此为管理／配置验收，不含任何模型推理、工具或扣费；Agent始终disabled。远端PR/Root组合与后继页面另验，不以本地配对冒称已merge。
+
 # System 验收证据
 
 当前 R6 交付：`dcfa8468446108c17cd65b32fc028af261472c99`（起始基线 `280d5d0567c94de33e32f0e85f163fbcf75ede20`）。下述G5为已验历史，末尾R6为当前提交证据。G5代码起始基线`51bc22dac4b32da86984e7147caaae5e4db6a34a`；Root committed HEAD 跨仓证据在 Root `docs/CURRENT.md` 绑定最终 SHA。历史G1–G4完整证据见唯一 IMPLEMENTATION_PLAN，不与当前结果混用。

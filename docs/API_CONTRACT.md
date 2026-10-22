@@ -1,3 +1,66 @@
+## MODEL-1 上游模型候选读取（2026-10-22，实施设计）
+
+新增 `GET /v1/system/model-catalog/providers/{provider_id}/upstream-models`，operation `listModelProviderUpstreamModels`，global `system:write`，仅 `model-management`／`system-admin`。无body/query、无CAS／幂等回执；成功沿标准envelope，data只含`provider_id`和`items:[{id}]`，运行时字段约束唯一来源为后继Zod schema，不在此复制机器定义。所有结果no-store，浏览器不得直接访问owner。
+
+已删除／擦除的provider为NOT_FOUND；无效或失败的上游读取为既有MODEL_UNAVAILABLE，响应不含上游正文／Key／敏感URL。未发送到许可地址为POLICY_DENIED；缺密钥材料沿原SYSTEM_UNAVAILABLE。非成功不伪造空列表。现有Agent-only凭据读取认证和路由约束不变。
+
+BFF后继为平台管理员专用`GET /v1/admin/model-providers/{provider_id}/upstream-models`，再经App同源桥到Admin；先固定System6.1发布物，不允许通用URL代理。Admin显式刷新候选与现“刷新本地目录”分开，选择候选后仍使用现创建/发布命令。无推理／充值／扣费副作用，读取不自动修改已发布事实。 非公网解析仅可由System部署侧精确主机清单显式许可；该清单不进入本API输入／输出，不允许客户端自报豁免，也不改变元数据／危险地址拒绝与原loopback开关。
+
+## MC-02 实施授权已确认（2026-10-20）
+
+用户已明确选择“采用 System 现有模块方案”：现 model-catalog 加密保存 API Key，后台只写不回显；Agent 按当前业务路由与精确修订受控领取，删除旧手工密钥文件读取，不新增服务。下方 MC-02 密钥候选的 owner／隔离边界据此进入实施；历史“待确认”文字不覆盖此次确认，实际完成仍以源码／正式生成物与验收为准。模型请求、工具执行和扣费继续暂停；只在隔离 worktree／自有测试资源验收，不切换正常服务或写入正常密钥。
+
+首个正式实现改 provider 创建输入为 api_key，由服务端生成 opaque ref；原非秘密 provider 投影保留。敏感创建将完整请求（含可信发起租户）经独立 HMAC 保护后交原 receipt 同事务处理，永久创建标记只限该用例，不另建通用命令框架。新增脱敏创建结果 GET 与 Agent-only 凭据读取 POST（只读事务、no-store、无重试）；全局资源 scope 不变，另保可信 actor tenant。独立 model-management 身份仅准模型目录／业务引用写和业务定义读取，拒绝密钥领取与其他 System 模块。私有材料固定启动加载，AES-256-GCM／独立HMAC；丢失或不匹配时敏感操作失败而普通目录仍可读。
+
+## MC-02A 业务模型配置：已确认实施边界（2026-10-20）
+
+共享 revision 不再输入／返回 feature_key；resolve 保留受权业务 feature_key。label 管理的 display_name 改为 nullable 可选别名：创建缺失默认 null，更新缺失不改、null 清空；普通业务 catalog 的 display_name 仍为必填有效名称，由别名或精确目标 request_model 得到。
+
+catalog 继续按可信 tenant 和可选业务 feature 分页，但返回显式 model_id/provider_id/provider/request_model/revision_id，revision_id 是 tenant override 或 label default 的有效目标，不再用全局 default_revision_id 冒充当前选择。key 仅为稳定业务选择标识，不解析成 provider。未绑定／未发布／退休／失效 provider 不进入可选目录；resolve 不对空绑定任意扫描模型。临时健康仍在执行解析时检查，目录存在不宣称能立即调用。
+
+本破坏性后继由原 Zod→生成器发布 System5，83业务／2probes 和认证入口不扩张；消费者后继配对，旧字段不以 alias/fallback 保留。当前正常服务和已固定 System4 消费者在配对前不切换。Key 保存／读取方案仍是另一步待确认候选，不由本节放行推理或资金。
+
+---
+
+## MC-02 最新产品语义（2026-10-20，设计待收敛）
+
+用户澄清：统一 Provider 配置，多模型复用；业务方领取自身组合的模型列表／默认项，可选别名默认原模型名。既有 catalog 可按 tenant＋可选 feature_key 过滤，resolve 输入 feature_key＋可选 label_key；这不自行证明各业务入口完整配对。后继先核这条正式消费链与列表／选择身份，不把密钥写入候选当已获批准的完整模型契约。
+
+展示别名不替换上游 request_model，不作为资源唯一身份；前端列表不含 Key，受控业务运行方才解析适用执行配置。现 display_name 必填且无默认原名语义是待补缺口，不伪装为已支持。具体 optional alias／默认投影与业务选择引用只在 owner 正式机器契约收敛后生成，不在此复制 DTO。
+
+## MC-02 API Key 配置：契约设计候选（2026-10-20，待确认）
+
+对应 TECHNICAL_DESIGN 的 MC-02，本密钥候选没有改变生产契约或操作；当前唯一最新业务配置机器契约为 MC-02A 的 System5候选，不含 Key 写入／领取。密钥后继另需正规发布 breaking artifact；具体字段／状态码只在运行时 Zod 与原生成器维护，消费者固定版本、commit、digest 后升级，不手改 generated。
+
+- 连接创建改为只写 API Key 输入，由 owner 生成 `secret_handle_ref`；普通响应只含非秘密连接元数据及凭据可用性，不回显原 Key、密文、Key hash 或可逆掩码。API Key 不限制为 `sk-` 前缀，并有明确字节／header 合法性边界。
+- provider/revision/label 等全局写仍是平台管理员操作；租户策略使用 BFF 受信 tenant 自动隔离。所有 body 严格拒绝自报 tenant／actor／service identity，不把默认租户变成写全局目录的许可。
+- 新的敏感输入只能通过正式 BFF 管理操作及模型专用机器身份到达；不让普通 `web-bff` token 获得站点／产品等全局写。需要的 definition/provider/revision/publish/label 管理操作逐项声明，不用万能代理端点。
+- 正式凭据明文读取仅允许 Agent 身份，按受信 tenant/feature/label 重核现 policy 与有效候选，要求精确 provider/revision/digest 相等，并核发布／退役、provider、健康与部署 URL 条件；不一致拒绝、不自动改选。沿 ADR-035 信任 Agent 的服务委托上下文，不冒充人类授权／Billing permit。普通目录、resolve、Admin 详情及通用后台转发不返回明文。读取响应强制 `Cache-Control: no-store`，不缓存／不自动重试。
+- 密钥创建沿 owner 幂等事务；脱敏结果查询核原 actor、发起 tenant、原命令标记，与全局资源 scope 分开。窗口内仅显式按原 key/body 重放；刷新丢 Key 后只能查询。7 日 receipt 外拒绝敏感命令重新创建，保留的创建标记仍可回读关联 provider 当前脱敏状态；未命中／失败保持 unknown，不是已撤销或可换 key 重建的证明。恢复决策以 TECHNICAL_DESIGN 表为准，既不缓存 Key，也不复制另一份完整 ACK。
+- 同源 CSRF、现 CAS、稳定错误及 request-id 继续；验证错误不回显原请求或原 Zod 输入，日志不采集敏感正文。地址／Key 保存和发布不调用外部模型、`/models` 探测或健康验证。
+
+首片 Key 随 provider/ref 固定，任意换 Key 均新连接／修订，不开放原位轮换接口。provider 软删立即拒领取，30 日内合法恢复用原密文，过期原子擦除并拒恢复。主密钥使用固定启动快照，未配或不匹配拒敏感操作；不提供在线 KEK／摘要密钥轮换。新增 System 保存与 Agent 读取边界仍待用户确认，确认前不实现敏感 API 或切换正常配置。
+
+---
+
+## MC-01：模型连接契约（2026-10-16；System4候选已生成）
+
+用户批准默认direct、可选LiteLLM；本工作树已由原Zod生成链生成4.0.0/OpenAPI与provenance，83业务operation/2probes及/v1不变。技术方案及生命周期以TECHNICAL_DESIGN同名MC-01为准，消费者和正常运行切换尚未完成。
+
+目标继续使用既有 provider/revision CRUD 与 `POST /v1/system/model-catalog/resolve`，caller、tenant、错误 envelope、限额和 generation fence 不变。协议与 direct/litellm 类型独立；连接由完整 API base URL、唯一请求模型标识与不透明凭据引用绑定，provider_id 作为稳定连接身份。
+
+resolve 的目标表示包含与同一 revision/digest 绑定的具名连接快照；管理输入、响应及快照采用同一运行时 Zod 事实源。目标 System artifact major 为 4.0.0，HTTP 路径仍 `/v1`；连接快照使用协议、direct/litellm 类型、完整 API base URL、credential reference 与 request_model 的明确语义。provider_model_name 保留声明目标元数据，不作为执行输入；旧 transport 固定标签及 gateway 专属执行名称退出新 route，不建立字段 alias 或缺字段 fallback。字段类型/长度只在后继运行时 Zod 中维护并由原生成器产生机器约束，本段不是第二份 JSON Schema。
+
+只有受认证 Agent resolve 与有权的内部管理操作看到适用的连接元数据/credential reference；公开 catalog、runtime manifest 和普通 BFF 用户投影不因此获得上游 URL 或 secret handle。实际 API key 在所有 System wire 中均禁止。已有公开模型列表只返回原有选择投影。
+
+provider 技术连接字段创建后固定，技术字段变更走新 provider 与新 model revision；显示名/优先级等 CAS 更新保留。任何新字段都不表示供应商实际执行归属、技术账户证明、价格或已获资金授权。健康 TTL 也不是执行许可有效期。
+
+发布顺序：System 运行时 Zod/SQL/HTTP 与真实资源门 → 正规 OpenAPI/provenance breaking 发布 → Agent 固定消费者/模型调用与 usage planned binding 正规发布 → Billing/BFF 等受影响消费者 pin → 隔离组合切换。旧模型使用记录、活动 Run 和缓存的处置先由对应 owner 核定，不把旧 published revision 补写成具有新连接保证；不手改 generated 文件，不保留第二执行协议。
+
+本片当前机器为4.0.0，consumer pin尚未升级；字段以正式runtime Zod/生成物唯一决定。provider创建使用Zod input导出，connection_type可省略并默认direct；输出类型必填，revision请求拒绝connection，response/resolve中的connection来自owner快照。URL完整规范化谓词、跨字段关系和部署HTTP许可仍由runtime校验，不能将生成pattern/长度检查当全部语义。request_model唯一执行名，旧transport/gateway_model_name无alias。完整contract19测试与资源门已通过；正常服务未启动新版本、未执行应用库DDL、模型发送0。未完成的收费保证来源与撤权/资金链仍按原设计门处理。
+
+---
+
 ## R257 当前技术路由保证设计门（2026-10-06；仅文档，未发布保证）
 
 对齐Root 15:33 owner/计费单位裁决与本仓TECHNICAL_DESIGN同名R257前缀。System基线 `955bd587f46a771e43a4330d202d90a7d2d67262`；现唯一机器仍3.0.0、SHA256 `94ed91655741cbba66ce80a4c41717b9179cc509cb6858534e0b78aa3e6dc059`。本片没有改Zod/OpenAPI/provenance/version、operation、认证、Schema或运行配置；以下语义是后继准入方案，尚不能被消费者当新机器pin。

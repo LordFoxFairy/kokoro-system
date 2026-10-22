@@ -1,3 +1,9 @@
+import { ProviderModelDiscoveryService } from "./provider-model-discovery.service.js";
+import { SystemConfig } from "../../config/system-config.js";
+import { ModelCredentialCrypto } from "./model-credential-crypto.js";
+import { ModelCredentialRepository } from "./model-credential.repository.js";
+import { ModelCredentialService } from "./model-credential.service.js";
+import { ModelCredentialController } from "./model-credential.controller.js";
 import { ModelMaintenanceRepository } from "./model-maintenance.repository.js";
 import { ModelMaintenanceService } from "./model-maintenance.service.js";
 import { CatalogService } from "./catalog.service.js";
@@ -33,6 +39,17 @@ import { HealthRepository } from "./health.repository.js";
   exports: [ModelMaintenanceService],
   imports: [DatabaseModule, CacheModule],
   providers: [
+    {
+      provide: ModelCredentialCrypto,
+      inject: [SystemConfig],
+      useFactory: (config: SystemConfig) =>
+        new ModelCredentialCrypto(
+          config.values.KOKORO_SYSTEM_MODEL_KEY_MATERIAL_FILE,
+        ),
+    },
+    ModelCredentialRepository,
+    ModelCredentialService,
+    ProviderModelDiscoveryService,
     ModelMaintenanceRepository,
     ModelMaintenanceService,
     CatalogRepository,
@@ -55,6 +72,7 @@ import { HealthRepository } from "./health.repository.js";
     HealthRepository,
   ],
   controllers: [
+    ModelCredentialController,
     CatalogController,
     ResolveController,
     RoutingController,

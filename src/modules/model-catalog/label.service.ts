@@ -29,21 +29,13 @@ export class LabelService {
     @Inject(ModelGenerationRepository)
     private readonly generation: ModelGenerationRepository,
   ) {}
-  private async validateDefault(
-    tx: TransactionContext,
-    feature: string,
-    id: string | null,
-  ) {
+  private async validateDefault(tx: TransactionContext, id: string | null) {
     if (id) {
       const revision = await this.revisions.find(tx, id, true);
-      if (
-        !revision.published_at ||
-        revision.retired_at ||
-        revision.feature_key !== feature
-      )
+      if (!revision.published_at || revision.retired_at)
         throw new SystemError(
           "INVALID_STATE",
-          "Default revision must be published with matching feature",
+          "Default revision must be published and active",
         );
     }
   }
@@ -63,11 +55,7 @@ export class LabelService {
   ) {
     return this.receipts.run(context, input, labelSchema, async (tx) => {
       await this.features.lock(tx, [input.feature_key]);
-      await this.validateDefault(
-        tx,
-        input.feature_key,
-        input.default_revision_id,
-      );
+      await this.validateDefault(tx, input.default_revision_id);
       await this.generation.advance(tx);
       return this.labels.create(tx, input);
     });
@@ -84,7 +72,6 @@ export class LabelService {
       requireVersion(current.version, context.precondition);
       await this.validateDefault(
         tx,
-        current.feature_key,
         input.default_revision_id === undefined
           ? current.default_revision_id
           : input.default_revision_id,
@@ -107,11 +94,7 @@ export class LabelService {
       await this.features.lock(tx, [snapshot.feature_key]);
       const current = await this.labels.find(tx, id, true, true);
       requireVersion(current.version, context.precondition);
-      await this.validateDefault(
-        tx,
-        current.feature_key,
-        current.default_revision_id,
-      );
+      await this.validateDefault(tx, current.default_revision_id);
       await this.generation.advance(tx);
       return this.labels.restore(tx, id);
     });

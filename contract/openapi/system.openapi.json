@@ -8,9 +8,9 @@
   ],
   "info": {
     "title": "Kokoro System internal owner",
-    "version": "3.0.0",
-    "x-kokoro-release-classification": "execution-bound-breaking",
-    "description": "Generated from runtime Zod schemas for implemented System internal-owner routes; 3.0.0 adds required model execution capability bounds."
+    "version": "6.1.0",
+    "x-kokoro-release-classification": "provider-model-discovery-additive",
+    "description": "Generated from runtime Zod schemas for implemented System internal-owner routes; 6.1.0 adds explicit management-only provider model discovery; existing encrypted credentials and Agent current-route retrieval are unchanged."
   },
   "paths": {
     "/v1/system/sites": {
@@ -4315,7 +4315,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -4595,7 +4596,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -7953,7 +7955,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -8090,7 +8093,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -8233,7 +8237,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -8360,7 +8365,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -8522,7 +8528,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -8676,7 +8683,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -8830,7 +8838,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -8916,7 +8925,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_8c4b0417f29ea4f6"
+                  "$ref": "#/components/schemas/schema_718c194a16b98db8"
                 }
               }
             }
@@ -8967,14 +8976,15 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
           {
             "name": "x-kokoro-tenant-id",
             "in": "header",
-            "required": false,
+            "required": true,
             "schema": {
               "type": "string",
               "minLength": 1,
@@ -9044,7 +9054,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_aa4df1351fa2e040"
+                  "$ref": "#/components/schemas/schema_c9f085ca41391022"
                 }
               }
             }
@@ -9070,7 +9080,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/schema_01457c921c0ed764"
+                "$ref": "#/components/schemas/schema_c6886f00771523fc"
               }
             }
           }
@@ -9110,7 +9120,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -9186,7 +9197,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_aa4df1351fa2e040"
+                  "$ref": "#/components/schemas/schema_c9f085ca41391022"
                 }
               }
             }
@@ -9237,7 +9248,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -9332,7 +9344,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_aa4df1351fa2e040"
+                  "$ref": "#/components/schemas/schema_c9f085ca41391022"
                 }
               }
             }
@@ -9361,7 +9373,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/schema_b81034ed151c3395"
+                "$ref": "#/components/schemas/schema_4c197d28bad9768d"
               }
             }
           }
@@ -9399,7 +9411,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -9494,7 +9507,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_aa4df1351fa2e040"
+                  "$ref": "#/components/schemas/schema_c9f085ca41391022"
                 }
               }
             }
@@ -9553,7 +9566,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -9648,7 +9662,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_aa4df1351fa2e040"
+                  "$ref": "#/components/schemas/schema_c9f085ca41391022"
                 }
               }
             }
@@ -9707,7 +9721,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -9793,7 +9808,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_48df62a23917bc3f"
+                  "$ref": "#/components/schemas/schema_fae624eabf7e35f4"
                 }
               }
             }
@@ -9844,7 +9859,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -9921,7 +9937,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_ef2e49ef4603904c"
+                  "$ref": "#/components/schemas/schema_2f56a90eba2ac4da"
                 }
               }
             }
@@ -9947,7 +9963,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/schema_dc66af1d9ea8a125"
+                "$ref": "#/components/schemas/schema_f1c13ea562a8f359"
               }
             }
           }
@@ -9987,7 +10003,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -10063,7 +10080,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_ef2e49ef4603904c"
+                  "$ref": "#/components/schemas/schema_2f56a90eba2ac4da"
                 }
               }
             }
@@ -10114,7 +10131,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -10209,7 +10227,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_ef2e49ef4603904c"
+                  "$ref": "#/components/schemas/schema_2f56a90eba2ac4da"
                 }
               }
             }
@@ -10238,7 +10256,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/schema_eed10c2aa8f760fa"
+                "$ref": "#/components/schemas/schema_669423387748cc79"
               }
             }
           }
@@ -10276,7 +10294,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -10371,7 +10390,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_ef2e49ef4603904c"
+                  "$ref": "#/components/schemas/schema_2f56a90eba2ac4da"
                 }
               }
             }
@@ -10430,7 +10449,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -10525,7 +10545,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_ef2e49ef4603904c"
+                  "$ref": "#/components/schemas/schema_2f56a90eba2ac4da"
                 }
               }
             }
@@ -10757,7 +10777,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -10843,7 +10864,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_bae99a4b7279f69b"
+                  "$ref": "#/components/schemas/schema_85af568018d2c865"
                 }
               }
             }
@@ -10894,7 +10915,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -10971,7 +10993,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_5c6199a875eda8c2"
+                  "$ref": "#/components/schemas/schema_edc460d150c8281c"
                 }
               }
             }
@@ -10997,7 +11019,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/schema_fa79766349ca0639"
+                "$ref": "#/components/schemas/schema_74a01a81a2a27c05"
               }
             }
           }
@@ -11037,7 +11059,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -11113,7 +11136,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_5c6199a875eda8c2"
+                  "$ref": "#/components/schemas/schema_edc460d150c8281c"
                 }
               }
             }
@@ -11164,7 +11187,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -11259,7 +11283,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_5c6199a875eda8c2"
+                  "$ref": "#/components/schemas/schema_edc460d150c8281c"
                 }
               }
             }
@@ -11288,7 +11312,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/schema_5cb107caffcc4a56"
+                "$ref": "#/components/schemas/schema_4eec9ad0168aadad"
               }
             }
           }
@@ -11328,7 +11352,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -11423,7 +11448,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_5c6199a875eda8c2"
+                  "$ref": "#/components/schemas/schema_edc460d150c8281c"
                 }
               }
             }
@@ -11482,7 +11507,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -11577,7 +11603,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_5c6199a875eda8c2"
+                  "$ref": "#/components/schemas/schema_edc460d150c8281c"
                 }
               }
             }
@@ -11636,7 +11662,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -11775,7 +11802,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -11946,7 +11974,8 @@
               "enum": [
                 "web-bff",
                 "kokoro-agent",
-                "system-admin"
+                "system-admin",
+                "model-management"
               ]
             }
           },
@@ -12196,7 +12225,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_cde61cf25a86b355"
+                  "$ref": "#/components/schemas/schema_a98f91be72cce9d2"
                 }
               }
             }
@@ -12316,7 +12345,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/schema_00b9b5a3e10401fb"
+                  "$ref": "#/components/schemas/schema_d5369d0003c7bbca"
                 }
               }
             }
@@ -12342,6 +12371,414 @@
                 "$ref": "#/components/schemas/schema_be87f43005ae8d24"
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/system/model-catalog/provider-creations": {
+      "get": {
+        "operationId": "getModelProviderCreation",
+        "tags": [
+          "model-catalog"
+        ],
+        "summary": "getModelProviderCreation",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "inherent",
+        "x-kokoro-permission": "system:write",
+        "x-kokoro-scope": "global",
+        "description": "global scope; global requires authenticated system-admin",
+        "x-kokoro-precondition": "none",
+        "security": [
+          {
+            "serviceBearer": []
+          },
+          {
+            "serviceSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-kokoro-service",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web-bff",
+                "kokoro-agent",
+                "system-admin",
+                "model-management"
+              ]
+            }
+          },
+          {
+            "name": "x-kokoro-tenant-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "x-kokoro-actor-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "x-kokoro-iam-permissions",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "x-request-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "x-kokoro-trace-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "idempotency_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/schema_37a3e49c0a766261"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OwnerError"
+          },
+          "403": {
+            "$ref": "#/components/responses/OwnerError"
+          },
+          "404": {
+            "$ref": "#/components/responses/OwnerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/OwnerError"
+          }
+        }
+      }
+    },
+    "/v1/system/model-catalog/credentials/read": {
+      "post": {
+        "operationId": "readModelCredential",
+        "tags": [
+          "model-catalog"
+        ],
+        "summary": "readModelCredential",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "inherent",
+        "x-kokoro-permission": "service-context",
+        "x-kokoro-scope": "tenant",
+        "description": "tenant scope; global requires authenticated system-admin",
+        "x-kokoro-precondition": "none",
+        "security": [
+          {
+            "serviceBearer": []
+          },
+          {
+            "serviceSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-kokoro-service",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "kokoro-agent"
+              ]
+            }
+          },
+          {
+            "name": "x-kokoro-tenant-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "x-kokoro-actor-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "x-kokoro-iam-permissions",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "x-request-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "x-kokoro-trace-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 160
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/schema_26712d5adc3fea2e"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OwnerError"
+          },
+          "403": {
+            "$ref": "#/components/responses/OwnerError"
+          },
+          "404": {
+            "$ref": "#/components/responses/OwnerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/OwnerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/schema_5ec7057fbec33ea4"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/system/model-catalog/providers/{provider_id}/upstream-models": {
+      "get": {
+        "operationId": "listModelProviderUpstreamModels",
+        "tags": [
+          "model-catalog"
+        ],
+        "summary": "listModelProviderUpstreamModels",
+        "x-kokoro-owner": "kokoro-system",
+        "x-kokoro-visibility": "internal-owner",
+        "x-kokoro-stability": "stable",
+        "x-kokoro-idempotency": "inherent",
+        "x-kokoro-permission": "system:write",
+        "x-kokoro-scope": "global",
+        "description": "Management-only global write read; trusted actor and actor tenant required. No body, query, command headers, persistence or automatic retry. Candidate IDs are not published models or capability guarantees.",
+        "x-kokoro-precondition": "none",
+        "security": [
+          {
+            "serviceBearer": []
+          },
+          {
+            "serviceSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-kokoro-service",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "model-management",
+                "system-admin"
+              ]
+            }
+          },
+          {
+            "name": "x-kokoro-tenant-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "x-kokoro-actor-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "x-kokoro-iam-permissions",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "x-request-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "x-kokoro-trace-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "x-request-id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+                }
+              },
+              "Cache-Control": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/schema_b4edf4b24ea3ca77"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OwnerError"
+          },
+          "403": {
+            "$ref": "#/components/responses/OwnerError"
+          },
+          "404": {
+            "$ref": "#/components/responses/OwnerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/OwnerError"
           }
         }
       }
@@ -17788,7 +18225,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_8c4b0417f29ea4f6": {
+      "schema_718c194a16b98db8": {
         "type": "object",
         "properties": {
           "data": {
@@ -17799,6 +18236,29 @@
                 "items": {
                   "type": "object",
                   "properties": {
+                    "protocol": {
+                      "type": "string",
+                      "const": "openai_chat_completions"
+                    },
+                    "connection_type": {
+                      "type": "string",
+                      "enum": [
+                        "direct",
+                        "litellm"
+                      ]
+                    },
+                    "base_url": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048,
+                      "pattern": "^https?:\\/\\/[^\\s\\\\?#]+$"
+                    },
+                    "secret_handle_ref": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                    },
                     "provider": {
                       "type": "string",
                       "minLength": 1,
@@ -17813,15 +18273,6 @@
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 160
-                    },
-                    "secret_handle_ref": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 255
-                    },
-                    "transport": {
-                      "type": "string",
-                      "const": "litellm"
                     },
                     "priority": {
                       "type": "integer",
@@ -17861,11 +18312,13 @@
                     }
                   },
                   "required": [
+                    "protocol",
+                    "connection_type",
+                    "base_url",
+                    "secret_handle_ref",
                     "provider",
                     "provider_key",
                     "display_name",
-                    "secret_handle_ref",
-                    "transport",
                     "priority",
                     "id",
                     "version",
@@ -17895,12 +18348,35 @@
         ],
         "additionalProperties": false
       },
-      "schema_aa4df1351fa2e040": {
+      "schema_c9f085ca41391022": {
         "type": "object",
         "properties": {
           "data": {
             "type": "object",
             "properties": {
+              "protocol": {
+                "type": "string",
+                "const": "openai_chat_completions"
+              },
+              "connection_type": {
+                "type": "string",
+                "enum": [
+                  "direct",
+                  "litellm"
+                ]
+              },
+              "base_url": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048,
+                "pattern": "^https?:\\/\\/[^\\s\\\\?#]+$"
+              },
+              "secret_handle_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+              },
               "provider": {
                 "type": "string",
                 "minLength": 1,
@@ -17915,15 +18391,6 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 160
-              },
-              "secret_handle_ref": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 255
-              },
-              "transport": {
-                "type": "string",
-                "const": "litellm"
               },
               "priority": {
                 "type": "integer",
@@ -17963,11 +18430,13 @@
               }
             },
             "required": [
+              "protocol",
+              "connection_type",
+              "base_url",
+              "secret_handle_ref",
               "provider",
               "provider_key",
               "display_name",
-              "secret_handle_ref",
-              "transport",
               "priority",
               "id",
               "version",
@@ -17983,9 +18452,27 @@
         ],
         "additionalProperties": false
       },
-      "schema_01457c921c0ed764": {
+      "schema_c6886f00771523fc": {
         "type": "object",
         "properties": {
+          "protocol": {
+            "type": "string",
+            "const": "openai_chat_completions"
+          },
+          "connection_type": {
+            "default": "direct",
+            "type": "string",
+            "enum": [
+              "direct",
+              "litellm"
+            ]
+          },
+          "base_url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "pattern": "^https?:\\/\\/[^\\s\\\\?#]+$"
+          },
           "provider": {
             "type": "string",
             "minLength": 1,
@@ -18001,32 +18488,31 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "secret_handle_ref": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255
-          },
-          "transport": {
-            "type": "string",
-            "const": "litellm"
-          },
           "priority": {
             "type": "integer",
             "minimum": 0,
             "maximum": 100000
+          },
+          "api_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^[\\x21-\\x7e]+$",
+            "writeOnly": true
           }
         },
         "required": [
+          "protocol",
+          "base_url",
           "provider",
           "provider_key",
           "display_name",
-          "secret_handle_ref",
-          "transport",
-          "priority"
+          "priority",
+          "api_key"
         ],
         "additionalProperties": false
       },
-      "schema_b81034ed151c3395": {
+      "schema_4c197d28bad9768d": {
         "type": "object",
         "properties": {
           "display_name": {
@@ -18034,11 +18520,6 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "secret_handle_ref": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255
-          },
           "priority": {
             "type": "integer",
             "minimum": 0,
@@ -18047,7 +18528,7 @@
         },
         "additionalProperties": false
       },
-      "schema_48df62a23917bc3f": {
+      "schema_fae624eabf7e35f4": {
         "type": "object",
         "properties": {
           "data": {
@@ -18064,9 +18545,16 @@
                       "maxLength": 128
                     },
                     "display_name": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 160
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "feature_key": {
                       "type": "string",
@@ -18150,7 +18638,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_ef2e49ef4603904c": {
+      "schema_2f56a90eba2ac4da": {
         "type": "object",
         "properties": {
           "data": {
@@ -18162,9 +18650,16 @@
                 "maxLength": 128
               },
               "display_name": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "feature_key": {
                 "type": "string",
@@ -18234,7 +18729,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_dc66af1d9ea8a125": {
+      "schema_f1c13ea562a8f359": {
         "type": "object",
         "properties": {
           "label_key": {
@@ -18243,9 +18738,17 @@
             "maxLength": 128
           },
           "display_name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "feature_key": {
             "type": "string",
@@ -18267,19 +18770,25 @@
         },
         "required": [
           "label_key",
-          "display_name",
           "feature_key",
           "default_revision_id"
         ],
         "additionalProperties": false
       },
-      "schema_eed10c2aa8f760fa": {
+      "schema_669423387748cc79": {
         "type": "object",
         "properties": {
           "display_name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "default_revision_id": {
             "anyOf": [
@@ -18370,7 +18879,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_bae99a4b7279f69b": {
+      "schema_85af568018d2c865": {
         "type": "object",
         "properties": {
           "data": {
@@ -18406,11 +18915,6 @@
                       "minLength": 1,
                       "maxLength": 160
                     },
-                    "feature_key": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
-                    },
                     "input_modalities": {
                       "minItems": 1,
                       "maxItems": 4,
@@ -18439,11 +18943,7 @@
                         ]
                       }
                     },
-                    "transport": {
-                      "type": "string",
-                      "const": "litellm"
-                    },
-                    "gateway_model_name": {
+                    "request_model": {
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 255
@@ -18476,6 +18976,41 @@
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 100000
+                    },
+                    "connection": {
+                      "type": "object",
+                      "properties": {
+                        "protocol": {
+                          "type": "string",
+                          "const": "openai_chat_completions"
+                        },
+                        "connection_type": {
+                          "type": "string",
+                          "enum": [
+                            "direct",
+                            "litellm"
+                          ]
+                        },
+                        "base_url": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2048,
+                          "pattern": "^https?:\\/\\/[^\\s\\\\?#]+$"
+                        },
+                        "secret_handle_ref": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        }
+                      },
+                      "required": [
+                        "protocol",
+                        "connection_type",
+                        "base_url",
+                        "secret_handle_ref"
+                      ],
+                      "additionalProperties": false
                     },
                     "id": {
                       "type": "string",
@@ -18531,14 +19066,13 @@
                     "revision",
                     "provider_model_name",
                     "display_name",
-                    "feature_key",
                     "input_modalities",
                     "output_modalities",
-                    "transport",
-                    "gateway_model_name",
+                    "request_model",
                     "context_window",
                     "max_output_tokens",
                     "priority",
+                    "connection",
                     "id",
                     "version",
                     "digest",
@@ -18569,7 +19103,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_5c6199a875eda8c2": {
+      "schema_edc460d150c8281c": {
         "type": "object",
         "properties": {
           "data": {
@@ -18600,11 +19134,6 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "feature_key": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 128
-              },
               "input_modalities": {
                 "minItems": 1,
                 "maxItems": 4,
@@ -18633,11 +19162,7 @@
                   ]
                 }
               },
-              "transport": {
-                "type": "string",
-                "const": "litellm"
-              },
-              "gateway_model_name": {
+              "request_model": {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 255
@@ -18670,6 +19195,41 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 100000
+              },
+              "connection": {
+                "type": "object",
+                "properties": {
+                  "protocol": {
+                    "type": "string",
+                    "const": "openai_chat_completions"
+                  },
+                  "connection_type": {
+                    "type": "string",
+                    "enum": [
+                      "direct",
+                      "litellm"
+                    ]
+                  },
+                  "base_url": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "pattern": "^https?:\\/\\/[^\\s\\\\?#]+$"
+                  },
+                  "secret_handle_ref": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                  }
+                },
+                "required": [
+                  "protocol",
+                  "connection_type",
+                  "base_url",
+                  "secret_handle_ref"
+                ],
+                "additionalProperties": false
               },
               "id": {
                 "type": "string",
@@ -18725,14 +19285,13 @@
               "revision",
               "provider_model_name",
               "display_name",
-              "feature_key",
               "input_modalities",
               "output_modalities",
-              "transport",
-              "gateway_model_name",
+              "request_model",
               "context_window",
               "max_output_tokens",
               "priority",
+              "connection",
               "id",
               "version",
               "digest",
@@ -18749,7 +19308,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_fa79766349ca0639": {
+      "schema_74a01a81a2a27c05": {
         "type": "object",
         "properties": {
           "model_id": {
@@ -18776,11 +19335,6 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 160
-          },
-          "feature_key": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
           },
           "input_modalities": {
             "minItems": 1,
@@ -18810,11 +19364,7 @@
               ]
             }
           },
-          "transport": {
-            "type": "string",
-            "const": "litellm"
-          },
-          "gateway_model_name": {
+          "request_model": {
             "type": "string",
             "minLength": 1,
             "maxLength": 255
@@ -18855,18 +19405,16 @@
           "revision",
           "provider_model_name",
           "display_name",
-          "feature_key",
           "input_modalities",
           "output_modalities",
-          "transport",
-          "gateway_model_name",
+          "request_model",
           "context_window",
           "max_output_tokens",
           "priority"
         ],
         "additionalProperties": false
       },
-      "schema_5cb107caffcc4a56": {
+      "schema_4eec9ad0168aadad": {
         "type": "object",
         "properties": {
           "provider_id": {
@@ -18883,11 +19431,6 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 160
-          },
-          "feature_key": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
           },
           "input_modalities": {
             "minItems": 1,
@@ -18917,11 +19460,7 @@
               ]
             }
           },
-          "transport": {
-            "type": "string",
-            "const": "litellm"
-          },
-          "gateway_model_name": {
+          "request_model": {
             "type": "string",
             "minLength": 1,
             "maxLength": 255
@@ -19174,7 +19713,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_cde61cf25a86b355": {
+      "schema_a98f91be72cce9d2": {
         "type": "object",
         "properties": {
           "data": {
@@ -19197,17 +19736,30 @@
                     "feature_key": {
                       "type": "string"
                     },
-                    "default_revision_id": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
+                    "model_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "revision_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "provider_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "provider": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "request_model": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255
                     }
                   },
                   "required": [
@@ -19215,7 +19767,11 @@
                     "display_name",
                     "is_default",
                     "feature_key",
-                    "default_revision_id"
+                    "model_id",
+                    "revision_id",
+                    "provider_id",
+                    "provider",
+                    "request_model"
                   ],
                   "additionalProperties": false
                 }
@@ -19239,7 +19795,7 @@
         ],
         "additionalProperties": false
       },
-      "schema_00b9b5a3e10401fb": {
+      "schema_d5369d0003c7bbca": {
         "type": "object",
         "properties": {
           "data": {
@@ -19290,12 +19846,45 @@
               "provider_model_name": {
                 "type": "string"
               },
-              "transport": {
+              "request_model": {
                 "type": "string",
-                "const": "litellm"
+                "minLength": 1,
+                "maxLength": 255
               },
-              "gateway_model_name": {
-                "type": "string"
+              "connection": {
+                "type": "object",
+                "properties": {
+                  "protocol": {
+                    "type": "string",
+                    "const": "openai_chat_completions"
+                  },
+                  "connection_type": {
+                    "type": "string",
+                    "enum": [
+                      "direct",
+                      "litellm"
+                    ]
+                  },
+                  "base_url": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "pattern": "^https?:\\/\\/[^\\s\\\\?#]+$"
+                  },
+                  "secret_handle_ref": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                  }
+                },
+                "required": [
+                  "protocol",
+                  "connection_type",
+                  "base_url",
+                  "secret_handle_ref"
+                ],
+                "additionalProperties": false
               },
               "label_key": {
                 "type": "string"
@@ -19315,8 +19904,8 @@
               "tenant_generation",
               "provider_id",
               "provider_model_name",
-              "transport",
-              "gateway_model_name",
+              "request_model",
+              "connection",
               "label_key",
               "feature_key"
             ],
@@ -19344,6 +19933,187 @@
         },
         "required": [
           "feature_key"
+        ],
+        "additionalProperties": false
+      },
+      "schema_37a3e49c0a766261": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "provider_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "credential_status": {
+                "type": "string",
+                "enum": [
+                  "stored",
+                  "erased"
+                ]
+              },
+              "deleted_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "provider_id",
+              "credential_status",
+              "deleted_at"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "schema_26712d5adc3fea2e": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "feature_key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "label_key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "provider_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "revision_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "secret_handle_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "api_key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096,
+                "pattern": "^[\\x21-\\x7e]+$"
+              }
+            },
+            "required": [
+              "feature_key",
+              "label_key",
+              "provider_id",
+              "revision_id",
+              "digest",
+              "secret_handle_ref",
+              "api_key"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "schema_5ec7057fbec33ea4": {
+        "type": "object",
+        "properties": {
+          "label_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "feature_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "provider_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "revision_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "feature_key",
+          "provider_id",
+          "revision_id",
+          "digest"
+        ],
+        "additionalProperties": false
+      },
+      "schema_b4edf4b24ea3ca77": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "provider_id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "items": {
+                "maxItems": 2000,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "provider_id",
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
         ],
         "additionalProperties": false
       },

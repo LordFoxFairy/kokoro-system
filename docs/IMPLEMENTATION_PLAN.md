@@ -1,3 +1,74 @@
+## MC-02 已批准实施：密钥底座与正式配置旅程（2026-10-20）
+
+主会话唯一 writer；隔离 worktree 从 b7fe78e 起步，原正常源码／进程不动。用户已批准 System 现模块方案；不重复等待相同裁决。
+
+Owner最终完整 `pnpm verify` 通过：格式/lint/type/build/contract、19文件225 PASS/0SKIP、fresh33断言/23表完整canonical；实际测试库存前后相等，无残留自有库。最终artifact `10ff7ee82ca7405dcab473f3fd80e620aa6c4e0bc92e64111797144ce0fa4061`、provenance `ed2e312bc5bc3022111797771190e57133818af83c0bb7ad2024a615a4e033c5`。两次完整门分别保留，最终门绑定classification纠正后的生成物；前置RED、fixture修正与初次失败不计通过。消费者、正常切换、页面及整批PR未完成。
+
+- [x] 运行时契约 RED→GREEN：provider只写Key输入、受控读取与脱敏查询、窄model-management身份；沿既有generator发布新major，消费者不先猜字段。
+- [x] 同owner PG事务落provider／密文／永久创建标记／脱敏receipt，原锁与CAS；固定启动私有材料、AAD、独立HMAC，误配置／篡改／跨身份拒绝。
+- [x] 领取从当前policy实际目标比较精确provider/revision/digest并核health、URL与删除状态；软删拒读、过期擦除同事务并保创建标记；原历史digest不改。
+- [x] 现测试文件承接新真实HTTP/PG回放、并发、rollback、未知查回、越权、30日恢复／擦除及fresh完整canonical；主方完整owner门后提交精确artifact。
+- [ ] Agent删除旧文件消费，BFF／App／Admin按固定源更新完整配置表单与业务组合；正常页面验收及本批集中PR另行据实完成。
+
+## MC-02A 当前执行：共享配置与业务组合（2026-10-20）
+
+用户已确认“共享模型配置，业务分别组合”。主会话是唯一 writer，沿当前 feature 分支；不碰对方自动化／连接器、正常数据库／进程或实际调用。
+
+- [x] 三面设计收敛 owner、目录、API/数据/状态／删除／验证；无新表或服务。
+- [x] 现合同回归2例取得缺别名／无feature输入RED→GREEN；现HTTP/PG共享业务场景409→200，含tenant override／别名清空／未绑定拒绝及首业务退休不影响共享引用，未另建suite。
+- [x] 现 schema/revision-content/repository/service 删除修订业务耦合；catalog 显式有效修订／真实 provider 投影；resolve 去掉未绑定扫描，保原取消／缓存／health／权限与事务。
+- [x] canonical SQL、feature使用关系／maintenance、fresh verifier和既有fixture配对；无新表／依赖，不删独有风险。
+- [x] 原 generator/provenance 发布 System5候选，83/2 inventory；主会话最终完整verify退出0：contract20、16文件214 PASS／0SKIP、fresh33／22表完整canonical与格式/lint/type/build；独审无确定P0–P2、55非model操作递归表示保持，测试库inventory前后相等。消费者／正常运行仍未切。
+- [ ] 后续 BFF/Agent/Admin/App 按固定提交／digest 消费，删除别名推 provider 等旧投影；Key 真实保存旅程继续独立收口，本批完整验收前不 push/merge 或重载正常组合。
+
+## MC-02 用户最新澄清：先闭合业务模型配置（2026-10-20）
+
+本节优先于下方 Key 候选的实施顺序；用户尚未直接批准新增密钥存储／读取边界。
+
+- [x] 源码核对统一 Provider 多模型、feature/label/tenant policy、业务 catalog／Agent resolve 基础，并记录现 revision/feature 耦合及 display_name 必填的实际限制。
+- [ ] 收敛各业务模型集合／默认项／选择身份与可选别名默认原名的语义，证明现配置如何由业务入口受控领取；优先复用现有结构，不机械新增组合平台。
+- [ ] 以该业务配置旅程确认必要契约／数据变化，才继续下方密钥底座与各消费者；Key 写入本身不作为模型模块全部完成。
+
+## MC-02 当前新增需求：直接配置 API Key（2026-10-20）
+
+用户要求后台配置地址、API Key 和模型；已核实当前没有密钥写入产品链，不能把 System4 的 opaque handle 或路由编辑页当完整密钥管理。
+
+- [x] 对照现源码核清租户边界：Product 会话经 IAM/BFF 校验，provider/revision 为全局目录，routing 才按受信 tenant 隔离；无手填 tenant 要求。
+- [x] 在现 TECHNICAL_DESIGN/API_CONTRACT/DATA_MODEL 增补 MC-02 候选；不另建 Secret 服务、Root schema 或可编辑 DTO 中心。
+- [ ] 确认新增 System 受保护存储／Agent 专用读取边界。已提交用户异步确认；初审四项已按固定 Key 随新连接、固定启动 KEK／独立 HMAC、现 tenant policy 当前候选精确比较、永久敏感创建标记及未知恢复决策表补候选，三面复审中，尚未实施。
+- [ ] 通过设计门后先更新 owner 正式运行时 Zod／canonical SQL，增加原子凭据写入、脱敏查回和窄身份控制，再按原生成器发布 breaking artifact；不先改消费者猜字段。
+- [ ] 依 owner 固定提交／digest 升级 BFF、App、Admin、Agent；新表单自动使用当前登录 tenant，敏感 Key 不进入浏览器持久恢复记录；删除旧 Agent 文件消费，不做双读兼容。
+- [ ] 主会话冻结后复验必要 owner 门与隔离真 HTTP/PG/认证链、页面保存及回读；正常模型、工具执行、扣费继续暂停，现只读／路由证据不替代新密钥链。
+
+本次仅新增三面候选及任务顺序，不改生产源码、生成物、数据库、配置或运行进程；本批已有候选提交／正常只读配对继续有效，但 PR/merge 仍待完整需求闭环。此前计划的“只读四操作消费，不扩 provider 创建”仅描述前一阶段，不再作为本新增需求的完成标准。
+
+## 2026-10-20 PR 收尾边界
+
+已有 MC-01 四提交通过完整本 owner 隔离 verify 后发布 Draft PR，未合并/未部署。BFF Public19 的 revision 投影仍对应 System3，是本次新确认的消费者配对缺口，下一步应正规升级公开契约及 Admin 而非构造兼容字段；Agent 已有 System4 固定消费，不能据此冒称整个组合配对。正常旧数据与 schema 切换不在此次 Draft 交付中。
+
+## MC-01 当前增量：默认 direct、LiteLLM 可选（2026-10-15）
+
+**目标**：落实用户已批准的连接拓扑，保持 System 配置/路由、Agent 执行、Billing 资金、IAM 身份的原 owner；完整 Skills/MCP 目标不缩减。此节复用本仓唯一计划，不另建任务中心。
+
+**范围**：System 既有 model-catalog 及其 canonical SQL/运行时 Zod/生成器；Agent 在自身文档和固定消费者中承接。Root 串行集成，所有远端 CI/推送/PR/merge 按用户要求暂缓。
+
+- [x] 核验当前 System `1460820`、Agent `84502e6`，确认 only-litellm 限制贯穿 schema/SQL/consumer，不是只改启动环境即可。
+- [x] 将已批准的 direct 默认/可选 LiteLLM 方向写入本仓三面设计，说明 provider 稳定连接、revision 快照及删除项；Agent 三面设计登记实际 usage planned 字段影响。
+- [x] 两owner设计候选独立审查通过：最小route/usage表示、历史读取表、旧attempt收束和回滚限制已明确；无剩余已证P1/P2设计阻断，不代表实现验收。
+- [x] 用户于 2026-10-16 明确确认关键连接不可变/版本切换方案：各服务独立地址/凭据引用、默认 direct/LiteLLM 可选、调用固定连接版本、历史记录不套新地址。配置与版本切换已获准；正式 Billing 许可前仍不发送模型请求。
+- [x] System 在现 schemas/SQL/service/repository/resolve/cache/digest 的最小闭集实施，先正式契约与失败反例，再业务实现；原生成器发布 breaking artifact，保 83 业务操作/2 probes，不新增网关服务。
+- [x] 主仓执行 System 本 owner 完整门及隔离 fresh schema/真实 HTTP/cache/并发发布；正式 source commit/artifact/version/digest 固定后才交消费者。
+- [ ] Agent 正式 pin、新连接/凭据装配及协议适配器；按先行冻结的usage2/HTTP6历史读取表正规发布唯一active canonical artifact和下游reader，v1仅冻结历史读取，不扩大重构其余usage语义。
+- [ ] 本地启动器只装配正式连接；分别验证 direct 与实际可选 LiteLLM，涵盖同 path 多地址/账户、缺凭据、取消、错误、stream 和硬限，禁止自动拓扑 fallback。
+- [ ] 版本验收覆盖 repository 先验证 frozen attempt 再解析 evidence、sealed attempt 终态维护的整条历史校验链；planned/evidence/HTTP envelope 版本错配、未知版本、v1原字节读取、旧attempt未收束、v2首写后旧部署回滚必须有明确反例。
+- [ ] Billing 授权/真实使用记录完整后，执行正式收费模型旅程；此前 native 零 provider 门保留，不造测试 grant 或免费状态。
+
+**当前状态**：System4候选源码和本owner资源门已通过，非正常部署完成。Node24.20.0/pnpm12.3.4执行完整pnpm verify退出0：format/lint/type/build、83业务＋2probe正规契约/20来源/contract19 PASS、完整16files212 PASS/0 SKIP及隔离fresh33 assertions/22表完整catalog。新增3schema/3真实HTTP-PG-cache/1脱敏恢复回归，仅扩既有文件、无新测试suite或依赖。已有锁/CAS/幂等/并发/取消/cache负控随全门保留。独审P2：维护合法清引用后restore误503，经真实RED后persistence-only tombstone投影修为409/INVALID_STATE/不推进generation或receipt，原CAS与DB恢复窗口未变；其余无新增确定P0/P1。
+
+正式4.0.0/artifact与provenance原字节只由两generator产生，完整83/2 inventory不变；source commit以本次提交与Root交付记录固定，不手填未知SHA。正常System/Agent/BFF/Admin未切新source或schema，未改登录/凭据/应用数据/积分或模型发送；Agent/BFF/Admin消费接线、原有数据明确处置和正常切换仍按下列未勾项推进，未把技术快照当资金许可。第一次完整check有4个测试字符串冗余转义lint错误、后purge回归出现typedPG行缺泛型lint，均已修并重新完整verify，未删除风险或改门禁。测试oracle首轮uuid/text参数推断及测试启动URL名错误修正后才取得真实503 RED；不把oracle失败当产品复现。
+
+---
+
 # System 完整交付唯一实施计划
 
 当前：完整System源码、消费者HTTP、NestJS工程边界与tag镜像发布均已验收。R8提交 `7252d50c67338842978961244e86a884daa87f5b`、tag `v0.1.2`；GitHub release run `34222465469`与常规CI run `34222465488`成功，GHCR digest `sha256:8fe6e701451f461b02b84c6520d76f49ad872c8f11d6ae3a8c5b80532797eb37`。private仓GitHub attestation按平台能力跳过，不冒称已签。完整五模块83业务操作，非仅Site交付。

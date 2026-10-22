@@ -293,7 +293,7 @@ describe("R39 owner namespace production boundaries", () => {
               [owner],
             )
           ).rows[0],
-        ).toEqual({ count: 22 });
+        ).toEqual({ count: 23 });
         const repeated = await runOwnerInstaller(databaseUrl);
         expect(repeated.signal).toBeNull();
         expect(repeated.code).not.toBe(0);
@@ -408,7 +408,7 @@ describe("R40 owner catalog semantic drift", () => {
       "DROP TRIGGER trg_model_revision_immutable_guard ON model_revision; CREATE TRIGGER trg_model_revision_immutable_guard BEFORE UPDATE ON model_revision FOR EACH ROW EXECUTE FUNCTION model_revision_immutable_guard()",
     ],
   ])(
-    "detects %s drift even with the same 22 owner tables",
+    "detects %s drift even with the same 23 owner tables",
     async (_name, mutation) => {
       await withOwnerNamespaceDatabase(
         async (db, _databaseUrl, owner, neighbor) => {
@@ -434,7 +434,7 @@ describe("R40 owner catalog semantic drift", () => {
                   [owner],
                 )
               ).rows[0],
-            ).toEqual({ count: 22 });
+            ).toEqual({ count: 23 });
             expect(await snapshotSystemSchemaCatalog(db, owner)).not.toEqual(
               expected,
             );

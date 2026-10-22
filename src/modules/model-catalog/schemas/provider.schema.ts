@@ -1,18 +1,28 @@
 import { z } from "zod";
+import { connectionSchema } from "./connection.schema.js";
 
-export const providerInputSchema = z.strictObject({
+const providerContentSchema = connectionSchema.extend({
   provider: z.string().min(1).max(128),
   provider_key: z.string().min(1).max(128),
   display_name: z.string().min(1).max(160),
-  secret_handle_ref: z.string().min(1).max(255),
-  transport: z.literal("litellm"),
   priority: z.int().min(0).max(100000),
 });
-export const providerUpdateSchema = providerInputSchema
-  .omit({ provider: true, provider_key: true, transport: true })
+export const modelApiKeySchema = z
+  .string()
+  .min(1)
+  .max(4096)
+  .regex(/^[\x21-\x7e]+$/u);
+export const providerInputSchema = providerContentSchema
+  .omit({ secret_handle_ref: true })
+  .extend({
+    api_key: modelApiKeySchema.meta({ writeOnly: true }),
+    connection_type: connectionSchema.shape.connection_type.default("direct"),
+  });
+export const providerUpdateSchema = providerContentSchema
+  .pick({ display_name: true, priority: true })
   .partial()
   .refine((v) => Object.keys(v).length > 0, "empty patch");
-export const providerSchema = providerInputSchema.extend({
+export const providerSchema = providerContentSchema.extend({
   id: z.uuid(),
   version: z.string().regex(/^[1-9][0-9]*$/u),
   created_at: z.iso.datetime(),
