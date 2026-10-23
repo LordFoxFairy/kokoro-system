@@ -23,4 +23,18 @@ export class HealthRepository {
     );
     return decodeRow(healthSchema, result.rows[0]!);
   }
+  // Caller holds provider then health locks. The observation time is captured
+  // when the network result completes, never refreshed after a long lock wait.
+  public async refresh(
+    tx: TransactionContext,
+    id: string,
+    observedAt: string,
+    maxAge: number,
+  ) {
+    const result = await tx.query(
+      `INSERT INTO model_provider_health_state(provider_id,status,observed_at) SELECT $1,'healthy',$2::timestamptz WHERE $2::timestamptz>clock_timestamp()-($3::bigint*INTERVAL '1 millisecond') AND $2::timestamptz<=clock_timestamp()+INTERVAL '5 seconds' ON CONFLICT(provider_id) DO UPDATE SET status='healthy',observed_at=EXCLUDED.observed_at,generation=model_provider_health_state.generation+1,updated_at=CURRENT_TIMESTAMP(3) WHERE model_provider_health_state.observed_at<=clock_timestamp()-($3::bigint*INTERVAL '1 millisecond') RETURNING ${columns}`,
+      [id, observedAt, maxAge],
+    );
+    return result.rowCount === 1;
+  }
 }
