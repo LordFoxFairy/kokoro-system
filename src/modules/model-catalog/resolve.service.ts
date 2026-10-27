@@ -1,3 +1,5 @@
+import { ProviderModelDiscoveryService } from "./provider-model-discovery.service.js";
+import { requestBudget } from "../../http/request-budget.js";
 import { Inject, Injectable } from "@nestjs/common";
 import type { z } from "zod";
 import type { RequestContext } from "../../access/request-context.js";
@@ -21,6 +23,8 @@ export class ResolveService {
     @Inject(ModelGenerationRepository)
     private readonly generation: ModelGenerationRepository,
     @Inject(ResolveRepository) private readonly resolver: ResolveRepository,
+    @Inject(ProviderModelDiscoveryService)
+    private readonly discovery: ProviderModelDiscoveryService,
   ) {}
   private generations(tenant: string) {
     return this.database.read((tx) => this.generation.read(tx, tenant));
@@ -32,9 +36,13 @@ export class ResolveService {
     if (context.service !== "kokoro-agent")
       throw new SystemError("FORBIDDEN", "Agent caller required");
     const tenant = tenantScope(context);
+    const probeDeadline = Math.min(
+      requestBudget()?.deadline ?? Infinity,
+      Date.now() + 10000,
+    );
     for (let attempt = 0; attempt < 3; attempt++) {
       const before = await this.generations(tenant),
-        key = `model-resolve:v5:${commandDigest({ tenant, feature: input.feature_key, label: input.label_key ?? null, allow_loopback_http: this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL, ...before })}`;
+        key = `model-resolve:v6:${commandDigest({ tenant, feature: input.feature_key, label: input.label_key ?? null, allow_loopback_http: this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL, ...before })}`;
       const cached = await this.cache.get(key);
       if (cached !== null) {
         const parsed = resolveCacheSchema.safeParse(JSON.parse(cached));
@@ -141,7 +149,17 @@ export class ResolveService {
                 this.config.values.KOKORO_SYSTEM_MODEL_HEALTH_MAX_AGE_MS,
                 this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL,
               );
-        if (!candidate)
+        if (!candidate) {
+          const target =
+            policy.revision_id === null
+              ? null
+              : await this.resolver.probeTarget(
+                  tx,
+                  policy.revision_id,
+                  this.config.values.KOKORO_SYSTEM_MODEL_HEALTH_MAX_AGE_MS,
+                  this.config.values.KOKORO_SYSTEM_ALLOW_LOOPBACK_MODEL_URL,
+                );
+          if (target) return { kind: "probe" as const, ...target };
           return {
             kind: "error" as const,
             key,
@@ -149,6 +167,7 @@ export class ResolveService {
             expires_at: Date.now() + 30000,
             ...before,
           };
+        }
         const { health_valid_until, ...route } = candidate;
         return {
           kind: "route" as const,
@@ -169,6 +188,37 @@ export class ResolveService {
         commandDigest(before) !== commandDigest(await this.generations(tenant))
       )
         continue;
+      if (value.kind === "probe") {
+        try {
+          await this.discovery.probe(
+            value.provider_id,
+            value.health_generation,
+            probeDeadline,
+          );
+        } catch (error) {
+          // A failed connection observation does not change the existing
+          // resolve-domain error or disclose provider lifecycle details.
+          if (
+            error instanceof SystemError &&
+            ["MODEL_UNAVAILABLE", "POLICY_DENIED", "NOT_FOUND"].includes(
+              error.code,
+            )
+          )
+            throw new SystemError(
+              "MODEL_UNAVAILABLE",
+              "Model route unavailable",
+              true,
+            );
+          throw error;
+        }
+        continue;
+      }
+      if (value.kind === "error" && value.code === "MODEL_UNAVAILABLE")
+        throw new SystemError(
+          "MODEL_UNAVAILABLE",
+          "Model route unavailable",
+          true,
+        );
       await this.cache.set(
         key,
         JSON.stringify({ ...value, checksum: commandDigest(value) }),
@@ -187,11 +237,7 @@ export class ResolveService {
         }
         return value.data;
       }
-      throw new SystemError(
-        value.code,
-        "Model route unavailable",
-        value.code === "MODEL_UNAVAILABLE",
-      );
+      throw new SystemError(value.code, "Model route unavailable", false);
     }
     throw new SystemError(
       "SYSTEM_UNAVAILABLE",

@@ -1,3 +1,15 @@
+## MODEL-1 解析时按需刷新连接健康（2026-10-23）
+
+正常目录与业务路由已发布，但唯一健康投影过期后没有生产者，导致永久 MODEL_UNAVAILABLE。沿既有 model-catalog 修复，不移除 freshness 门、不延长 TTL、不伪造 healthy；不新增服务、Schema、wire、定时器或模型请求。
+
+Resolve 仅对已授权、可见、有效发布且密文／连接／限额均有效的精确目标，在健康缺失或过期时探测。fresh unknown/down/degraded 与异常未来观察继续拒绝。复用 ProviderModelDiscoveryService 的同 provider 排他／总8槽、有界 DNS／HTTPS GET models、安全地址与取消边界；公开 upstream-models GET 仍只读。三次 generation 重读共享一次10秒探测截止，探测失败不重试、不调用推理。
+
+网络在事务外；完成后短事务锁 provider，再核原连接／handle／密文快照，再锁健康并比较探测前 generation（含缺失）。仅未变化且仍过期时记录本次真实连通观察并同事务推进原 global generation。并发删除／擦除／管理员新观察／凭据漂移／已知取消均不写健康。提交后的取消不宣称能撤回已提交观察。随后回到原 resolve 重读／租户与全局 fence，不直接拿探测结果拼路由。GET models 只证明该凭据的控制面连通，不保证推理或实际计费用量。
+
+缓存改 namespace v6；MODEL_UNAVAILABLE 不负缓存，防止30秒旧错误阻断过期后的探测；成功路由 TTL 仍不晚于健康期限，其余原错误及 generation fence 保持。凭据领取仍按精确路由及新鲜健康校验，不新增明文出口。
+
+写区限原 resolve repository/service、discovery service、health repository 及其已有测试／文档。验收先真实 HTTP/PG RED，再缺失／过期恢复、fresh down零发送、隐藏／未发布零发送、管理员并发down／删除／密文变化／取消与缓存fence、原公开GET零写；最后本仓完整verify。正常服务在验收前保持。
+
 ## MODEL-1 提供方上游模型发现（2026-10-22，实施设计）
 
 沿已批准的共享提供方→共享模型修订→业务组合设计，在现 model-catalog 内增加显式候选读取；不新增服务、Schema、缓存或自动同步后台任务。当前“刷新目录”只重读本地事实，不代表读取上游。

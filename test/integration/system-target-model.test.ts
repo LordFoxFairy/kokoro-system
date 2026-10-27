@@ -1159,7 +1159,7 @@ describe("real Nest Model catalog", () => {
     expect(first.response.status).toBe(200);
     const generation = String(first.json.data?.generation);
     const tenantGeneration = String(first.json.data?.tenant_generation);
-    const key = `model-resolve:v5:${commandDigest({
+    const key = `model-resolve:v6:${commandDigest({
       tenant: "tenant-a",
       allow_loopback_http: false,
       feature,

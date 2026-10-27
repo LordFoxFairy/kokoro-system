@@ -1,6 +1,10 @@
+import { HealthRepository } from "./health.repository.js";
+import { ProviderRepository } from "./provider.repository.js";
+import { ModelGenerationRepository } from "./model-generation.repository.js";
 import { Inject, Injectable } from "@nestjs/common";
 import { DatabaseService } from "../../database/database.service.js";
 import { SystemConfig } from "../../config/system-config.js";
+import type { TransactionContext } from "../../database/transaction-context.js";
 import { requestBudget, withRequestBudget } from "../../http/request-budget.js";
 import { SystemError } from "../../system.error.js";
 import { ModelCredentialRepository } from "./model-credential.repository.js";
@@ -17,8 +21,27 @@ export class ProviderModelDiscoveryService {
     private readonly credentials: ModelCredentialRepository,
     @Inject(ModelCredentialCrypto)
     private readonly crypto: ModelCredentialCrypto,
+    @Inject(ProviderRepository) private readonly providers: ProviderRepository,
+    @Inject(HealthRepository) private readonly health: HealthRepository,
+    @Inject(ModelGenerationRepository)
+    private readonly generation: ModelGenerationRepository,
   ) {}
-  public async list(providerId: string) {
+  public list(providerId: string) {
+    return this.discover(providerId, undefined, Infinity);
+  }
+  // Owner-internal only. Public catalog discovery remains read-only.
+  public async probe(
+    providerId: string,
+    expectedHealthGeneration: string | null,
+    deadline: number,
+  ) {
+    await this.discover(providerId, expectedHealthGeneration, deadline);
+  }
+  private async discover(
+    providerId: string,
+    expectedHealthGeneration: string | null | undefined,
+    probeDeadline: number,
+  ) {
     if (this.active.size >= 8 || this.active.has(providerId))
       throw new SystemError(
         "MODEL_UNAVAILABLE",
@@ -28,7 +51,11 @@ export class ProviderModelDiscoveryService {
     const parent = requestBudget();
     const controller = new AbortController();
     const cancel = () => controller.abort();
-    const deadline = Math.min(parent?.deadline ?? Infinity, Date.now() + 10000);
+    const deadline = Math.min(
+      parent?.deadline ?? Infinity,
+      probeDeadline,
+      Date.now() + 10000,
+    );
     const timeout = setTimeout(cancel, Math.max(0, deadline - Date.now()));
     timeout.unref();
     parent?.signal.addEventListener("abort", cancel, { once: true });
@@ -62,17 +89,51 @@ export class ProviderModelDiscoveryService {
             controller.signal,
             this.config.values.KOKORO_SYSTEM_MODEL_DISCOVERY_PRIVATE_HOSTS,
           );
-          const current = await this.database.read((tx) =>
-            this.credentials.discoveryCredential(tx, providerId),
-          );
-          if (!current)
-            throw new SystemError("NOT_FOUND", "Provider not found");
-          if (controller.signal.aborted)
-            throw new SystemError(
-              "MODEL_UNAVAILABLE",
-              "Provider discovery cancelled",
-              true,
+          const observedAt = new Date().toISOString();
+          const check = async (tx: TransactionContext) => {
+            if (expectedHealthGeneration !== undefined)
+              await this.providers.find(tx, providerId, false, true);
+            const current = await this.credentials.discoveryCredential(
+              tx,
+              providerId,
             );
+            if (!current)
+              throw new SystemError("NOT_FOUND", "Provider not found");
+            if (controller.signal.aborted)
+              throw new SystemError(
+                "MODEL_UNAVAILABLE",
+                "Provider discovery cancelled",
+                true,
+              );
+            if (expectedHealthGeneration === undefined) return;
+            if (
+              current.base_url !== snapshot.base_url ||
+              current.secret_handle_ref !== snapshot.secret_handle_ref ||
+              !current.nonce.equals(snapshot.nonce) ||
+              !current.auth_tag.equals(snapshot.auth_tag) ||
+              !current.ciphertext.equals(snapshot.ciphertext)
+            )
+              throw new SystemError(
+                "MODEL_UNAVAILABLE",
+                "Provider connection changed during probe",
+                true,
+              );
+            const prior = await this.health.find(tx, providerId);
+            if ((prior?.generation ?? null) !== expectedHealthGeneration)
+              return;
+            if (
+              await this.health.refresh(
+                tx,
+                providerId,
+                observedAt,
+                this.config.values.KOKORO_SYSTEM_MODEL_HEALTH_MAX_AGE_MS,
+              )
+            )
+              await this.generation.advance(tx);
+          };
+          if (expectedHealthGeneration === undefined)
+            await this.database.read(check);
+          else await this.database.transaction(check);
           return providerModelDiscoverySchema.parse({
             provider_id: providerId,
             items,

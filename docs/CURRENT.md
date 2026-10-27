@@ -1,3 +1,9 @@
+## MODEL-1 正常路由健康自恢复候选（2026-10-23）
+
+正常配置合法，但健康过期后无生产者导致永久不可用，已沿原Resolve/Discovery/Health修复；无新表／服务／wire，不延长TTL或伪造healthy。仅合法stale目标复用原8槽GET models，网络外provider→health快照／generation CAS与原global fence；fresh down保持，旧探测不覆盖并发管理员观察，公开发现GET零写。正常切换及实际调用／积分结算尚待。
+
+真实HTTP/PG首RED503→200保留；定向3文件37 PASS，最终完整 `pnpm verify` 退出0：format/lint/type/build/contract、24文件263 PASS／0SKIP，fresh33断言／23表完整canonical。独立只读审查Approved。初次fixture尝试退休已被正常RESOURCE_IN_USE拒绝，改为明确的stale/corrupt lower-layer负例；旧错误映射3FAIL经resolve领域错误归一化修复，不放宽断言；首次5个lint错误与Docs空行失败保留。原始196输入快照后只有两个测试的lint修正，生产输入及契约原件均保持；最终交付输入另存私有收据。
+
 ## 2026-10-22 提供方模型发现候选（System6.1）
 
 新增显式管理读取 `GET /v1/system/model-catalog/providers/{provider_id}/upstream-models`，使用已有加密Key返回候选ID，不要求先创建业务路由，不回传Key／原始上游正文，不发布或修改模型／价格／健康。原System6.0的87个operation及66个既有schema逐项保持；BFF/Admin仍待固定新发布物接线。

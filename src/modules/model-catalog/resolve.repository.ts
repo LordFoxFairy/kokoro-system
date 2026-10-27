@@ -45,4 +45,21 @@ export class ResolveRepository {
     );
     return result.rows[0] ?? null;
   }
+  // Health is the only missing eligibility fact. Do not probe arbitrary providers
+  // or turn an unbound/draft/retired/erased route into an executable selection.
+  public async probeTarget(
+    tx: TransactionContext,
+    pinned: string,
+    maxAge: number,
+    allowLoopbackHttp: boolean,
+  ) {
+    const result = await tx.query<{
+      provider_id: string;
+      health_generation: string | null;
+    }>(
+      "SELECT p.id AS provider_id,h.generation::text AS health_generation FROM model_revision r JOIN model_definition m ON m.id=r.model_id JOIN model_provider p ON p.id=r.provider_id JOIN model_provider_credential c ON c.provider_id=p.id AND c.secret_handle_ref=p.secret_handle_ref AND c.secret_handle_ref=r.connection_secret_handle_ref LEFT JOIN model_provider_health_state h ON h.provider_id=p.id WHERE r.id=$1 AND r.published_at IS NOT NULL AND r.retired_at IS NULL AND m.deleted_at IS NULL AND p.deleted_at IS NULL AND c.erased_at IS NULL AND r.context_window IS NOT NULL AND r.max_output_tokens IS NOT NULL AND r.max_output_tokens<=r.context_window AND ($3::boolean OR r.connection_base_url LIKE 'https://%') AND p.secret_handle_ref<>'' AND (h.provider_id IS NULL OR h.observed_at<=clock_timestamp()-($2::bigint*INTERVAL '1 millisecond'))",
+      [pinned, maxAge, allowLoopbackHttp],
+    );
+    return result.rows[0] ?? null;
+  }
 }

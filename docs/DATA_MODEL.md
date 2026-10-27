@@ -1,3 +1,7 @@
+## MODEL-1 健康观察按需刷新（2026-10-23）
+
+无 canonical SQL／迁移或新增持久事实。仅在现 model_provider_health_state 记录真实 GET models 连通观察；provider→health 锁序、原 generation CAS 与全局 model_cache_generation 同事务。探测前后核同一未删除且未擦除的密文快照，网络不在事务内；旧探测不覆盖任何新健康 generation，包括并发down。观察缺失的并发创建由原provider锁串行；无新幂等回执或任务表。控制面健康不成为推理成功／actual attribution／价格事实；这些仍由 Agent／Billing 各自负责。
+
 ## MODEL-1 上游模型发现（2026-10-22）
 
 不加表／列／迁移。 非公网提供方主机许可仅为受控部署配置，非provider业务字段或自动推断事实。provider候选是外部瞬时读取，非持久模型目录事实；现model_provider与model_provider_credential同owner JOIN读取未删除、未擦除且handle一致的连接，原密文及创建审计不变。候选读取不推进目录generation、不写健康或价格；选中后按现模型定义／不可变revision／label／tenant routing归属写入。删除与外发不是跨系统事务，结果返回前重核有效provider，错误不触发本地清空或自动建模。

@@ -1,3 +1,12 @@
+## MODEL-1 当前执行：正常解析健康自恢复（2026-10-23）
+
+沿 Root 唯一目标与原16项，主会话唯一writer；System基线8ca52fb，隔离候选，不改正常服务。设计门见三面文档首节，无Schema／wire变化。
+
+- [x] 现真实HTTP/PG测试先复现 missing/stale 健康永久不可用。
+- [x] 原discovery共享8槽／取消和安全地址；原resolve仅探测合法stale目标，provider→health精确CAS，原generation重读。
+- [x] 竞态／失败与原只读GET回归、完整owner verify（263 PASS／0SKIP＋fresh33／23表）及独立只读审查通过。
+- [ ] 正常配对与实际供应商／积分整链另记真实证据，不提前宣称闭环。
+
 ## MC-02 已批准实施：密钥底座与正式配置旅程（2026-10-20）
 
 主会话唯一 writer；隔离 worktree 从 b7fe78e 起步，原正常源码／进程不动。用户已批准 System 现模块方案；不重复等待相同裁决。

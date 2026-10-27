@@ -1,3 +1,9 @@
+## MODEL-1 解析健康自恢复（2026-10-23）
+
+现 POST /v1/system/model-catalog/resolve 仍仅 kokoro-agent、受信 tenant、feature_key／可选 label_key，响应和错误 schema 不变；无新端点、权限或费用字段。该解析操作可对唯一合法目标的缺失／过期健康执行一次有界 GET models 连通探测，并在原健康投影写入真实观察；不修改 provider／revision／label／route，不发推理或计费请求。fresh非healthy、无权限／目标无效及探测失败仍沿原错误拒绝；不自动换模型。MODEL_UNAVAILABLE 不负缓存。
+
+管理 GET upstream-models 仍无任何本地写，保存／发布配置也不探测。Agent-only credentials/read 保持原严格绑定、新鲜健康和 no-store；普通目录仍不承诺即刻可执行。wire原件不变，不以文档补造机器字段。
+
 ## MODEL-1 上游模型候选读取（2026-10-22，实施设计）
 
 新增 `GET /v1/system/model-catalog/providers/{provider_id}/upstream-models`，operation `listModelProviderUpstreamModels`，global `system:write`，仅 `model-management`／`system-admin`。无body/query、无CAS／幂等回执；成功沿标准envelope，data只含`provider_id`和`items:[{id}]`，运行时字段约束唯一来源为后继Zod schema，不在此复制机器定义。所有结果no-store，浏览器不得直接访问owner。
