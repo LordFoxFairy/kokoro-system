@@ -1,3 +1,6 @@
+import type { ModelGenerationRepository } from "../../src/modules/model-catalog/model-generation.repository.js";
+import type { HealthRepository } from "../../src/modules/model-catalog/health.repository.js";
+import type { ProviderRepository } from "../../src/modules/model-catalog/provider.repository.js";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import dns from "node:dns/promises";
@@ -88,6 +91,21 @@ async function setup(
       config,
       credentials,
       crypto,
+      {
+        find: () => {
+          throw Error("List must not lock provider");
+        },
+      } as unknown as ProviderRepository,
+      {
+        find: () => {
+          throw Error("List must not touch health");
+        },
+      } as unknown as HealthRepository,
+      {
+        advance: () => {
+          throw Error("List must not advance generation");
+        },
+      } as unknown as ModelGenerationRepository,
     ),
     budgets,
     sends: () => sends,
